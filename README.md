@@ -29,6 +29,9 @@ React + TypeScript app for Spanish syntax practice with drag-and-drop annotation
    ```bash
    copy .env.example .env
    ```
+4. Functions base URLs are mode-based:
+   - `.env.development` uses local emulator URL
+   - `.env.production` uses deployed Functions URL
 4. Set Functions secret for Gemini:
    ```bash
    firebase functions:secrets:set GEMINI_API_KEY
