@@ -1,0 +1,35 @@
+rules_version = '2';
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function isSignedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(uid) {
+      return isSignedIn() && request.auth.uid == uid;
+    }
+
+    match /errors/{errorId} {
+      allow create: if isSignedIn()
+        && request.resource.data.uid == request.auth.uid
+        && request.resource.data.sentenceType in ['simple', 'compuesta']
+        && request.resource.data.difficulty in [1, 2, 3]
+        && request.resource.data.category in ['pos', 'function', 'grouping', 'sentenceType', 'punctuation']
+        && request.resource.data.severity in ['minor', 'major']
+        && request.resource.data.spanStart is int
+        && request.resource.data.spanEnd is int
+        && request.resource.data.spanStart <= request.resource.data.spanEnd
+        && request.resource.data.error_code is string
+        && request.resource.data.createdAt == request.time;
+
+      allow read: if isSignedIn() && resource.data.uid == request.auth.uid;
+      allow update, delete: if false;
+    }
+
+    match /users/{uid}/analytics/summary {
+      allow read: if isOwner(uid);
+      allow write: if false;
+    }
+  }
+}
