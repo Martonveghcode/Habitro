@@ -6,7 +6,7 @@ import App from "./App";
 const rootElement = document.getElementById("root");
 
 if (!rootElement) {
-  throw new Error("Root element not found");
+  throw new Error("No se encontro el elemento root");
 }
 
 createRoot(rootElement).render(

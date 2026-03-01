@@ -5,9 +5,26 @@ interface AnalyticsPanelProps {
   recentErrors: Array<ErrorDocument & { id: string }>;
 }
 
+const categoryLabel: Record<ErrorDocument["category"], string> = {
+  pos: "Categoria gramatical",
+  function: "Funcion",
+  grouping: "Agrupacion",
+  sentenceType: "Tipo de oracion",
+  punctuation: "Puntuacion",
+};
+
 export function AnalyticsPanel({ summary, recentErrors }: AnalyticsPanelProps) {
+  const errorsByCode = summary?.errorsByCode ?? {};
+  const errorsByCategory = summary?.errorsByCategory ?? {
+    pos: 0,
+    function: 0,
+    grouping: 0,
+    sentenceType: 0,
+    punctuation: 0,
+  };
+
   const topCodes = summary
-    ? Object.entries(summary.errorsByCode)
+    ? Object.entries(errorsByCode)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 5)
     : [];
@@ -33,11 +50,11 @@ export function AnalyticsPanel({ summary, recentErrors }: AnalyticsPanelProps) {
             </article>
             <article>
               <span>Funcion</span>
-              <strong>{summary.errorsByCategory.function}</strong>
+              <strong>{errorsByCategory.function}</strong>
             </article>
             <article>
-              <span>Grouping</span>
-              <strong>{summary.errorsByCategory.grouping}</strong>
+              <span>Agrupacion</span>
+              <strong>{errorsByCategory.grouping}</strong>
             </article>
           </div>
 
@@ -66,7 +83,8 @@ export function AnalyticsPanel({ summary, recentErrors }: AnalyticsPanelProps) {
           <ul>
             {recentErrors.map((error) => (
               <li key={error.id}>
-                {error.error_code} [{error.category}] d{error.difficulty} span {error.spanStart}-{error.spanEnd}
+                {error.error_code} [{categoryLabel[error.category]}] d{error.difficulty} tramo {error.spanStart}-
+                {error.spanEnd}
               </li>
             ))}
           </ul>

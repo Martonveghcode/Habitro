@@ -1,10 +1,6 @@
-import {
-  DndContext,
-  type DragEndEvent,
-  useDraggable,
-  useDroppable,
-} from "@dnd-kit/core";
+import { DndContext, type DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
+import { useMemo } from "react";
 
 import { TRACK_IDS, usePracticeStore } from "../store/usePracticeStore";
 
@@ -67,16 +63,21 @@ function TrackLane({ laneId }: { laneId: string }) {
   const { setNodeRef, isOver } = useDroppable({
     id: laneId,
   });
-  const annotations = usePracticeStore((state) =>
-    state.annotations.filter((annotation) => annotation.laneId === laneId).map((item) => item.id),
+
+  const allAnnotations = usePracticeStore((state) => state.annotations);
+  const annotationIds = useMemo(
+    () => allAnnotations.filter((annotation) => annotation.laneId === laneId).map((item) => item.id),
+    [allAnnotations, laneId],
   );
+
+  const laneLabel = laneId.startsWith("lane-") ? `Capa ${laneId.replace("lane-", "")}` : laneId;
 
   return (
     <div ref={setNodeRef} className={isOver ? "track-lane over" : "track-lane"}>
-      <div className="track-title">{laneId.toUpperCase()}</div>
+      <div className="track-title">{laneLabel}</div>
       <div className="track-items">
-        {annotations.length === 0 ? <span className="muted">Arrastra aqui</span> : null}
-        {annotations.map((annotationId) => (
+        {annotationIds.length === 0 ? <span className="muted">Arrastra aqui</span> : null}
+        {annotationIds.map((annotationId) => (
           <AnnotationCard key={annotationId} annotationId={annotationId} />
         ))}
       </div>
@@ -115,7 +116,7 @@ export function AnnotationCanvas() {
   return (
     <section className="panel annotation-panel">
       <header className="panel-header">
-        <h2>Capas de anotacion (drag-and-drop)</h2>
+        <h2>Capas de anotacion (arrastrar y soltar)</h2>
       </header>
 
       <div className="annotation-draft">
@@ -124,17 +125,17 @@ export function AnnotationCanvas() {
           <input
             value={draft.label}
             onChange={(event) => setDraft({ label: event.target.value })}
-            placeholder="Ej: CD, CI, Término, Sujeto..."
+            placeholder="Ej: CD, CI, Termino, Sujeto..."
           />
         </label>
 
         <label className="field">
           <span>Tipo</span>
           <select value={draft.kind} onChange={(event) => setDraft({ kind: event.target.value as typeof draft.kind })}>
-            <option value="wordFunction">Word function</option>
-            <option value="groupFunction">Group function</option>
-            <option value="clause">Clause</option>
-            <option value="sentenceType">Sentence type</option>
+            <option value="wordFunction">Funcion de palabra</option>
+            <option value="groupFunction">Funcion de grupo</option>
+            <option value="clause">Proposicion</option>
+            <option value="sentenceType">Tipo de oracion</option>
           </select>
         </label>
 

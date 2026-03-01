@@ -34,3 +34,9 @@ export interface UserAnalyticsSummary {
   };
   last30dCount: number;
 }
+
+export interface PracticePreferences {
+  updatedAt: Timestamp;
+  customFocusTopics: string[];
+  selectedFocusTopics: string[];
+}

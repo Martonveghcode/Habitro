@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 
 import { usePracticeStore } from "../store/usePracticeStore";
 
@@ -25,6 +25,9 @@ export function SentenceWorkspace() {
   const sentenceTypeBuild = usePracticeStore((state) => state.sentenceTypeBuild);
   const setSentenceTypeTags = usePracticeStore((state) => state.setSentenceTypeTags);
   const [sentenceTypeInput, setSentenceTypeInput] = useState("");
+  const selectionAnchorRef = useRef<number | null>(null);
+  const isPointerSelectingRef = useRef(false);
+  const didDragSelectRef = useRef(false);
 
   const posByToken = useMemo(() => {
     const map = new Map<number, string>();
@@ -33,15 +36,73 @@ export function SentenceWorkspace() {
   }, [tokenPosAssignments]);
 
   const handleTokenClick = (tokenIndex: number, withExtend: boolean) => {
-    if (!selectedSpan || !withExtend) {
+    if (!selectedSpan) {
       setSelectedSpan({ start: tokenIndex, end: tokenIndex });
       return;
     }
+
+    if (withExtend) {
+      setSelectedSpan({
+        start: Math.min(selectedSpan.start, tokenIndex),
+        end: Math.max(selectedSpan.start, tokenIndex),
+      });
+      return;
+    }
+
+    if (selectedSpan.start === selectedSpan.end && tokenIndex !== selectedSpan.start) {
+      setSelectedSpan({
+        start: Math.min(selectedSpan.start, tokenIndex),
+        end: Math.max(selectedSpan.start, tokenIndex),
+      });
+      return;
+    }
+
+    if (tokenIndex < selectedSpan.start) {
+      setSelectedSpan({ start: tokenIndex, end: selectedSpan.end });
+      return;
+    }
+
+    if (tokenIndex > selectedSpan.end) {
+      setSelectedSpan({ start: selectedSpan.start, end: tokenIndex });
+      return;
+    }
+
+    setSelectedSpan({ start: tokenIndex, end: tokenIndex });
+  };
+
+  const handleTokenMouseDown = (tokenIndex: number, withExtend: boolean) => {
+    if (withExtend) {
+      handleTokenClick(tokenIndex, true);
+      return;
+    }
+    selectionAnchorRef.current = tokenIndex;
+    isPointerSelectingRef.current = true;
+    didDragSelectRef.current = false;
+  };
+
+  const handleTokenMouseEnter = (tokenIndex: number) => {
+    if (!isPointerSelectingRef.current || selectionAnchorRef.current === null) {
+      return;
+    }
+    if (selectionAnchorRef.current === tokenIndex) {
+      return;
+    }
+    didDragSelectRef.current = true;
     setSelectedSpan({
-      start: Math.min(selectedSpan.start, tokenIndex),
-      end: Math.max(selectedSpan.start, tokenIndex),
+      start: Math.min(selectionAnchorRef.current, tokenIndex),
+      end: Math.max(selectionAnchorRef.current, tokenIndex),
     });
   };
+
+  const stopPointerSelection = () => {
+    isPointerSelectingRef.current = false;
+    selectionAnchorRef.current = null;
+  };
+
+  useEffect(() => {
+    window.addEventListener("mouseup", stopPointerSelection);
+    return () => window.removeEventListener("mouseup", stopPointerSelection);
+  }, []);
 
   const addSentenceTypeTag = () => {
     const cleaned = sentenceTypeInput.trim();
@@ -82,13 +143,31 @@ export function SentenceWorkspace() {
               key={`${token.text}_${token.index}`}
               type="button"
               className={isSelected ? "token-chip selected" : "token-chip"}
-              onClick={(event) => handleTokenClick(token.index, event.shiftKey)}
+              onMouseDown={(event) => {
+                if (event.button !== 0) {
+                  return;
+                }
+                event.preventDefault();
+                handleTokenMouseDown(token.index, event.shiftKey);
+              }}
+              onMouseEnter={() => handleTokenMouseEnter(token.index)}
+              onMouseUp={stopPointerSelection}
+              onClick={(event) => {
+                if (didDragSelectRef.current) {
+                  didDragSelectRef.current = false;
+                  return;
+                }
+                handleTokenClick(token.index, event.shiftKey);
+              }}
             >
               {token.text}
             </button>
           );
         })}
       </div>
+      <p className="muted">
+        Seleccion de tramo: haz clic en una palabra y luego en la palabra final (o usa Shift + clic).
+      </p>
 
       {settings.showPosRow ? (
         <div className="pos-grid">
@@ -100,7 +179,7 @@ export function SentenceWorkspace() {
                 value={posByToken.get(token.index) ?? ""}
                 onChange={(event) => setTokenPos(token.index, event.target.value)}
                 disabled={token.isPunctuation}
-                placeholder={token.isPunctuation ? "punct" : "POS"}
+                placeholder={token.isPunctuation ? "signo" : "categoria"}
               />
             </label>
           ))}

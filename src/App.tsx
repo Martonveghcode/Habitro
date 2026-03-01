@@ -6,21 +6,49 @@ import { AnalyticsPanel } from "./components/AnalyticsPanel";
 import { AnnotationCanvas } from "./components/AnnotationCanvas";
 import { AuthGate } from "./components/AuthGate";
 import { ControlsPanel } from "./components/ControlsPanel";
+import { ErrorBoundary } from "./components/ErrorBoundary";
 import { FeedbackPanel } from "./components/FeedbackPanel";
 import { SentenceWorkspace } from "./components/SentenceWorkspace";
 import { generateSentence, gradeAttempt } from "./lib/api";
-import { getLastErrors, readAnalyticsSummary, saveErrors } from "./lib/firestore";
+import {
+  getLastErrors,
+  readAnalyticsSummary,
+  readPracticePreferences,
+  saveErrors,
+  savePracticePreferences,
+} from "./lib/firestore";
 import { toSentenceTokens, tokenizeFallback } from "./lib/tokenize";
 import { usePracticeStore } from "./store/usePracticeStore";
 import type { ErrorDocument, UserAnalyticsSummary } from "./types/firestore";
 import type { UserAnalysisPayload } from "./types/syntax";
 
+const normalizeTopics = (topics: string[]) => {
+  const seen = new Set<string>();
+  const normalized: string[] = [];
+  topics.forEach((topic) => {
+    const cleaned = topic.trim();
+    if (!cleaned) {
+      return;
+    }
+    const key = cleaned.toLowerCase();
+    if (seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    normalized.push(cleaned);
+  });
+  return normalized;
+};
+
 function PracticePage({ user }: { user: User }) {
   const settings = usePracticeStore((state) => state.settings);
+  const customFocusTopics = usePracticeStore((state) => state.customFocusTopics);
   const sentenceState = usePracticeStore((state) => state.sentenceState);
   const tokenPosAssignments = usePracticeStore((state) => state.tokenPosAssignments);
   const annotations = usePracticeStore((state) => state.annotations);
   const sentenceTypeBuild = usePracticeStore((state) => state.sentenceTypeBuild);
+  const setFocusTopics = usePracticeStore((state) => state.setFocusTopics);
+  const setCustomFocusTopics = usePracticeStore((state) => state.setCustomFocusTopics);
   const setSentenceData = usePracticeStore((state) => state.setSentenceData);
   const setGenerating = usePracticeStore((state) => state.setGenerating);
   const setGrading = usePracticeStore((state) => state.setGrading);
@@ -29,12 +57,13 @@ function PracticePage({ user }: { user: User }) {
   const errorMessage = usePracticeStore((state) => state.errorMessage);
   const [summary, setSummary] = useState<UserAnalyticsSummary | null>(null);
   const [recentErrors, setRecentErrors] = useState<Array<ErrorDocument & { id: string }>>([]);
+  const [preferencesLoaded, setPreferencesLoaded] = useState(false);
 
   const weaknessSummary = useMemo(() => {
     if (!summary || !settings.personalizedMode) {
       return undefined;
     }
-    const top = Object.entries(summary.errorsByCode)
+    const top = Object.entries(summary.errorsByCode ?? {})
       .sort((a, b) => b[1] - a[1])
       .slice(0, 3)
       .map(([code]) => code);
@@ -43,18 +72,67 @@ function PracticePage({ user }: { user: User }) {
       return undefined;
     }
 
-    return `Top weak error codes: ${top.join(", ")}`;
+    return `Codigos de error mas frecuentes: ${top.join(", ")}`;
   }, [settings.personalizedMode, summary]);
 
   const refreshAnalytics = async () => {
-    const [nextSummary, nextErrors] = await Promise.all([readAnalyticsSummary(user), getLastErrors(user, 20)]);
-    setSummary(nextSummary);
-    setRecentErrors(nextErrors);
+    try {
+      const [nextSummary, nextErrors] = await Promise.all([readAnalyticsSummary(user), getLastErrors(user, 20)]);
+      setSummary(nextSummary);
+      setRecentErrors(nextErrors);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo cargar la analitica.");
+    }
   };
 
   useEffect(() => {
     void refreshAnalytics();
-  }, []);
+  }, [user.uid]);
+
+  useEffect(() => {
+    let isCancelled = false;
+    setPreferencesLoaded(false);
+
+    const loadPreferences = async () => {
+      try {
+        const preferences = await readPracticePreferences(user);
+        if (isCancelled) {
+          return;
+        }
+        if (preferences) {
+          setCustomFocusTopics(normalizeTopics(preferences.customFocusTopics));
+          setFocusTopics(normalizeTopics(preferences.selectedFocusTopics));
+        }
+      } catch (error) {
+        if (!isCancelled) {
+          setErrorMessage(error instanceof Error ? error.message : "No se pudieron cargar las preferencias.");
+        }
+      } finally {
+        if (!isCancelled) {
+          setPreferencesLoaded(true);
+        }
+      }
+    };
+
+    void loadPreferences();
+
+    return () => {
+      isCancelled = true;
+    };
+  }, [user.uid]);
+
+  useEffect(() => {
+    if (!preferencesLoaded) {
+      return;
+    }
+
+    void savePracticePreferences(user, {
+      customFocusTopics: normalizeTopics(customFocusTopics),
+      selectedFocusTopics: normalizeTopics(settings.focusTopics),
+    }).catch((error) => {
+      setErrorMessage(error instanceof Error ? error.message : "No se pudieron guardar las preferencias.");
+    });
+  }, [customFocusTopics, preferencesLoaded, settings.focusTopics, user.uid]);
 
   const handleGenerateSentence = async () => {
     setGenerating(true);
@@ -166,5 +244,9 @@ function PracticePage({ user }: { user: User }) {
 }
 
 export default function App() {
-  return <AuthGate>{(user) => <PracticePage user={user} />}</AuthGate>;
+  return (
+    <ErrorBoundary>
+      <AuthGate>{(user) => <PracticePage user={user} />}</AuthGate>
+    </ErrorBoundary>
+  );
 }

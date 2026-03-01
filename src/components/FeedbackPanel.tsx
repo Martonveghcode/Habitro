@@ -1,10 +1,19 @@
 import ReactMarkdown from "react-markdown";
 
 import { usePracticeStore } from "../store/usePracticeStore";
+import type { ErrorCategory } from "../types/syntax";
 
 interface FeedbackPanelProps {
   onGrade: () => Promise<void>;
 }
+
+const categoryLabel: Record<ErrorCategory, string> = {
+  pos: "Categoria gramatical",
+  function: "Funcion",
+  grouping: "Agrupacion",
+  sentenceType: "Tipo de oracion",
+  punctuation: "Puntuacion",
+};
 
 export function FeedbackPanel({ onGrade }: FeedbackPanelProps) {
   const gradeResult = usePracticeStore((state) => state.gradeResult);
@@ -29,13 +38,19 @@ export function FeedbackPanel({ onGrade }: FeedbackPanelProps) {
           <div className="error-list">
             <h3>Errores detectados</h3>
             {gradeResult.errors.length === 0 ? (
-              <p className="success-text">Sin errores.</p>
+              <p className="success-text">Sin errores detectados.</p>
             ) : (
               <ul>
                 {gradeResult.errors.map((error, index) => (
                   <li key={`${error.error_code}_${index}`}>
-                    <strong>{error.error_code}</strong> [{error.category}] ({error.severity}) span{" "}
+                    <strong>{error.error_code}</strong> [{categoryLabel[error.category]}] ({error.severity}) tramo{" "}
                     {error.spanStart}-{error.spanEnd}
+                    {error.expected !== null || error.got !== null ? (
+                      <div className="muted">
+                        Esperado: {error.expected ?? "-"} | Tu analisis: {error.got ?? "-"}
+                      </div>
+                    ) : null}
+                    {error.explanation ? <div className="muted">{error.explanation}</div> : null}
                   </li>
                 ))}
               </ul>

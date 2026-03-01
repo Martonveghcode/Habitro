@@ -19,12 +19,17 @@ async function parseAndValidate<T>(text: string, schema: z.ZodSchema<T>): Promis
   return schema.parseAsync(parsed);
 }
 
-async function requestText(model: GenerativeModel, systemPrompt: string, userPrompt: string): Promise<string> {
+async function requestText(
+  model: GenerativeModel,
+  systemPrompt: string,
+  userPrompt: string,
+  temperature: number,
+): Promise<string> {
   const result = await model.generateContent({
     contents: [{ role: "user", parts: [{ text: userPrompt }] }],
     generationConfig: {
       responseMimeType: "application/json",
-      temperature: 0.4,
+      temperature,
     },
     systemInstruction: {
       role: "system",
@@ -35,16 +40,33 @@ async function requestText(model: GenerativeModel, systemPrompt: string, userPro
   return result.response.text();
 }
 
-export async function requestStrictJson<T>(input: {
-  apiKey: string;
+function isMissingModelError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return normalized.includes("404") && normalized.includes("model") && normalized.includes("not found");
+}
+
+function isQuotaError(error: unknown): boolean {
+  const message = error instanceof Error ? error.message : String(error);
+  const normalized = message.toLowerCase();
+  return (
+    normalized.includes("429") ||
+    normalized.includes("too many requests") ||
+    normalized.includes("quota exceeded") ||
+    normalized.includes("rate limit")
+  );
+}
+
+async function requestAndValidateWithModel<T>(input: {
+  client: GoogleGenerativeAI;
   modelName: string;
   systemPrompt: string;
   userPrompt: string;
   schema: z.ZodSchema<T>;
+  temperature: number;
 }): Promise<T> {
-  const client = new GoogleGenerativeAI(input.apiKey);
-  const model = client.getGenerativeModel({ model: input.modelName });
-  const firstText = await requestText(model, input.systemPrompt, input.userPrompt);
+  const model = input.client.getGenerativeModel({ model: input.modelName });
+  const firstText = await requestText(model, input.systemPrompt, input.userPrompt, input.temperature);
 
   try {
     return await parseAndValidate(firstText, input.schema);
@@ -56,7 +78,44 @@ export async function requestStrictJson<T>(input: {
       firstText,
     ].join("\n");
 
-    const repairedText = await requestText(model, input.systemPrompt, repairPrompt);
+    const repairedText = await requestText(model, input.systemPrompt, repairPrompt, input.temperature);
     return parseAndValidate(repairedText, input.schema);
   }
+}
+
+export async function requestStrictJson<T>(input: {
+  apiKey: string;
+  modelNames: string[];
+  systemPrompt: string;
+  userPrompt: string;
+  schema: z.ZodSchema<T>;
+  temperature?: number;
+}): Promise<T> {
+  const client = new GoogleGenerativeAI(input.apiKey);
+  const uniqueModelNames = Array.from(new Set(input.modelNames.map((name) => name.trim()).filter(Boolean)));
+  if (uniqueModelNames.length === 0) {
+    throw new Error("No Gemini model names were provided.");
+  }
+
+  let lastError: unknown = null;
+  for (const modelName of uniqueModelNames) {
+    try {
+      return await requestAndValidateWithModel({
+        client,
+        modelName,
+        systemPrompt: input.systemPrompt,
+        userPrompt: input.userPrompt,
+        schema: input.schema,
+        temperature: input.temperature ?? 0.25,
+      });
+    } catch (error) {
+      lastError = error;
+      if (!isMissingModelError(error) && !isQuotaError(error)) {
+        throw error;
+      }
+      console.warn(`Gemini model failed, trying fallback model: ${modelName}`);
+    }
+  }
+
+  throw lastError instanceof Error ? lastError : new Error("All Gemini model fallbacks failed.");
 }

@@ -33,6 +33,7 @@ export interface SpanSelection {
 
 interface PracticeStore {
   settings: PracticeSettingsState;
+  customFocusTopics: string[];
   sentenceState: SentenceState;
   tokenPosAssignments: Array<{ tokenIndex: number; pos: string }>;
   annotations: AnnotationNode[];
@@ -49,6 +50,7 @@ interface PracticeStore {
   errorMessage: string | null;
   setSetting: <K extends keyof PracticeSettingsState>(key: K, value: PracticeSettingsState[K]) => void;
   setFocusTopics: (topics: string[]) => void;
+  setCustomFocusTopics: (topics: string[]) => void;
   setSentenceData: (payload: { sentenceId: string; sentence: string; tokens: SentenceToken[]; targetFeatures: string[] }) => void;
   clearSentence: () => void;
   setSelectedSpan: (span: SpanSelection | null) => void;
@@ -83,6 +85,7 @@ const lanePrefix = "lane";
 
 export const usePracticeStore = create<PracticeStore>((set, get) => ({
   settings: defaultSettings,
+  customFocusTopics: [],
   sentenceState: {
     sentenceId: null,
     sentence: "",
@@ -116,6 +119,7 @@ export const usePracticeStore = create<PracticeStore>((set, get) => ({
         focusTopics: topics,
       },
     })),
+  setCustomFocusTopics: (topics) => set({ customFocusTopics: topics }),
   setSentenceData: ({ sentenceId, sentence, tokens, targetFeatures }) =>
     set({
       sentenceState: { sentenceId, sentence, tokens, targetFeatures },

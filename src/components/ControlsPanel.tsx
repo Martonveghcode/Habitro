@@ -8,10 +8,12 @@ const focusOptions = [
   "Coordinadas",
   "Subordinadas sustantivas",
   "Subordinadas adjetivas",
-  "CRég",
+  "CReg",
   "Atributo",
   "Pasiva",
 ];
+
+const topicKey = (value: string) => value.trim().toLowerCase();
 
 interface ControlsPanelProps {
   onGenerateSentence: () => Promise<void>;
@@ -19,17 +21,33 @@ interface ControlsPanelProps {
 
 export function ControlsPanel({ onGenerateSentence }: ControlsPanelProps) {
   const settings = usePracticeStore((state) => state.settings);
+  const customFocusTopics = usePracticeStore((state) => state.customFocusTopics);
   const setSetting = usePracticeStore((state) => state.setSetting);
   const setFocusTopics = usePracticeStore((state) => state.setFocusTopics);
+  const setCustomFocusTopics = usePracticeStore((state) => state.setCustomFocusTopics);
   const isGenerating = usePracticeStore((state) => state.isGenerating);
   const targetFeatures = usePracticeStore((state) => state.sentenceState.targetFeatures);
   const [customTopic, setCustomTopic] = useState("");
 
-  const selectedFocus = useMemo(() => new Set(settings.focusTopics), [settings.focusTopics]);
+  const selectedFocus = useMemo(
+    () => new Set(settings.focusTopics.map((topic) => topicKey(topic))),
+    [settings.focusTopics],
+  );
+  const visibleTopics = useMemo(() => {
+    const merged = [...focusOptions];
+    customFocusTopics.forEach((topic) => {
+      const exists = merged.some((entry) => topicKey(entry) === topicKey(topic));
+      if (!exists) {
+        merged.push(topic);
+      }
+    });
+    return merged;
+  }, [customFocusTopics]);
 
   const toggleFocusTopic = (topic: string) => {
-    if (selectedFocus.has(topic)) {
-      setFocusTopics(settings.focusTopics.filter((item) => item !== topic));
+    const key = topicKey(topic);
+    if (selectedFocus.has(key)) {
+      setFocusTopics(settings.focusTopics.filter((item) => topicKey(item) !== key));
     } else {
       setFocusTopics([...settings.focusTopics, topic]);
     }
@@ -37,9 +55,18 @@ export function ControlsPanel({ onGenerateSentence }: ControlsPanelProps) {
 
   const addCustomTopic = () => {
     const cleaned = customTopic.trim();
-    if (!cleaned || selectedFocus.has(cleaned)) {
+    if (!cleaned) {
       return;
     }
+    const existing = visibleTopics.find((topic) => topicKey(topic) === topicKey(cleaned));
+    if (existing) {
+      if (!selectedFocus.has(topicKey(existing))) {
+        setFocusTopics([...settings.focusTopics, existing]);
+      }
+      setCustomTopic("");
+      return;
+    }
+    setCustomFocusTopics([...customFocusTopics, cleaned]);
     setFocusTopics([...settings.focusTopics, cleaned]);
     setCustomTopic("");
   };
@@ -64,7 +91,10 @@ export function ControlsPanel({ onGenerateSentence }: ControlsPanelProps) {
 
         <label className="field">
           <span>Dificultad</span>
-          <select value={settings.difficulty} onChange={(event) => setSetting("difficulty", Number(event.target.value) as 1 | 2 | 3)}>
+          <select
+            value={settings.difficulty}
+            onChange={(event) => setSetting("difficulty", Number(event.target.value) as 1 | 2 | 3)}
+          >
             <option value={1}>1</option>
             <option value={2}>2</option>
             <option value={3}>3</option>
@@ -75,11 +105,11 @@ export function ControlsPanel({ onGenerateSentence }: ControlsPanelProps) {
       <div className="field">
         <span>Foco sintactico</span>
         <div className="chip-wrap">
-          {focusOptions.map((topic) => (
+          {visibleTopics.map((topic) => (
             <button
               key={topic}
               type="button"
-              className={selectedFocus.has(topic) ? "chip active" : "chip"}
+              className={selectedFocus.has(topicKey(topic)) ? "chip active" : "chip"}
               onClick={() => toggleFocusTopic(topic)}
             >
               {topic}
@@ -105,7 +135,7 @@ export function ControlsPanel({ onGenerateSentence }: ControlsPanelProps) {
             checked={settings.showPosRow}
             onChange={(event) => setSetting("showPosRow", event.target.checked)}
           />
-          Mostrar POS sobre palabras
+          Mostrar categoria gramatical sobre palabras
         </label>
         <label>
           <input
@@ -121,7 +151,7 @@ export function ControlsPanel({ onGenerateSentence }: ControlsPanelProps) {
             checked={settings.compactLayout}
             onChange={(event) => setSetting("compactLayout", event.target.checked)}
           />
-          Layout compacto
+          Diseno compacto
         </label>
         <label>
           <input
@@ -139,7 +169,7 @@ export function ControlsPanel({ onGenerateSentence }: ControlsPanelProps) {
 
       {targetFeatures.length > 0 ? (
         <div className="target-features">
-          <h3>Features objetivo</h3>
+          <h3>Objetivos de la frase</h3>
           <ul>
             {targetFeatures.map((feature) => (
               <li key={feature}>{feature}</li>
