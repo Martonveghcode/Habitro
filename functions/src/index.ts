@@ -126,6 +126,60 @@ function dedupeErrors(errors: GraderError[]): GraderError[] {
   return merged;
 }
 
+type SentenceType = "simple" | "compuesta";
+type Difficulty = 1 | 2 | 3;
+
+interface DifficultyProfile {
+  minTokens: number;
+  maxTokens: number;
+  complexityHint: string;
+}
+
+const difficultyProfiles: Record<SentenceType, Record<Difficulty, DifficultyProfile>> = {
+  simple: {
+    1: {
+      minTokens: 5,
+      maxTokens: 8,
+      complexityHint: "Estructura muy directa, una sola forma verbal personal, complementos basicos.",
+    },
+    2: {
+      minTokens: 8,
+      maxTokens: 12,
+      complexityHint: "Una sola forma verbal personal con expansion moderada (CN/CC/CI).",
+    },
+    3: {
+      minTokens: 12,
+      maxTokens: 18,
+      complexityHint: "Una sola forma verbal personal con alta densidad de complementos y expansion.",
+    },
+  },
+  compuesta: {
+    1: {
+      minTokens: 8,
+      maxTokens: 12,
+      complexityHint: "Dos proposiciones breves enlazadas por un nexo claro.",
+    },
+    2: {
+      minTokens: 12,
+      maxTokens: 18,
+      complexityHint: "Dos proposiciones con expansion intermedia y nexo claro.",
+    },
+    3: {
+      minTokens: 18,
+      maxTokens: 26,
+      complexityHint: "Dos o tres proposiciones con complejidad sintactica avanzada.",
+    },
+  },
+};
+
+function profileFor(sentenceType: SentenceType, difficulty: Difficulty): DifficultyProfile {
+  return difficultyProfiles[sentenceType][difficulty];
+}
+
+function fitsDifficultyProfile(tokens: string[], profile: DifficultyProfile): boolean {
+  return tokens.length >= profile.minTokens && tokens.length <= profile.maxTokens;
+}
+
 export const generateSentence = onRequest(
   { cors: true, secrets: [geminiApiKey], region: "us-central1" },
   async (request, response) => {
@@ -141,8 +195,10 @@ export const generateSentence = onRequest(
         badRequest(parsed.error.message);
       }
       const payload = parsed.data as GenerationRequest;
+      const profile = profileFor(payload.sentenceType, payload.difficulty);
 
-      const userPrompt = JSON.stringify(
+      const buildGenerationPrompt = (retryNote?: string) =>
+        JSON.stringify(
         {
           requestType: "generation",
           constraints: {
@@ -151,6 +207,12 @@ export const generateSentence = onRequest(
             focusTopics: payload.focusTopics,
             punctuationPolicy: payload.punctuationPolicy,
             weaknessSummary: payload.weaknessSummary ?? null,
+            difficultyProfile: {
+              minTokens: profile.minTokens,
+              maxTokens: profile.maxTokens,
+              complexityHint: profile.complexityHint,
+            },
+            retryNote: retryNote ?? null,
           },
           requiredOutputSchema: {
             sentence: "string",
@@ -165,14 +227,27 @@ export const generateSentence = onRequest(
         2,
       );
 
-      const generation = await requestStrictJson({
+      let generation = await requestStrictJson({
         apiKey: geminiApiKey.value(),
         modelNames: getModelCandidates(),
         systemPrompt: GENERATOR_SYSTEM_PROMPT,
-        userPrompt,
+        userPrompt: buildGenerationPrompt(),
         schema: generationResponseSchema,
         temperature: 0.35,
       });
+
+      if (!fitsDifficultyProfile(generation.tokens, profile)) {
+        generation = await requestStrictJson({
+          apiKey: geminiApiKey.value(),
+          modelNames: getModelCandidates(),
+          systemPrompt: GENERATOR_SYSTEM_PROMPT,
+          userPrompt: buildGenerationPrompt(
+            `Salida anterior fuera de rango: ${generation.tokens.length} tokens. Debes cumplir estrictamente ${profile.minTokens}-${profile.maxTokens} tokens.`,
+          ),
+          schema: generationResponseSchema,
+          temperature: 0.25,
+        });
+      }
 
       response.status(200).json(generation);
     } catch (error) {
@@ -258,7 +333,6 @@ export const gradeAttempt = onRequest(
 );
 
 type ErrorCategory = "pos" | "function" | "grouping" | "sentenceType" | "punctuation";
-type Difficulty = 1 | 2 | 3;
 
 interface ErrorDocument {
   uid: string;

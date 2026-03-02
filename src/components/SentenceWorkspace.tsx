@@ -191,26 +191,28 @@ export function SentenceWorkspace() {
         </div>
       ) : null}
 
-      <div className="sentence-type-builder">
-        <h3>Constructor de tipo de oracion</h3>
-        <div className="chip-wrap">
-          {sentenceTypeBuild.tags.map((tag) => (
-            <button key={tag} type="button" className="chip active" onClick={() => removeSentenceTypeTag(tag)}>
-              {tag}
+      {settings.showSentenceTypeBuilder ? (
+        <div className="sentence-type-builder">
+          <h3>Constructor de tipo de oracion</h3>
+          <div className="chip-wrap">
+            {sentenceTypeBuild.tags.map((tag) => (
+              <button key={tag} type="button" className="chip active" onClick={() => removeSentenceTypeTag(tag)}>
+                {tag}
+              </button>
+            ))}
+          </div>
+          <div className="inline-row">
+            <input
+              value={sentenceTypeInput}
+              onChange={(event) => setSentenceTypeInput(event.target.value)}
+              placeholder="Agregar descriptor"
+            />
+            <button type="button" className="ghost-btn" onClick={addSentenceTypeTag}>
+              Anadir
             </button>
-          ))}
+          </div>
         </div>
-        <div className="inline-row">
-          <input
-            value={sentenceTypeInput}
-            onChange={(event) => setSentenceTypeInput(event.target.value)}
-            placeholder="Agregar descriptor"
-          />
-          <button type="button" className="ghost-btn" onClick={addSentenceTypeTag}>
-            Anadir
-          </button>
-        </div>
-      </div>
+      ) : null}
     </section>
   );
 }

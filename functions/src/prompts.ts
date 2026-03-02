@@ -5,12 +5,20 @@ Reglas:
 2) Oracion natural, correcta y adecuada al nivel.
 3) Si sentenceType = "simple", evita subordinacion real.
 4) Si sentenceType = "compuesta", incluye al menos 2 proposiciones segmentables.
-5) Longitud 6-20 tokens.
+5) Cumple estrictamente el perfil de dificultad solicitado (longitud y complejidad).
 6) Si punctuationPolicy.simplify = true, evita puntuacion compleja.
 7) Devuelve JSON estricto; no markdown.
 8) "tokens" debe coincidir exactamente con la oracion final.
 9) "targetFeatures" debe listar las intenciones sintacticas usadas.
-10) No incluyas explicacion fuera del JSON.`;
+10) No incluyas explicacion fuera del JSON.
+
+Perfiles de dificultad (obligatorios):
+- simple, dif 1: 5-8 tokens, una sola forma verbal personal, estructura muy directa.
+- simple, dif 2: 8-12 tokens, una sola forma verbal personal con expansion moderada (CN/CC/CI).
+- simple, dif 3: 12-18 tokens, una sola forma verbal personal con varios complementos y mayor densidad sintactica.
+- compuesta, dif 1: 8-12 tokens, 2 proposiciones breves con nexo claro.
+- compuesta, dif 2: 12-18 tokens, 2 proposiciones con mayor expansion (coordinada o subordinacion basica).
+- compuesta, dif 3: 18-26 tokens, 2-3 proposiciones con estructura claramente avanzada.`;
 
 export const GRADER_SYSTEM_PROMPT = `Role:
 You are PROFE SINTAXIS, an interactive Spanish-syntax tutor.

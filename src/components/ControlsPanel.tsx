@@ -26,7 +26,6 @@ export function ControlsPanel({ onGenerateSentence }: ControlsPanelProps) {
   const setFocusTopics = usePracticeStore((state) => state.setFocusTopics);
   const setCustomFocusTopics = usePracticeStore((state) => state.setCustomFocusTopics);
   const isGenerating = usePracticeStore((state) => state.isGenerating);
-  const targetFeatures = usePracticeStore((state) => state.sentenceState.targetFeatures);
   const [customTopic, setCustomTopic] = useState("");
 
   const selectedFocus = useMemo(
@@ -95,9 +94,9 @@ export function ControlsPanel({ onGenerateSentence }: ControlsPanelProps) {
             value={settings.difficulty}
             onChange={(event) => setSetting("difficulty", Number(event.target.value) as 1 | 2 | 3)}
           >
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-            <option value={3}>3</option>
+            <option value={1}>1 - Basico</option>
+            <option value={2}>2 - Intermedio</option>
+            <option value={3}>3 - Avanzado</option>
           </select>
         </label>
       </div>
@@ -161,22 +160,35 @@ export function ControlsPanel({ onGenerateSentence }: ControlsPanelProps) {
           />
           Modo personalizado
         </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={settings.showAnalyticsPanel}
+            onChange={(event) => setSetting("showAnalyticsPanel", event.target.checked)}
+          />
+          Mostrar analitica
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={settings.showFeedbackPanel}
+            onChange={(event) => setSetting("showFeedbackPanel", event.target.checked)}
+          />
+          Mostrar correccion
+        </label>
+        <label>
+          <input
+            type="checkbox"
+            checked={settings.showSentenceTypeBuilder}
+            onChange={(event) => setSetting("showSentenceTypeBuilder", event.target.checked)}
+          />
+          Mostrar constructor de tipo
+        </label>
       </div>
 
       <button type="button" className="primary-btn" onClick={onGenerateSentence} disabled={isGenerating}>
         {isGenerating ? "Generando..." : "Generar oracion"}
       </button>
-
-      {targetFeatures.length > 0 ? (
-        <div className="target-features">
-          <h3>Objetivos de la frase</h3>
-          <ul>
-            {targetFeatures.map((feature) => (
-              <li key={feature}>{feature}</li>
-            ))}
-          </ul>
-        </div>
-      ) : null}
     </section>
   );
 }

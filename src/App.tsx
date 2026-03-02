@@ -263,17 +263,19 @@ function PracticePage({ user }: { user: User }) {
       <main className="layout">
         <div className="left-column">
           <ControlsPanel onGenerateSentence={handleGenerateSentence} />
-          <AnalyticsPanel summary={summary} recentErrors={recentErrors} />
+          {settings.showAnalyticsPanel ? <AnalyticsPanel summary={summary} recentErrors={recentErrors} /> : null}
         </div>
         <div className="main-column">
           <SentenceWorkspace />
           <AnnotationCanvas />
-          <FeedbackPanel
-            onGrade={handleGrade}
-            onSave={handleSaveCorrection}
-            isSaving={isSavingCorrection}
-            saved={isCorrectionSaved}
-          />
+          {settings.showFeedbackPanel ? (
+            <FeedbackPanel
+              onGrade={handleGrade}
+              onSave={handleSaveCorrection}
+              isSaving={isSavingCorrection}
+              saved={isCorrectionSaved}
+            />
+          ) : null}
         </div>
       </main>
     </div>

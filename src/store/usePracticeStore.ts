@@ -17,6 +17,9 @@ interface PracticeSettingsState {
   simplifyPunctuation: boolean;
   compactLayout: boolean;
   personalizedMode: boolean;
+  showAnalyticsPanel: boolean;
+  showFeedbackPanel: boolean;
+  showSentenceTypeBuilder: boolean;
 }
 
 interface SentenceState {
@@ -77,6 +80,9 @@ const defaultSettings: PracticeSettingsState = {
   simplifyPunctuation: true,
   compactLayout: false,
   personalizedMode: false,
+  showAnalyticsPanel: true,
+  showFeedbackPanel: true,
+  showSentenceTypeBuilder: true,
 };
 
 const defaultSentenceTypeBuild: SentenceTypeBuild = {
