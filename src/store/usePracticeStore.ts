@@ -34,6 +34,7 @@ export interface SpanSelection {
 interface PracticeStore {
   settings: PracticeSettingsState;
   customFocusTopics: string[];
+  customAnnotationLabels: Record<AnnotationKind, string[]>;
   sentenceState: SentenceState;
   tokenPosAssignments: Array<{ tokenIndex: number; pos: string }>;
   annotations: AnnotationNode[];
@@ -51,6 +52,8 @@ interface PracticeStore {
   setSetting: <K extends keyof PracticeSettingsState>(key: K, value: PracticeSettingsState[K]) => void;
   setFocusTopics: (topics: string[]) => void;
   setCustomFocusTopics: (topics: string[]) => void;
+  setCustomAnnotationLabels: (labels: Record<AnnotationKind, string[]>) => void;
+  addCustomAnnotationLabel: (kind: AnnotationKind, label: string) => void;
   setSentenceData: (payload: { sentenceId: string; sentence: string; tokens: SentenceToken[]; targetFeatures: string[] }) => void;
   clearSentence: () => void;
   setSelectedSpan: (span: SpanSelection | null) => void;
@@ -82,10 +85,23 @@ const defaultSentenceTypeBuild: SentenceTypeBuild = {
 };
 
 const lanePrefix = "lane";
+const laneDraftPreset: Record<string, { kind: AnnotationKind; level: AnnotationLevel }> = {
+  "lane-1": { kind: "wordFunction", level: 1 },
+  "lane-2": { kind: "groupFunction", level: 2 },
+  "lane-3": { kind: "groupFunction", level: 3 },
+  "lane-4": { kind: "clause", level: 4 },
+  "lane-5": { kind: "sentenceType", level: 5 },
+};
 
 export const usePracticeStore = create<PracticeStore>((set, get) => ({
   settings: defaultSettings,
   customFocusTopics: [],
+  customAnnotationLabels: {
+    wordFunction: [],
+    groupFunction: [],
+    clause: [],
+    sentenceType: [],
+  },
   sentenceState: {
     sentenceId: null,
     sentence: "",
@@ -120,6 +136,26 @@ export const usePracticeStore = create<PracticeStore>((set, get) => ({
       },
     })),
   setCustomFocusTopics: (topics) => set({ customFocusTopics: topics }),
+  setCustomAnnotationLabels: (labels) => set({ customAnnotationLabels: labels }),
+  addCustomAnnotationLabel: (kind, label) =>
+    set((state) => {
+      const cleaned = label.trim();
+      if (!cleaned) {
+        return state;
+      }
+      const exists = state.customAnnotationLabels[kind].some(
+        (entry) => entry.trim().toLowerCase() === cleaned.toLowerCase(),
+      );
+      if (exists) {
+        return state;
+      }
+      return {
+        customAnnotationLabels: {
+          ...state.customAnnotationLabels,
+          [kind]: [...state.customAnnotationLabels[kind], cleaned],
+        },
+      };
+    }),
   setSentenceData: ({ sentenceId, sentence, tokens, targetFeatures }) =>
     set({
       sentenceState: { sentenceId, sentence, tokens, targetFeatures },
@@ -156,11 +192,16 @@ export const usePracticeStore = create<PracticeStore>((set, get) => ({
       return;
     }
 
+    const lanePreset = laneDraftPreset[laneId] ?? {
+      kind: annotationDraft.kind,
+      level: annotationDraft.level,
+    };
+
     const id = `ann_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`;
     const node: AnnotationNode = {
       id,
-      level: annotationDraft.level,
-      kind: annotationDraft.kind,
+      level: lanePreset.level,
+      kind: lanePreset.kind,
       label: annotationDraft.label.trim(),
       span: { ...selectedSpan },
       parentId: null,

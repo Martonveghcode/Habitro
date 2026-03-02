@@ -1,8 +1,41 @@
 import { DndContext, type DragEndEvent, useDraggable, useDroppable } from "@dnd-kit/core";
 import { CSS } from "@dnd-kit/utilities";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
+import type { AnnotationKind } from "../types/syntax";
 import { TRACK_IDS, usePracticeStore } from "../store/usePracticeStore";
+
+const laneMeta: Record<string, { title: string; kind: AnnotationKind }> = {
+  "lane-1": { title: "Nivel 1 - Funcion de palabra", kind: "wordFunction" },
+  "lane-2": { title: "Nivel 2 - Funcion de grupo", kind: "groupFunction" },
+  "lane-3": { title: "Nivel 3 - Funcion apilada", kind: "groupFunction" },
+  "lane-4": { title: "Nivel 4 - Proposicion", kind: "clause" },
+  "lane-5": { title: "Nivel 5 - Tipo de oracion", kind: "sentenceType" },
+};
+
+const kindLabels: Record<AnnotationKind, string> = {
+  wordFunction: "Palabra",
+  groupFunction: "Grupo",
+  clause: "Proposicion",
+  sentenceType: "Tipo oracion",
+};
+
+const presetLabelsByKind: Record<AnnotationKind, string[]> = {
+  wordFunction: ["NN", "NV", "Nucleo", "Det", "Pron", "Adj", "Adv", "Prep", "Conj"],
+  groupFunction: ["CD", "CI", "CC", "CReg", "Atributo", "CPvo", "Termino", "CN", "CAg", "Sujeto", "Predicado"],
+  clause: ["Principal", "Coordinada", "Subordinada sustantiva", "Subordinada adjetiva", "Subordinada adverbial"],
+  sentenceType: ["Oracion simple", "Oracion compuesta", "Predicativa", "Copulativa", "Activa", "Pasiva"],
+};
+
+const kindOrder: AnnotationKind[] = ["wordFunction", "groupFunction", "clause", "sentenceType"];
+const kindDefaultLevel: Record<AnnotationKind, 1 | 2 | 3 | 4 | 5> = {
+  wordFunction: 1,
+  groupFunction: 2,
+  clause: 4,
+  sentenceType: 5,
+};
+
+const normalizeText = (value: string) => value.trim().toLowerCase();
 
 function SelectedSpanDraggable() {
   const selectedSpan = usePracticeStore((state) => state.selectedSpan);
@@ -24,7 +57,7 @@ function SelectedSpanDraggable() {
 
   return (
     <button ref={setNodeRef} style={style} {...listeners} {...attributes} className="drag-pill" type="button">
-      {draftLabel.trim() ? draftLabel : "Etiqueta pendiente"} [{selectedSpan.start}-{selectedSpan.end}]
+      {draftLabel.trim() ? draftLabel : "Selecciona etiqueta"} [{selectedSpan.start}-{selectedSpan.end}]
     </button>
   );
 }
@@ -50,7 +83,7 @@ function AnnotationCard({ annotationId }: { annotationId: string }) {
       className="annotation-card"
     >
       <button className="annotation-chip" type="button" {...listeners} {...attributes}>
-        {annotation.label} (L{annotation.level}) [{annotation.span.start}-{annotation.span.end}]
+        {annotation.label} [{annotation.span.start}-{annotation.span.end}]
       </button>
       <button className="icon-btn" type="button" onClick={() => deleteAnnotation(annotation.id)}>
         x
@@ -70,11 +103,9 @@ function TrackLane({ laneId }: { laneId: string }) {
     [allAnnotations, laneId],
   );
 
-  const laneLabel = laneId.startsWith("lane-") ? `Capa ${laneId.replace("lane-", "")}` : laneId;
-
   return (
     <div ref={setNodeRef} className={isOver ? "track-lane over" : "track-lane"}>
-      <div className="track-title">{laneLabel}</div>
+      <div className="track-title">{laneMeta[laneId]?.title ?? laneId}</div>
       <div className="track-items">
         {annotationIds.length === 0 ? <span className="muted">Arrastra aqui</span> : null}
         {annotationIds.map((annotationId) => (
@@ -88,9 +119,44 @@ function TrackLane({ laneId }: { laneId: string }) {
 export function AnnotationCanvas() {
   const selectedSpan = usePracticeStore((state) => state.selectedSpan);
   const draft = usePracticeStore((state) => state.annotationDraft);
+  const customAnnotationLabels = usePracticeStore((state) => state.customAnnotationLabels);
   const setDraft = usePracticeStore((state) => state.setAnnotationDraft);
+  const addCustomAnnotationLabel = usePracticeStore((state) => state.addCustomAnnotationLabel);
   const addAnnotationToLane = usePracticeStore((state) => state.addAnnotationToLane);
   const moveAnnotation = usePracticeStore((state) => state.moveAnnotation);
+  const [labelKind, setLabelKind] = useState<AnnotationKind>("groupFunction");
+  const [customLabelInput, setCustomLabelInput] = useState("");
+
+  const availableLabels = useMemo(() => {
+    const combined = [...presetLabelsByKind[labelKind], ...customAnnotationLabels[labelKind]];
+    const seen = new Set<string>();
+    return combined.filter((label) => {
+      const key = normalizeText(label);
+      if (!key || seen.has(key)) {
+        return false;
+      }
+      seen.add(key);
+      return true;
+    });
+  }, [customAnnotationLabels, labelKind]);
+
+  const setLabelFromChip = (label: string) => {
+    setDraft({
+      label,
+      kind: labelKind,
+      level: kindDefaultLevel[labelKind],
+    });
+  };
+
+  const addCustomLabel = () => {
+    const cleaned = customLabelInput.trim();
+    if (!cleaned) {
+      return;
+    }
+    addCustomAnnotationLabel(labelKind, cleaned);
+    setLabelFromChip(cleaned);
+    setCustomLabelInput("");
+  };
 
   const onDragEnd = (event: DragEndEvent) => {
     if (!event.over) {
@@ -101,8 +167,20 @@ export function AnnotationCanvas() {
       return;
     }
 
+    const laneKind = laneMeta[targetLane]?.kind;
+    if (!laneKind) {
+      return;
+    }
+
     const activeId = String(event.active.id);
     if (activeId.startsWith("new:") && selectedSpan) {
+      if (!draft.label.trim()) {
+        return;
+      }
+      setDraft({
+        kind: laneKind,
+        level: kindDefaultLevel[laneKind],
+      });
       addAnnotationToLane(targetLane);
       return;
     }
@@ -119,40 +197,52 @@ export function AnnotationCanvas() {
         <h2>Capas de anotacion (arrastrar y soltar)</h2>
       </header>
 
-      <div className="annotation-draft">
-        <label className="field">
-          <span>Etiqueta</span>
-          <input
-            value={draft.label}
-            onChange={(event) => setDraft({ label: event.target.value })}
-            placeholder="Ej: CD, CI, Termino, Sujeto..."
-          />
-        </label>
-
-        <label className="field">
-          <span>Tipo</span>
-          <select value={draft.kind} onChange={(event) => setDraft({ kind: event.target.value as typeof draft.kind })}>
-            <option value="wordFunction">Funcion de palabra</option>
-            <option value="groupFunction">Funcion de grupo</option>
-            <option value="clause">Proposicion</option>
-            <option value="sentenceType">Tipo de oracion</option>
-          </select>
-        </label>
-
-        <label className="field">
-          <span>Nivel</span>
-          <select
-            value={draft.level}
-            onChange={(event) => setDraft({ level: Number(event.target.value) as typeof draft.level })}
-          >
-            <option value={1}>1</option>
-            <option value={2}>2</option>
-            <option value={3}>3</option>
-            <option value={4}>4</option>
-            <option value={5}>5</option>
-          </select>
-        </label>
+      <div className="field">
+        <span>Etiquetas rapidas</span>
+        <div className="chip-wrap">
+          {kindOrder.map((kind) => (
+            <button
+              key={kind}
+              type="button"
+              className={kind === labelKind ? "chip active" : "chip"}
+              onClick={() => setLabelKind(kind)}
+            >
+              {kindLabels[kind]}
+            </button>
+          ))}
+        </div>
       </div>
+
+      <div className="field">
+        <span>Selecciona etiqueta</span>
+        <div className="chip-wrap">
+          {availableLabels.map((label) => (
+            <button
+              key={`${labelKind}:${label}`}
+              type="button"
+              className={normalizeText(draft.label) === normalizeText(label) ? "chip active" : "chip"}
+              onClick={() => setLabelFromChip(label)}
+            >
+              {label}
+            </button>
+          ))}
+        </div>
+      </div>
+
+      <div className="inline-row">
+        <input
+          value={customLabelInput}
+          onChange={(event) => setCustomLabelInput(event.target.value)}
+          placeholder={`Agregar etiqueta personalizada (${kindLabels[labelKind]})`}
+        />
+        <button type="button" className="ghost-btn" onClick={addCustomLabel}>
+          Agregar
+        </button>
+      </div>
+
+      <p className="muted">
+        Flujo: 1) selecciona palabras, 2) elige etiqueta, 3) arrastra el bloque a la linea correcta.
+      </p>
 
       <DndContext onDragEnd={onDragEnd}>
         <div className="drag-source">

@@ -78,8 +78,18 @@ export interface GraderError {
   explanation?: string;
 }
 
+export interface ReviewItem {
+  status: "correct" | "incorrect";
+  title: string;
+  detail: string;
+  spanStart?: number;
+  spanEnd?: number;
+}
+
 export interface GradeResult {
   feedbackMarkdown: string;
+  correctedAnswerMarkdown: string;
+  reviewItems: ReviewItem[];
   errors: GraderError[];
   score?: {
     overall: number;

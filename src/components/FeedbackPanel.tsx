@@ -5,6 +5,9 @@ import type { ErrorCategory } from "../types/syntax";
 
 interface FeedbackPanelProps {
   onGrade: () => Promise<void>;
+  onSave: () => Promise<void>;
+  isSaving: boolean;
+  saved: boolean;
 }
 
 const categoryLabel: Record<ErrorCategory, string> = {
@@ -15,7 +18,7 @@ const categoryLabel: Record<ErrorCategory, string> = {
   punctuation: "Puntuacion",
 };
 
-export function FeedbackPanel({ onGrade }: FeedbackPanelProps) {
+export function FeedbackPanel({ onGrade, onSave, isSaving, saved }: FeedbackPanelProps) {
   const gradeResult = usePracticeStore((state) => state.gradeResult);
   const isGrading = usePracticeStore((state) => state.isGrading);
 
@@ -33,8 +36,34 @@ export function FeedbackPanel({ onGrade }: FeedbackPanelProps) {
       {gradeResult ? (
         <>
           <div className="feedback-markdown">
-            <ReactMarkdown>{gradeResult.feedbackMarkdown}</ReactMarkdown>
+            <ReactMarkdown>{gradeResult.correctedAnswerMarkdown || gradeResult.feedbackMarkdown}</ReactMarkdown>
           </div>
+
+          <div className="review-list">
+            <h3>Revision por bloques</h3>
+            {gradeResult.reviewItems.length === 0 ? (
+              <p className="muted">Sin items de revision.</p>
+            ) : (
+              <ul>
+                {gradeResult.reviewItems.map((item, index) => (
+                  <li
+                    key={`${item.title}_${index}`}
+                    className={item.status === "correct" ? "review-item ok" : "review-item bad"}
+                  >
+                    <strong>{item.title}</strong>
+                    {item.spanStart && item.spanEnd ? (
+                      <span className="muted">
+                        {" "}
+                        (tramo {item.spanStart}-{item.spanEnd})
+                      </span>
+                    ) : null}
+                    <div>{item.detail}</div>
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+
           <div className="error-list">
             <h3>Errores detectados</h3>
             {gradeResult.errors.length === 0 ? (
@@ -56,6 +85,15 @@ export function FeedbackPanel({ onGrade }: FeedbackPanelProps) {
               </ul>
             )}
           </div>
+
+          <button
+            type="button"
+            className="primary-btn"
+            onClick={onSave}
+            disabled={isSaving || saved || gradeResult.errors.length === 0}
+          >
+            {saved ? "Guardado en base de datos" : isSaving ? "Guardando..." : "Guardar para modo personalizado"}
+          </button>
         </>
       ) : null}
     </section>

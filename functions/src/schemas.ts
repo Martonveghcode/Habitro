@@ -42,14 +42,24 @@ export const graderErrorSchema = z.object({
   category: errorCategorySchema,
   expected: z.string().nullable(),
   got: z.string().nullable(),
-  spanStart: z.number().int().nonnegative(),
-  spanEnd: z.number().int().nonnegative(),
+  spanStart: z.number().int().positive(),
+  spanEnd: z.number().int().positive(),
   severity: errorSeveritySchema,
   explanation: z.string().optional(),
 });
 
+export const reviewItemSchema = z.object({
+  status: z.enum(["correct", "incorrect"]),
+  title: z.string().min(1),
+  detail: z.string().min(1),
+  spanStart: z.number().int().positive().optional(),
+  spanEnd: z.number().int().positive().optional(),
+});
+
 export const gradingResponseSchema = z.object({
   feedbackMarkdown: z.string().min(1),
+  correctedAnswerMarkdown: z.string().min(1),
+  reviewItems: z.array(reviewItemSchema).default([]),
   errors: z.array(graderErrorSchema),
   score: z
     .object({

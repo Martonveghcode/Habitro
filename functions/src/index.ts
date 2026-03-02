@@ -6,7 +6,7 @@ import { HttpsError, onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 
 import { requestStrictJson } from "./llm";
-import { GENERATOR_SYSTEM_PROMPT, GRADER_AUDIT_SYSTEM_PROMPT, GRADER_SYSTEM_PROMPT } from "./prompts";
+import { GENERATOR_SYSTEM_PROMPT, GRADER_SYSTEM_PROMPT } from "./prompts";
 import {
   type GenerationRequest,
   generationRequestSchema,
@@ -79,10 +79,11 @@ function sanitizeError(error: GraderError, tokenCount: number): GraderError | nu
 
   let start = Math.trunc(error.spanStart);
   let end = Math.trunc(error.spanEnd);
-  const maxIndex = tokenCount - 1;
+  const minIndex = 1;
+  const maxIndex = tokenCount;
 
-  start = Math.max(0, Math.min(maxIndex, start));
-  end = Math.max(0, Math.min(maxIndex, end));
+  start = Math.max(minIndex, Math.min(maxIndex, start));
+  end = Math.max(minIndex, Math.min(maxIndex, end));
 
   if (end < start) {
     const nextStart = end;
@@ -123,133 +124,6 @@ function dedupeErrors(errors: GraderError[]): GraderError[] {
   });
 
   return merged;
-}
-
-interface AnalysisLike {
-  settings?: {
-    showPosRow?: boolean;
-  };
-  tokenPosAssignments?: Array<{
-    tokenIndex?: number;
-    pos?: string;
-  }>;
-  annotations?: Array<{
-    label?: string;
-    kind?: string;
-    span?: {
-      start?: number;
-      end?: number;
-    };
-  }>;
-}
-
-function isPunctuationToken(token: string): boolean {
-  return /^[.,;:!?()[\]{}"'\-]+$/.test(token.trim());
-}
-
-function collectRuleBasedErrors(payload: GradingRequest): GraderError[] {
-  const analysis = (payload.analysis ?? {}) as AnalysisLike;
-  const tokenCount = payload.tokens.length;
-  const errors: GraderError[] = [];
-
-  if (analysis.settings?.showPosRow) {
-    const assignedPos = new Set<number>();
-    (analysis.tokenPosAssignments ?? []).forEach((entry) => {
-      const tokenIndex = entry.tokenIndex;
-      if (typeof tokenIndex !== "number" || !Number.isInteger(tokenIndex) || !entry.pos?.trim()) {
-        return;
-      }
-      assignedPos.add(tokenIndex);
-    });
-
-    payload.tokens.forEach((token, index) => {
-      if (isPunctuationToken(token)) {
-        return;
-      }
-      if (assignedPos.has(index)) {
-        return;
-      }
-      errors.push({
-        error_code: "POS_MISSING",
-        category: "pos",
-        expected: "Categoria gramatical asignada",
-        got: null,
-        spanStart: index,
-        spanEnd: index,
-        severity: "major",
-        explanation: "Falta la categoria gramatical de este token.",
-      });
-    });
-  }
-
-  const annotations = analysis.annotations ?? [];
-  if (annotations.length === 0 && tokenCount > 0) {
-    errors.push({
-      error_code: "FUNCTION_MISSING",
-      category: "function",
-      expected: "Al menos una anotacion sintactica",
-      got: "Sin anotaciones",
-      spanStart: 0,
-      spanEnd: tokenCount - 1,
-      severity: "major",
-      explanation: "No hay funciones sintacticas marcadas en la oracion.",
-    });
-    return errors;
-  }
-
-  annotations.forEach((annotation) => {
-    const start = annotation.span?.start;
-    const end = annotation.span?.end;
-    const hasValidBounds = Number.isInteger(start) && Number.isInteger(end);
-    const normalizedStart = Number.isInteger(start) ? Number(start) : 0;
-    const normalizedEnd = Number.isInteger(end) ? Number(end) : 0;
-
-    if (!annotation.label?.trim()) {
-      errors.push({
-        error_code: "FUNCTION_LABEL_MISMATCH",
-        category: annotation.kind === "groupFunction" ? "grouping" : "function",
-        expected: "Etiqueta sintactica valida",
-        got: annotation.label ?? null,
-        spanStart: Math.max(0, Math.min(tokenCount - 1, normalizedStart)),
-        spanEnd: Math.max(0, Math.min(tokenCount - 1, normalizedEnd)),
-        severity: "major",
-        explanation: "La anotacion no tiene etiqueta.",
-      });
-    }
-
-    if (!hasValidBounds || tokenCount === 0) {
-      return;
-    }
-
-    if (normalizedStart < 0 || normalizedEnd < 0 || normalizedStart >= tokenCount || normalizedEnd >= tokenCount) {
-      errors.push({
-        error_code: "GROUPING_SPAN_MISMATCH",
-        category: "grouping",
-        expected: `Indices entre 0 y ${tokenCount - 1}`,
-        got: `${normalizedStart}-${normalizedEnd}`,
-        spanStart: Math.max(0, Math.min(tokenCount - 1, normalizedStart)),
-        spanEnd: Math.max(0, Math.min(tokenCount - 1, normalizedEnd)),
-        severity: "major",
-        explanation: "El tramo de la anotacion queda fuera de los limites de tokens.",
-      });
-      return;
-    }
-
-    if (normalizedStart > normalizedEnd) {
-      errors.push({
-        error_code: "GROUPING_SPAN_MISMATCH",
-        category: "grouping",
-        expected: "spanStart <= spanEnd",
-        got: `${normalizedStart}-${normalizedEnd}`,
-        spanStart: normalizedEnd,
-        spanEnd: normalizedStart,
-        severity: "major",
-        explanation: "El tramo tiene inicio mayor que el final.",
-      });
-    }
-  });
-
-  return errors;
 }
 
 export const generateSentence = onRequest(
@@ -327,13 +201,18 @@ export const gradeAttempt = onRequest(
       const promptEnvelope = {
         requestType: "grading",
         input: payload,
-        gradingPolicy: {
-          mustBeExhaustive: true,
-          reportEveryMismatchSeparately: true,
-          preferMajorWhenClearlyWrong: true,
-        },
         requiredOutputSchema: {
           feedbackMarkdown: "string",
+          correctedAnswerMarkdown: "string",
+          reviewItems: [
+            {
+              status: "correct|incorrect",
+              title: "string",
+              detail: "string",
+              spanStart: "number(optional, 1-based)",
+              spanEnd: "number(optional, 1-based)",
+            },
+          ],
           errors: [
             {
               error_code: "string",
@@ -357,55 +236,18 @@ export const gradeAttempt = onRequest(
         systemPrompt: GRADER_SYSTEM_PROMPT,
         userPrompt,
         schema: gradingResponseSchema,
-        temperature: 0.1,
+        temperature: 0.2,
       });
-
-      let auditGrade: GradingResponse | null = null;
-      try {
-        const auditPrompt = JSON.stringify(
-          {
-            requestType: "grading_audit",
-            originalInput: payload,
-            preliminaryErrors: mainGrade.errors,
-            requiredOutputSchema: promptEnvelope.requiredOutputSchema,
-          },
-          null,
-          2,
-        );
-
-        auditGrade = await requestStrictJson({
-          apiKey: geminiApiKey.value(),
-          modelNames: getModelCandidates(),
-          systemPrompt: GRADER_AUDIT_SYSTEM_PROMPT,
-          userPrompt: auditPrompt,
-          schema: gradingResponseSchema,
-          temperature: 0,
-        });
-      } catch (auditError) {
-        console.warn("Grading audit pass failed; returning primary grading only.", auditError);
-      }
 
       const tokenCount = payload.tokens.length;
       const primarySanitized = mainGrade.errors
         .map((error) => sanitizeError(error, tokenCount))
         .filter((error): error is GraderError => error !== null);
-      const auditSanitized = (auditGrade?.errors ?? [])
-        .map((error) => sanitizeError(error, tokenCount))
-        .filter((error): error is GraderError => error !== null);
-      const ruleBased = collectRuleBasedErrors(payload)
-        .map((error) => sanitizeError(error, tokenCount))
-        .filter((error): error is GraderError => error !== null);
-      const mergedErrors = dedupeErrors([...primarySanitized, ...auditSanitized, ...ruleBased]);
-
-      const extraErrorsFound = Math.max(0, mergedErrors.length - primarySanitized.length);
-      const feedbackTail =
-        extraErrorsFound > 0
-          ? `\n\nRevision adicional: se detectaron ${extraErrorsFound} errores extra en la auditoria.`
-          : "";
+      const mergedErrors = dedupeErrors(primarySanitized);
 
       response.status(200).json({
         ...mainGrade,
-        feedbackMarkdown: `${mainGrade.feedbackMarkdown}${feedbackTail}`,
+        feedbackMarkdown: mainGrade.feedbackMarkdown,
         errors: mergedErrors,
       } satisfies GradingResponse);
     } catch (error) {

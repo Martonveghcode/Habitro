@@ -1,6 +1,6 @@
 import type { Timestamp } from "firebase/firestore";
 
-import type { Difficulty, ErrorCategory, ErrorSeverity, SentenceType } from "./syntax";
+import type { AnnotationKind, Difficulty, ErrorCategory, ErrorSeverity, SentenceType } from "./syntax";
 
 export interface ErrorDocument {
   uid: string;
@@ -39,4 +39,5 @@ export interface PracticePreferences {
   updatedAt: Timestamp;
   customFocusTopics: string[];
   selectedFocusTopics: string[];
+  customAnnotationLabels: Record<AnnotationKind, string[]>;
 }

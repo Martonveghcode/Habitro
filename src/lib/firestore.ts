@@ -15,6 +15,7 @@ import {
 
 import { db } from "./firebase";
 import type { ErrorDocument, PracticePreferences, UserAnalyticsSummary } from "../types/firestore";
+import type { AnnotationKind } from "../types/syntax";
 import type { GraderError, SentenceType } from "../types/syntax";
 
 export async function saveError(
@@ -99,6 +100,11 @@ export async function readPracticePreferences(user: User): Promise<PracticePrefe
   }
 
   const raw = snap.data() as Partial<PracticePreferences>;
+  const customAnnotationLabelsRaw = raw.customAnnotationLabels as Partial<Record<AnnotationKind, unknown>> | undefined;
+
+  const parseLabelList = (value: unknown): string[] =>
+    Array.isArray(value) ? value.filter((entry): entry is string => typeof entry === "string") : [];
+
   return {
     ...(raw as PracticePreferences),
     customFocusTopics: Array.isArray(raw.customFocusTopics)
@@ -107,6 +113,12 @@ export async function readPracticePreferences(user: User): Promise<PracticePrefe
     selectedFocusTopics: Array.isArray(raw.selectedFocusTopics)
       ? raw.selectedFocusTopics.filter((entry): entry is string => typeof entry === "string")
       : [],
+    customAnnotationLabels: {
+      wordFunction: parseLabelList(customAnnotationLabelsRaw?.wordFunction),
+      groupFunction: parseLabelList(customAnnotationLabelsRaw?.groupFunction),
+      clause: parseLabelList(customAnnotationLabelsRaw?.clause),
+      sentenceType: parseLabelList(customAnnotationLabelsRaw?.sentenceType),
+    },
   };
 }
 
@@ -115,6 +127,7 @@ export async function savePracticePreferences(
   payload: {
     customFocusTopics: string[];
     selectedFocusTopics: string[];
+    customAnnotationLabels: Record<AnnotationKind, string[]>;
   },
 ): Promise<void> {
   const ref = doc(db, "users", user.uid, "preferences", "practice");
@@ -124,6 +137,7 @@ export async function savePracticePreferences(
       updatedAt: serverTimestamp(),
       customFocusTopics: payload.customFocusTopics,
       selectedFocusTopics: payload.selectedFocusTopics,
+      customAnnotationLabels: payload.customAnnotationLabels,
     },
     { merge: true },
   );

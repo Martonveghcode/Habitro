@@ -17,14 +17,24 @@ const generationResponseSchema = z.object({
 
 const gradeResponseSchema = z.object({
   feedbackMarkdown: z.string(),
+  correctedAnswerMarkdown: z.string(),
+  reviewItems: z.array(
+    z.object({
+      status: z.enum(["correct", "incorrect"]),
+      title: z.string(),
+      detail: z.string(),
+      spanStart: z.number().int().positive().optional(),
+      spanEnd: z.number().int().positive().optional(),
+    }),
+  ),
   errors: z.array(
     z.object({
       error_code: z.string(),
       category: z.enum(["pos", "function", "grouping", "sentenceType", "punctuation"]),
       expected: z.string().nullable(),
       got: z.string().nullable(),
-      spanStart: z.number().int().nonnegative(),
-      spanEnd: z.number().int().nonnegative(),
+      spanStart: z.number().int().positive(),
+      spanEnd: z.number().int().positive(),
       severity: z.enum(["minor", "major"]),
       explanation: z.string().optional(),
     }),

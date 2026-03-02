@@ -40,24 +40,39 @@ const normalizeTopics = (topics: string[]) => {
   return normalized;
 };
 
+const normalizeAnnotationLabels = (labels: Record<string, string[]>) => {
+  const normalizeList = (entries: string[]) => normalizeTopics(entries);
+  return {
+    wordFunction: normalizeList(labels.wordFunction ?? []),
+    groupFunction: normalizeList(labels.groupFunction ?? []),
+    clause: normalizeList(labels.clause ?? []),
+    sentenceType: normalizeList(labels.sentenceType ?? []),
+  };
+};
+
 function PracticePage({ user }: { user: User }) {
   const settings = usePracticeStore((state) => state.settings);
   const customFocusTopics = usePracticeStore((state) => state.customFocusTopics);
+  const customAnnotationLabels = usePracticeStore((state) => state.customAnnotationLabels);
   const sentenceState = usePracticeStore((state) => state.sentenceState);
   const tokenPosAssignments = usePracticeStore((state) => state.tokenPosAssignments);
   const annotations = usePracticeStore((state) => state.annotations);
   const sentenceTypeBuild = usePracticeStore((state) => state.sentenceTypeBuild);
   const setFocusTopics = usePracticeStore((state) => state.setFocusTopics);
   const setCustomFocusTopics = usePracticeStore((state) => state.setCustomFocusTopics);
+  const setCustomAnnotationLabels = usePracticeStore((state) => state.setCustomAnnotationLabels);
   const setSentenceData = usePracticeStore((state) => state.setSentenceData);
   const setGenerating = usePracticeStore((state) => state.setGenerating);
   const setGrading = usePracticeStore((state) => state.setGrading);
   const setGradeResult = usePracticeStore((state) => state.setGradeResult);
+  const gradeResult = usePracticeStore((state) => state.gradeResult);
   const setErrorMessage = usePracticeStore((state) => state.setErrorMessage);
   const errorMessage = usePracticeStore((state) => state.errorMessage);
   const [summary, setSummary] = useState<UserAnalyticsSummary | null>(null);
   const [recentErrors, setRecentErrors] = useState<Array<ErrorDocument & { id: string }>>([]);
   const [preferencesLoaded, setPreferencesLoaded] = useState(false);
+  const [isSavingCorrection, setIsSavingCorrection] = useState(false);
+  const [isCorrectionSaved, setIsCorrectionSaved] = useState(false);
 
   const weaknessSummary = useMemo(() => {
     if (!summary || !settings.personalizedMode) {
@@ -102,6 +117,7 @@ function PracticePage({ user }: { user: User }) {
         if (preferences) {
           setCustomFocusTopics(normalizeTopics(preferences.customFocusTopics));
           setFocusTopics(normalizeTopics(preferences.selectedFocusTopics));
+          setCustomAnnotationLabels(normalizeAnnotationLabels(preferences.customAnnotationLabels));
         }
       } catch (error) {
         if (!isCancelled) {
@@ -129,14 +145,16 @@ function PracticePage({ user }: { user: User }) {
     void savePracticePreferences(user, {
       customFocusTopics: normalizeTopics(customFocusTopics),
       selectedFocusTopics: normalizeTopics(settings.focusTopics),
+      customAnnotationLabels: normalizeAnnotationLabels(customAnnotationLabels),
     }).catch((error) => {
       setErrorMessage(error instanceof Error ? error.message : "No se pudieron guardar las preferencias.");
     });
-  }, [customFocusTopics, preferencesLoaded, settings.focusTopics, user.uid]);
+  }, [customAnnotationLabels, customFocusTopics, preferencesLoaded, settings.focusTopics, user.uid]);
 
   const handleGenerateSentence = async () => {
     setGenerating(true);
     setErrorMessage(null);
+    setIsCorrectionSaved(false);
     try {
       const response = await generateSentence(user, {
         sentenceType: settings.sentenceType,
@@ -172,6 +190,7 @@ function PracticePage({ user }: { user: User }) {
 
     setGrading(true);
     setErrorMessage(null);
+    setIsCorrectionSaved(false);
 
     try {
       const analysis: UserAnalysisPayload = {
@@ -204,16 +223,29 @@ function PracticePage({ user }: { user: User }) {
       });
 
       setGradeResult(grade);
-
-      if (grade.errors.length > 0) {
-        await saveErrors(user, settings.sentenceType, settings.difficulty, grade.errors);
-      }
-
-      await refreshAnalytics();
     } catch (error) {
       setErrorMessage(error instanceof Error ? error.message : "No se pudo corregir.");
     } finally {
       setGrading(false);
+    }
+  };
+
+  const handleSaveCorrection = async () => {
+    if (!gradeResult || gradeResult.errors.length === 0) {
+      setIsCorrectionSaved(true);
+      return;
+    }
+
+    setIsSavingCorrection(true);
+    setErrorMessage(null);
+    try {
+      await saveErrors(user, settings.sentenceType, settings.difficulty, gradeResult.errors);
+      await refreshAnalytics();
+      setIsCorrectionSaved(true);
+    } catch (error) {
+      setErrorMessage(error instanceof Error ? error.message : "No se pudo guardar la correccion.");
+    } finally {
+      setIsSavingCorrection(false);
     }
   };
 
@@ -236,7 +268,12 @@ function PracticePage({ user }: { user: User }) {
         <div className="main-column">
           <SentenceWorkspace />
           <AnnotationCanvas />
-          <FeedbackPanel onGrade={handleGrade} />
+          <FeedbackPanel
+            onGrade={handleGrade}
+            onSave={handleSaveCorrection}
+            isSaving={isSavingCorrection}
+            saved={isCorrectionSaved}
+          />
         </div>
       </main>
     </div>

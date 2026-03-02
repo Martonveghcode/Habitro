@@ -35,12 +35,22 @@ service cloud.firestore {
     match /users/{uid}/preferences/practice {
       allow read: if isOwner(uid);
       allow write: if isOwner(uid)
-        && request.resource.data.keys().hasOnly(['updatedAt', 'customFocusTopics', 'selectedFocusTopics'])
+        && request.resource.data.keys().hasOnly(['updatedAt', 'customFocusTopics', 'selectedFocusTopics', 'customAnnotationLabels'])
         && request.resource.data.updatedAt == request.time
         && request.resource.data.customFocusTopics is list
         && request.resource.data.customFocusTopics.size() <= 100
         && request.resource.data.selectedFocusTopics is list
-        && request.resource.data.selectedFocusTopics.size() <= 100;
+        && request.resource.data.selectedFocusTopics.size() <= 100
+        && request.resource.data.customAnnotationLabels is map
+        && request.resource.data.customAnnotationLabels.keys().hasOnly(['wordFunction', 'groupFunction', 'clause', 'sentenceType'])
+        && request.resource.data.customAnnotationLabels.wordFunction is list
+        && request.resource.data.customAnnotationLabels.wordFunction.size() <= 100
+        && request.resource.data.customAnnotationLabels.groupFunction is list
+        && request.resource.data.customAnnotationLabels.groupFunction.size() <= 100
+        && request.resource.data.customAnnotationLabels.clause is list
+        && request.resource.data.customAnnotationLabels.clause.size() <= 100
+        && request.resource.data.customAnnotationLabels.sentenceType is list
+        && request.resource.data.customAnnotationLabels.sentenceType.size() <= 100;
     }
   }
 }

@@ -360,8 +360,26 @@ select {
 
 .top-codes,
 .recent-errors,
-.error-list {
+.error-list,
+.review-list {
   margin-top: 0.8rem;
+}
+
+.review-item {
+  border: 1px solid var(--line);
+  padding: 0.45rem 0.55rem;
+  margin-bottom: 0.4rem;
+  background: rgba(22, 27, 33, 0.8);
+}
+
+.review-item.ok {
+  border-color: rgba(143, 243, 181, 0.7);
+  background: rgba(45, 82, 59, 0.35);
+}
+
+.review-item.bad {
+  border-color: rgba(255, 133, 133, 0.7);
+  background: rgba(98, 37, 37, 0.35);
 }
 
 .muted {
