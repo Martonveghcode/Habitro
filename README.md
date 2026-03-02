@@ -1,66 +1,47 @@
-# Sintaxis WebApp (MVP)
+# Valores del se App (Streamlit)
 
-React + TypeScript app for Spanish syntax practice with drag-and-drop annotation, Gemini generation/grading, and Firebase analytics.
+Nueva version centrada solo en practica de **valores del se**.
 
-## Stack
+## Incluye
 
-- Frontend: Vite + React + TypeScript + Zustand + dnd-kit
-- Backend: Firebase Cloud Functions v2 (TypeScript)
-- Data: Firestore (`/errors` + `/users/{uid}/analytics/summary`)
-- LLM: Google Gemini through backend proxy
+- Generacion de frases (dificultad 1-3) con "se".
+- Respuesta correcta incluida en el mismo llamado al LLM:
+  - valor de "se"
+  - funcion (CD/CI/etc.)
+  - tipo de oracion
+  - explicacion breve
+- Comprobacion inmediata de tu respuesta.
+- Historial de errores con:
+  - ocultar/mostrar
+  - reset completo
+- Modo personalizado usando tus errores guardados.
+- Navegacion lateral (`Practicar`, `Historial`, `Ajustes`).
 
-## Prerequisites
+## Requisitos
 
-- Node.js 20+
-- Firebase CLI (`npm i -g firebase-tools` or `npx firebase-tools`)
-- Firebase project: `database-for-sintaxis`
+- Python 3.10+
 
-## Local setup
-
-1. Install web dependencies:
-   ```bash
-   npm install
-   ```
-2. Install Functions dependencies:
-   ```bash
-   npm --prefix functions install
-   ```
-3. Copy environment file:
-   ```bash
-   copy .env.example .env
-   ```
-4. Functions base URLs are mode-based:
-   - `.env.development` uses local emulator URL
-   - `.env.production` uses deployed Functions URL
-4. Set Functions secret for Gemini:
-   ```bash
-   firebase functions:secrets:set GEMINI_API_KEY
-   ```
-5. Run frontend:
-   ```bash
-   npm run dev
-   ```
-6. Run emulators (from repo root):
-   ```bash
-   npx firebase-tools emulators:start --only firestore,functions
-   ```
-
-## Firestore paths
-
-- Error documents: `/errors/{autoId}`
-- Analytics summary: `/users/{uid}/analytics/summary`
-
-## Functions
-
-- `generateSentence` (HTTP POST)
-- `gradeAttempt` (HTTP POST)
-- `onErrorCreated` (Firestore trigger)
-
-Both HTTP endpoints require a Firebase ID token in `Authorization: Bearer <token>`.
-
-## Build checks
+## Instalacion
 
 ```bash
-npm run build
-npm --prefix functions run build
+pip install -r requirements-streamlit.txt
+```
+
+Opcional (Gemini):
+
+- En variable de entorno:
+  - `GEMINI_API_KEY=...`
+  - `GEMINI_MODEL=gemini-2.5-flash-lite` (opcional)
+- O en `.streamlit/secrets.toml`:
+  ```toml
+  GEMINI_API_KEY = "tu_clave"
+  GEMINI_MODEL = "gemini-2.5-flash-lite"
+  ```
+
+Si no hay API key, la app usa ejemplos locales para que siga funcionando.
+
+## Ejecutar
+
+```bash
+streamlit run streamlit_app.py
 ```

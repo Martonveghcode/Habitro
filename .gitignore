@@ -29,3 +29,9 @@ dist-ssr
 .env.development
 .env.example
 .env.example
+
+# Streamlit / Python local data
+.streamlit/secrets.toml
+*.db
+.env.example
+.streamlit/secret.toml
