@@ -9,6 +9,13 @@ from datetime import datetime, timezone
 from typing import Any, Dict, List, Optional, Tuple
 
 import streamlit as st
+from morfologia_section import (
+    ensure_morfologia_state,
+    init_morfologia_db,
+    render_morfologia_history_page,
+    render_morfologia_practice_page,
+    render_morfologia_settings_page,
+)
 
 DB_PATH = "se_valores.db"
 
@@ -1690,23 +1697,37 @@ def render_settings_page() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Valores del se", page_icon="se", layout="wide")
+    st.set_page_config(page_title="Sintaxis WebApp", page_icon="se", layout="wide")
     st.markdown(CSS, unsafe_allow_html=True)
 
     init_db()
+    init_morfologia_db()
     ensure_state()
+    ensure_morfologia_state()
 
     st.sidebar.title("Navegacion")
-    page = st.sidebar.radio("Ir a", ["Practicar", "Historial", "Ajustes"])
-    st.sidebar.caption(f"Perfil: {st.session_state.profile_id}")
-    st.sidebar.caption(f"Modelo: {st.session_state.model_name}")
+    section = st.sidebar.radio("Seccion", ["Valores del se", "Morfologia"])
+    page_key = "se_nav_page" if section == "Valores del se" else "morf_nav_page"
+    page = st.sidebar.radio("Ir a", ["Practicar", "Historial", "Ajustes"], key=page_key)
 
-    if page == "Practicar":
-        render_practice_page()
-    elif page == "Historial":
-        render_history_page()
+    if section == "Valores del se":
+        st.sidebar.caption(f"Perfil: {st.session_state.profile_id}")
+        st.sidebar.caption(f"Modelo: {st.session_state.model_name}")
+        if page == "Practicar":
+            render_practice_page()
+        elif page == "Historial":
+            render_history_page()
+        else:
+            render_settings_page()
     else:
-        render_settings_page()
+        st.sidebar.caption(f"Perfil: {st.session_state.morf_profile_id}")
+        st.sidebar.caption(f"Modelo: {st.session_state.morf_model_name}")
+        if page == "Practicar":
+            render_morfologia_practice_page()
+        elif page == "Historial":
+            render_morfologia_history_page()
+        else:
+            render_morfologia_settings_page()
 
 
 if __name__ == "__main__":
