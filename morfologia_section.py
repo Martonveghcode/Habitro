@@ -25,6 +25,7 @@ MORFO_MORPHEME_TYPES = [
     "Sufijo derivativo",
     "Morfema flexivo nominal (genero)",
     "Morfema flexivo nominal (numero)",
+    "Vocal tematica",
     "Morfema flexivo verbal (tiempo/modo/aspecto)",
     "Morfema flexivo verbal (persona/numero)",
 ]
@@ -58,6 +59,7 @@ Tipos de morfema validos (exactos):
 - Sufijo derivativo
 - Morfema flexivo nominal (genero)
 - Morfema flexivo nominal (numero)
+- Vocal tematica
 - Morfema flexivo verbal (tiempo/modo/aspecto)
 - Morfema flexivo verbal (persona/numero)
 
@@ -146,11 +148,11 @@ MORFO_SAMPLE_BANK: Dict[int, List[Dict[str, Any]]] = {
             "accepted_lexemes": ["cant", "canta"],
             "morphemes": ["a", "mos"],
             "morpheme_types": [
-                "Morfema flexivo verbal (tiempo/modo/aspecto)",
+                "Vocal tematica",
                 "Morfema flexivo verbal (persona/numero)",
             ],
             "analysis_type": "Verbo en primera persona plural",
-            "explanation": "Lexema cant + marca verbal de tiempo/modo/aspecto + marca de persona/numero.",
+            "explanation": "Lexema cant + vocal tematica -a + marca de persona/numero -mos.",
         },
         {
             "word": "injusto",
@@ -393,6 +395,9 @@ def normalize_morpheme_type_label(value: str) -> str:
         "numero": "Morfema flexivo nominal (numero)",
         "morfema de numero": "Morfema flexivo nominal (numero)",
         "morfema flexivo nominal (numero)": "Morfema flexivo nominal (numero)",
+        "vocal tematica": "Vocal tematica",
+        "vocal temática": "Vocal tematica",
+        "vt": "Vocal tematica",
         "morfema verbal tma": "Morfema flexivo verbal (tiempo/modo/aspecto)",
         "tiempo/modo/aspecto": "Morfema flexivo verbal (tiempo/modo/aspecto)",
         "morfema flexivo verbal (tiempo/modo/aspecto)": "Morfema flexivo verbal (tiempo/modo/aspecto)",
