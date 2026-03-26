@@ -1,4 +1,10 @@
-import { normalizeFunctionLabel, normalizeMorphemeTypeLabel } from "./logic";
+import {
+  normalizeFunctionLabel,
+  normalizeMorphemeTypeLabel,
+  normalizePeriphrasisTypeLabel,
+  normalizeSeValueLabel,
+  normalizeVerbalStructureLabel,
+} from "./logic";
 import type {
   MorfoItem,
   MorfoStrategy,
@@ -30,18 +36,37 @@ async function postAi<T>(body: unknown, apiKey?: string): Promise<T> {
   return payload as T;
 }
 
-function sanitizeSeItem(raw: Record<string, unknown>, strategy: SeStrategy): Omit<SeItem, "id"> | null {
+function sanitizeSeItem(
+  raw: Record<string, unknown>,
+  strategy: SeStrategy,
+  options: {
+    allowedValues: readonly string[];
+    allowedVerbalStructures: readonly string[];
+    allowedPeriphrasisTypes: readonly string[];
+  },
+): Omit<SeItem, "id"> | null {
   const sentence = String(raw.sentence ?? "").trim();
-  const seValue = String(raw.seValue ?? "").trim();
-  const seFunction = normalizeFunctionLabel(String(raw.seFunction ?? "").trim());
-  const acceptedFunctions = Array.isArray(raw.acceptedFunctions)
-    ? raw.acceptedFunctions.map((entry) => normalizeFunctionLabel(String(entry).trim())).filter(Boolean)
+  const seValue = normalizeSeValueLabel(String(raw.seValue ?? raw.se_value ?? "").trim(), options.allowedValues);
+  const seFunction = normalizeFunctionLabel(String(raw.seFunction ?? raw.se_function ?? "").trim());
+  const rawAcceptedFunctions = raw.acceptedFunctions ?? raw.accepted_functions;
+  const acceptedFunctions = Array.isArray(rawAcceptedFunctions)
+    ? rawAcceptedFunctions
+        .map((entry: unknown) => normalizeFunctionLabel(String(entry).trim()))
+        .filter(Boolean)
     : [];
-  const phraseType = String(raw.phraseType ?? "").trim();
+  const verbalStructure = normalizeVerbalStructureLabel(
+    String(raw.verbalStructure ?? raw.verbal_structure ?? "").trim(),
+    options.allowedVerbalStructures,
+  );
+  const periphrasisType = normalizePeriphrasisTypeLabel(
+    String(raw.periphrasisType ?? raw.periphrasis_type ?? "").trim(),
+    options.allowedPeriphrasisTypes,
+  );
+  const phraseType = String(raw.phraseType ?? raw.phrase_type ?? "").trim();
   const explanation = String(raw.explanation ?? "").trim();
   const difficulty = Number(raw.difficulty ?? 0) as SeItem["difficulty"];
 
-  if (!sentence || !seValue || !seFunction || !phraseType || !explanation || !difficulty) {
+  if (!sentence || !seValue || !seFunction || !verbalStructure || !periphrasisType || !phraseType || !explanation || !difficulty) {
     return null;
   }
 
@@ -51,6 +76,8 @@ function sanitizeSeItem(raw: Record<string, unknown>, strategy: SeStrategy): Omi
     seValue,
     seFunction,
     acceptedFunctions: acceptedFunctions.length > 0 ? acceptedFunctions : [seFunction],
+    verbalStructure,
+    periphrasisType,
     phraseType,
     explanation,
     mode: strategy.mode,
@@ -97,7 +124,11 @@ export async function requestSeGeneration(input: {
   strategies: SeStrategy[];
   profile: unknown;
   recentSentences: string[];
-  recentLabels: Array<{ value: string; function: string }>;
+  recentLabels: Array<{ value: string; function: string; verbalStructure: string; periphrasisType: string }>;
+  allowedValues: string[];
+  allowedFunctions: string[];
+  allowedVerbalStructures: string[];
+  allowedPeriphrasisTypes: string[];
 }): Promise<Array<Omit<SeItem, "id">>> {
   const payload = await postAi<{ items?: Array<Record<string, unknown>> }>(
     {
@@ -109,13 +140,23 @@ export async function requestSeGeneration(input: {
         profile: input.profile,
         recentSentences: input.recentSentences,
         recentLabels: input.recentLabels,
+        allowedValues: input.allowedValues,
+        allowedFunctions: input.allowedFunctions,
+        allowedVerbalStructures: input.allowedVerbalStructures,
+        allowedPeriphrasisTypes: input.allowedPeriphrasisTypes,
       },
     },
     input.apiKey,
   );
 
   return (payload.items ?? [])
-    .map((item, index) => sanitizeSeItem(item, input.strategies[index] ?? input.strategies[0]))
+    .map((item, index) =>
+      sanitizeSeItem(item, input.strategies[index] ?? input.strategies[0], {
+        allowedValues: input.allowedValues,
+        allowedVerbalStructures: input.allowedVerbalStructures,
+        allowedPeriphrasisTypes: input.allowedPeriphrasisTypes,
+      }),
+    )
     .filter((item): item is Omit<SeItem, "id"> => item !== null);
 }
 
@@ -155,8 +196,14 @@ export async function requestSeRecheck(payload: {
   seValue: string;
   seFunction: string;
   acceptedFunctions: string[];
+  verbalStructure: string;
+  periphrasisType: string;
   phraseType: string;
   explanation: string;
+  allowedValues: string[];
+  allowedFunctions: string[];
+  allowedVerbalStructures: string[];
+  allowedPeriphrasisTypes: string[];
 }): Promise<RecheckResultSe> {
   const { apiKey, ...rest } = payload;
   return postAi<RecheckResultSe>(
@@ -198,6 +245,8 @@ export async function requestSeQuestion(payload: {
     sentence: string;
     seValue: string;
     seFunction: string;
+    verbalStructure: string;
+    periphrasisType: string;
     phraseType: string;
     explanation: string;
   };

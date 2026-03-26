@@ -19,6 +19,21 @@ const SE_FUNCTIONS = [
   "Marca de impersonal",
 ];
 
+const SE_VERBAL_STRUCTURES = ["Verbo simple", "Perifrasis verbal", "Locucion verbal", "Dos verbos"];
+
+const SE_PERIPHRASIS_TYPES = [
+  "No aplica",
+  "Modal obligativa",
+  "Modal de posibilidad",
+  "Aspectual ingresiva",
+  "Aspectual incoativa",
+  "Aspectual durativa",
+  "Aspectual terminativa",
+  "Aspectual reiterativa",
+  "Aspectual resultativa",
+  "Aspectual habitual",
+];
+
 const MORFO_WORD_TYPES = ["Sustantivo", "Adjetivo", "Verbo", "Adverbio"];
 
 const MORFO_MORPHEME_TYPES = [
@@ -38,27 +53,15 @@ const SE_SYSTEM_PROMPT = `
 Eres PROFE SINTAXIS en modo especializado en valores de "se".
 Debes generar solo frases para practicar VALORES DEL SE.
 
-Valores validos (exactos):
-1) Reflexivo
-2) Reciproco
-3) Sustitucion (le -> se)
-4) Pronominal
-5) Pasiva refleja
-6) Impersonal
-7) Accidental (dativo de interes)
-
-Funciones posibles de "se" (exactas):
-- CD
-- CI
-- Sin funcion sintactica propia
-- Morfema verbal
-- Marca de pasiva
-- Marca de impersonal
+Los valores y funciones exactos llegan en el JSON del usuario como allowed_values y allowed_functions.
+Tambien debes clasificar cada frase por:
+- verbal_structure: Verbo simple, Perifrasis verbal, Locucion verbal o Dos verbos
+- periphrasis_type: tipo exacto de la perifrasis si la hay; si NO hay perifrasis, usa exactamente "No aplica"
 
 Reglas obligatorias:
 - La frase debe contener "se" de forma clara.
 - Si se solicita batch_size > 1, devuelve exactamente ese numero de frases.
-- Devuelve tambien la respuesta correcta (valor + funcion) y una explicacion breve.
+- Devuelve tambien la respuesta correcta (valor + funcion + analisis verbal) y una explicacion breve.
 - Incluye tipo de oracion.
 - Ajusta dificultad:
   d1: estructura simple y muy transparente
@@ -74,7 +77,7 @@ Reglas obligatorias:
 
 const SE_RECHECK_PROMPT = `
 Eres un verificador estricto de gramatica espanola para "valores del se".
-Recibes una frase y la respuesta propuesta por otro modelo.
+Recibes una frase y la respuesta propuesta por otro modelo, incluyendo el analisis de construccion verbal.
 Tu tarea es decidir si la respuesta propuesta es correcta.
 Devuelve SOLO JSON valido.
 `;
@@ -165,7 +168,20 @@ const requestSchema = z.discriminatedUnion("action", [
       strategies: z.array(seStrategySchema).min(1),
       profile: z.unknown(),
       recentSentences: z.array(z.string()).default([]),
-      recentLabels: z.array(z.object({ value: z.string(), function: z.string() })).default([]),
+      recentLabels: z
+        .array(
+          z.object({
+            value: z.string(),
+            function: z.string(),
+            verbalStructure: z.string().default(""),
+            periphrasisType: z.string().default(""),
+          }),
+        )
+        .default([]),
+      allowedValues: z.array(z.string()).min(1).default(SE_VALUES),
+      allowedFunctions: z.array(z.string()).min(1).default(SE_FUNCTIONS),
+      allowedVerbalStructures: z.array(z.string()).min(1).default(SE_VERBAL_STRUCTURES),
+      allowedPeriphrasisTypes: z.array(z.string()).min(1).default(SE_PERIPHRASIS_TYPES),
     }),
   }),
   z.object({
@@ -187,8 +203,14 @@ const requestSchema = z.discriminatedUnion("action", [
       seValue: z.string().min(1),
       seFunction: z.string().min(1),
       acceptedFunctions: z.array(z.string()).default([]),
+      verbalStructure: z.string().min(1),
+      periphrasisType: z.string().min(1),
       phraseType: z.string().min(1),
       explanation: z.string().min(1),
+      allowedValues: z.array(z.string()).min(1).default(SE_VALUES),
+      allowedFunctions: z.array(z.string()).min(1).default(SE_FUNCTIONS),
+      allowedVerbalStructures: z.array(z.string()).min(1).default(SE_VERBAL_STRUCTURES),
+      allowedPeriphrasisTypes: z.array(z.string()).min(1).default(SE_PERIPHRASIS_TYPES),
     }),
   }),
   z.object({
@@ -212,6 +234,8 @@ const requestSchema = z.discriminatedUnion("action", [
         sentence: z.string().min(1),
         seValue: z.string().min(1),
         seFunction: z.string().min(1),
+        verbalStructure: z.string().min(1),
+        periphrasisType: z.string().min(1),
         phraseType: z.string().min(1),
         explanation: z.string().min(1),
       }),
@@ -364,6 +388,21 @@ function normalizeFunctionLabel(value) {
   return mapping[key] || String(value || "").trim();
 }
 
+function normalizeTextToken(value) {
+  return String(value || "")
+    .trim()
+    .toLowerCase()
+    .normalize("NFD")
+    .replace(/[\u0300-\u036f]/g, "");
+}
+
+function normalizeLabelAgainstOptions(value, options) {
+  const raw = String(value || "").trim();
+  const key = normalizeTextToken(raw);
+  const match = options.find((item) => normalizeTextToken(item) === key);
+  return match || raw;
+}
+
 function normalizeMorphemeType(value) {
   const raw = String(value || "").trim();
   const normalized = raw.toLowerCase();
@@ -371,18 +410,20 @@ function normalizeMorphemeType(value) {
   return match || raw;
 }
 
-function normalizeSeItem(item, difficulty, strategy) {
-  const acceptedFunctions = Array.isArray(item.accepted_functions)
-    ? item.accepted_functions.map((entry) => normalizeFunctionLabel(entry)).filter(Boolean)
+function normalizeSeItem(item, difficulty, strategy, options) {
+  const acceptedFunctions = Array.isArray(item.accepted_functions ?? item.acceptedFunctions)
+    ? (item.accepted_functions ?? item.acceptedFunctions).map((entry) => normalizeFunctionLabel(entry)).filter(Boolean)
     : [];
-  const seFunction = normalizeFunctionLabel(item.se_function);
+  const seFunction = normalizeFunctionLabel(item.se_function ?? item.seFunction);
   return {
     sentence: String(item.sentence || "").trim(),
     difficulty: Number(item.difficulty || difficulty),
-    seValue: String(item.se_value || "").trim(),
+    seValue: normalizeLabelAgainstOptions(item.se_value ?? item.seValue, options.allowedValues),
     seFunction,
     acceptedFunctions: acceptedFunctions.length > 0 ? acceptedFunctions : seFunction ? [seFunction] : [],
-    phraseType: String(item.phrase_type || "").trim(),
+    verbalStructure: normalizeLabelAgainstOptions(item.verbal_structure ?? item.verbalStructure, options.allowedVerbalStructures),
+    periphrasisType: normalizeLabelAgainstOptions(item.periphrasis_type ?? item.periphrasisType, options.allowedPeriphrasisTypes),
+    phraseType: String(item.phrase_type ?? item.phraseType ?? "").trim(),
     explanation: String(item.explanation || "").trim(),
     mode: strategy.mode,
   };
@@ -412,9 +453,17 @@ function normalizeMorfoItem(item, difficulty, strategy) {
 function buildSeGenerationPrompt(payload) {
   const recentValues = payload.recentLabels.map((entry) => entry.value);
   const recentFunctions = payload.recentLabels.map((entry) => entry.function);
+  const recentStructures = payload.recentLabels.map((entry) => entry.verbalStructure).filter(Boolean);
+  const recentPeriphrasisTypes = payload.recentLabels.map((entry) => entry.periphrasisType).filter(Boolean);
   const avoidValues = recentValues.length >= 2 && recentValues[0] === recentValues[1] ? [recentValues[0]] : [];
   const avoidFunctions =
     recentFunctions.length >= 3 && new Set(recentFunctions.slice(0, 3)).size === 1 ? [recentFunctions[0]] : [];
+  const avoidStructures =
+    recentStructures.length >= 2 && recentStructures[0] === recentStructures[1] ? [recentStructures[0]] : [];
+  const avoidPeriphrasisTypes =
+    recentPeriphrasisTypes.length >= 2 && recentPeriphrasisTypes[0] === recentPeriphrasisTypes[1]
+      ? [recentPeriphrasisTypes[0]]
+      : [];
 
   return JSON.stringify(
     {
@@ -433,12 +482,16 @@ function buildSeGenerationPrompt(payload) {
         ratio_hint: payload.strategies[0]?.ratioHint || "sin ratio",
       },
       learning_profile: payload.profile,
-      allowed_values: SE_VALUES,
-      allowed_functions: SE_FUNCTIONS,
+      allowed_values: payload.allowedValues,
+      allowed_functions: payload.allowedFunctions,
+      allowed_verbal_structures: payload.allowedVerbalStructures,
+      allowed_periphrasis_types: payload.allowedPeriphrasisTypes,
       anti_repetition: {
         avoid_recent_sentences: payload.recentSentences,
         avoid_values_temporarily: avoidValues,
         avoid_functions_temporarily: avoidFunctions,
+        avoid_verbal_structures_temporarily: avoidStructures,
+        avoid_periphrasis_types_temporarily: avoidPeriphrasisTypes,
         must_be_semantically_distinct: true,
         do_not_repeat_main_verb_or_frame: true,
       },
@@ -461,6 +514,8 @@ function buildSeGenerationPrompt(payload) {
             se_value: "one_of_allowed_values",
             se_function: "one_of_allowed_functions",
             accepted_functions: ["one_or_more_allowed_functions"],
+            verbal_structure: "one_of_allowed_verbal_structures",
+            periphrasis_type: "one_of_allowed_periphrasis_types",
             phrase_type: "string",
             explanation: "string_short",
           },
@@ -543,16 +598,26 @@ async function handleGenerateSe(apiKey, requestBody) {
   const parsed = extractJson(result.text);
   const items = extractCandidateItems(parsed)
     .slice(0, requestBody.payload.strategies.length)
-    .map((item, index) => normalizeSeItem(item, requestBody.payload.difficulty, requestBody.payload.strategies[index]))
+    .map((item, index) =>
+      normalizeSeItem(item, requestBody.payload.difficulty, requestBody.payload.strategies[index], {
+        allowedValues: requestBody.payload.allowedValues,
+        allowedVerbalStructures: requestBody.payload.allowedVerbalStructures,
+        allowedPeriphrasisTypes: requestBody.payload.allowedPeriphrasisTypes,
+      }),
+    )
     .filter(
       (item) =>
         item.sentence &&
         item.seValue &&
         item.seFunction &&
+        item.verbalStructure &&
+        item.periphrasisType &&
         item.phraseType &&
         item.explanation &&
-        SE_VALUES.includes(item.seValue) &&
-        SE_FUNCTIONS.includes(item.seFunction),
+        requestBody.payload.allowedValues.includes(item.seValue) &&
+        requestBody.payload.allowedFunctions.includes(item.seFunction) &&
+        requestBody.payload.allowedVerbalStructures.includes(item.verbalStructure) &&
+        requestBody.payload.allowedPeriphrasisTypes.includes(item.periphrasisType),
     );
 
   return jsonResponse(200, { model: result.model, items });
@@ -596,16 +661,22 @@ async function handleSeRecheck(apiKey, requestBody) {
         se_function: requestBody.payload.seFunction,
         accepted_functions:
           requestBody.payload.acceptedFunctions.length > 0 ? requestBody.payload.acceptedFunctions : [requestBody.payload.seFunction],
+        verbal_structure: requestBody.payload.verbalStructure,
+        periphrasis_type: requestBody.payload.periphrasisType,
         phrase_type: requestBody.payload.phraseType,
         explanation: requestBody.payload.explanation,
       },
-      allowed_values: SE_VALUES,
-      allowed_functions: SE_FUNCTIONS,
+      allowed_values: requestBody.payload.allowedValues,
+      allowed_functions: requestBody.payload.allowedFunctions,
+      allowed_verbal_structures: requestBody.payload.allowedVerbalStructures,
+      allowed_periphrasis_types: requestBody.payload.allowedPeriphrasisTypes,
       task: "Verificar si la respuesta propuesta es correcta para la frase.",
       output_schema: {
         is_correct: "boolean",
         corrected_value: "one_of_allowed_values",
         corrected_function: "one_of_allowed_functions",
+        corrected_verbal_structure: "one_of_allowed_verbal_structures",
+        corrected_periphrasis_type: "one_of_allowed_periphrasis_types",
         issues: ["lista corta de problemas encontrados"],
         correction_note: "explicacion breve",
       },
@@ -624,10 +695,22 @@ async function handleSeRecheck(apiKey, requestBody) {
   });
 
   const parsed = extractJson(result.text);
-  const correctedValue = SE_VALUES.includes(parsed.corrected_value) ? parsed.corrected_value : requestBody.payload.seValue;
-  const correctedFunction = SE_FUNCTIONS.includes(normalizeFunctionLabel(parsed.corrected_function))
+  const correctedValue = requestBody.payload.allowedValues.includes(normalizeLabelAgainstOptions(parsed.corrected_value, requestBody.payload.allowedValues))
+    ? normalizeLabelAgainstOptions(parsed.corrected_value, requestBody.payload.allowedValues)
+    : requestBody.payload.seValue;
+  const correctedFunction = requestBody.payload.allowedFunctions.includes(normalizeFunctionLabel(parsed.corrected_function))
     ? normalizeFunctionLabel(parsed.corrected_function)
     : requestBody.payload.seFunction;
+  const correctedVerbalStructure = requestBody.payload.allowedVerbalStructures.includes(
+    normalizeLabelAgainstOptions(parsed.corrected_verbal_structure, requestBody.payload.allowedVerbalStructures),
+  )
+    ? normalizeLabelAgainstOptions(parsed.corrected_verbal_structure, requestBody.payload.allowedVerbalStructures)
+    : requestBody.payload.verbalStructure;
+  const correctedPeriphrasisType = requestBody.payload.allowedPeriphrasisTypes.includes(
+    normalizeLabelAgainstOptions(parsed.corrected_periphrasis_type, requestBody.payload.allowedPeriphrasisTypes),
+  )
+    ? normalizeLabelAgainstOptions(parsed.corrected_periphrasis_type, requestBody.payload.allowedPeriphrasisTypes)
+    : requestBody.payload.periphrasisType;
 
   return jsonResponse(200, {
     success: true,
@@ -635,6 +718,8 @@ async function handleSeRecheck(apiKey, requestBody) {
     isCorrect: Boolean(parsed.is_correct),
     correctedValue,
     correctedFunction,
+    correctedVerbalStructure,
+    correctedPeriphrasisType,
     issues: Array.isArray(parsed.issues) ? parsed.issues.map((entry) => String(entry).trim()).filter(Boolean) : [],
     correctionNote: String(parsed.correction_note || "").trim(),
   });
@@ -773,6 +858,8 @@ export default async (request) => {
               initial_answer: {
                 se_value: requestBody.payload.item.seValue,
                 se_function: requestBody.payload.item.seFunction,
+                verbal_structure: requestBody.payload.item.verbalStructure,
+                periphrasis_type: requestBody.payload.item.periphrasisType,
                 phrase_type: requestBody.payload.item.phraseType,
                 explanation: requestBody.payload.item.explanation,
               },

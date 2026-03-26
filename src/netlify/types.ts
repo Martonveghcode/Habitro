@@ -30,6 +30,19 @@ export interface SeItem {
   seValue: string;
   seFunction: string;
   acceptedFunctions: string[];
+  verbalStructure: string;
+  periphrasisType: string;
+  phraseType: string;
+  explanation: string;
+  mode: Mode;
+}
+
+export interface PeriphrasisItem {
+  id: string;
+  sentence: string;
+  difficulty: Difficulty;
+  verbalStructure: string;
+  periphrasisType: string;
   phraseType: string;
   explanation: string;
   mode: Mode;
@@ -57,10 +70,35 @@ export interface SeAttempt {
   sentence: string;
   expectedValue: string;
   expectedFunction: string;
+  expectedVerbalStructure: string;
+  expectedPeriphrasisType: string;
   guessValue: string;
   guessFunction: string;
+  guessVerbalStructure: string;
+  guessPeriphrasisType: string;
   valueOk: boolean;
   functionOk: boolean;
+  verbalStructureOk: boolean;
+  periphrasisTypeOk: boolean;
+  overallOk: boolean;
+  phraseType: string;
+  explanation: string;
+  mode: Mode;
+}
+
+export interface PeriphrasisAttempt {
+  id: string;
+  profileId: string;
+  createdAt: string;
+  difficulty: Difficulty;
+  sentence: string;
+  expectedStructure: string;
+  expectedPeriphrasisType: string;
+  guessStructure: string;
+  guessPeriphrasisType: string;
+  structureOk: boolean;
+  periphrasisTypeOk: boolean;
+  overallOk: boolean;
   phraseType: string;
   explanation: string;
   mode: Mode;
@@ -98,6 +136,20 @@ export interface SeSettings {
   difficulty: Difficulty;
   personalized: boolean;
   focusValues: string[];
+  customValues: string[];
+  customPeriphrasisTypes: string[];
+  targetWeight: number;
+  normalWeight: number;
+  hideHistory: boolean;
+}
+
+export interface PeriphrasisSettings {
+  profileId: string;
+  modelName: string;
+  difficulty: Difficulty;
+  personalized: boolean;
+  focusStructures: string[];
+  customPeriphrasisTypes: string[];
   targetWeight: number;
   normalWeight: number;
   hideHistory: boolean;
@@ -118,8 +170,10 @@ export interface StorageState {
   version: 1;
   geminiApiKey: string;
   seSettings: SeSettings;
+  periphrasisSettings: PeriphrasisSettings;
   morfoSettings: MorfoSettings;
   seAttempts: SeAttempt[];
+  periphrasisAttempts: PeriphrasisAttempt[];
   morfoAttempts: MorfoAttempt[];
 }
 
@@ -129,8 +183,25 @@ export interface SeProfile {
   strongValues: SummaryRow[];
   weakFunctions: SummaryRow[];
   strongFunctions: SummaryRow[];
+  weakVerbalStructures: SummaryRow[];
+  strongVerbalStructures: SummaryRow[];
+  weakPeriphrasisTypes: SummaryRow[];
+  strongPeriphrasisTypes: SummaryRow[];
   valueOverview: SummaryRow[];
   functionOverview: SummaryRow[];
+  verbalStructureOverview: SummaryRow[];
+  periphrasisTypeOverview: SummaryRow[];
+  weakPairs: PairSummaryRow[];
+}
+
+export interface PeriphrasisProfile {
+  totalAttempts: number;
+  weakStructures: SummaryRow[];
+  strongStructures: SummaryRow[];
+  weakPeriphrasisTypes: SummaryRow[];
+  strongPeriphrasisTypes: SummaryRow[];
+  structureOverview: SummaryRow[];
+  periphrasisTypeOverview: SummaryRow[];
   weakPairs: PairSummaryRow[];
 }
 
@@ -154,6 +225,15 @@ export interface SeStrategy {
   ratioHint: string;
 }
 
+export interface PeriphrasisStrategy {
+  mode: Mode;
+  targeted: boolean;
+  focusStructures: string[];
+  targetStructure: string;
+  targetPeriphrasisType: string;
+  ratioHint: string;
+}
+
 export interface MorfoStrategy {
   mode: Mode;
   targeted: boolean;
@@ -166,8 +246,20 @@ export interface MorfoStrategy {
 export interface SeEvaluation {
   guessValue: string;
   guessFunction: string;
+  guessVerbalStructure: string;
+  guessPeriphrasisType: string;
   valueOk: boolean;
   functionOk: boolean;
+  verbalStructureOk: boolean;
+  periphrasisTypeOk: boolean;
+  overallOk: boolean;
+}
+
+export interface PeriphrasisEvaluation {
+  guessStructure: string;
+  guessPeriphrasisType: string;
+  structureOk: boolean;
+  periphrasisTypeOk: boolean;
   overallOk: boolean;
 }
 
@@ -189,6 +281,8 @@ export interface RecheckResultSe {
   isCorrect?: boolean;
   correctedValue?: string;
   correctedFunction?: string;
+  correctedVerbalStructure?: string;
+  correctedPeriphrasisType?: string;
   issues?: string[];
   correctionNote?: string;
   error?: string;

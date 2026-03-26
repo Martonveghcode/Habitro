@@ -3,9 +3,14 @@ import {
   MORFO_MORPHEME_TYPES,
   MORFO_SAMPLE_BANK,
   MORFO_WORD_TYPES,
+  PERIPHRASIS_SAMPLE_BANK,
+  PERIPHRASIS_STRUCTURES,
+  PERIPHRASIS_TYPES,
   SE_FUNCTIONS,
+  SE_PERIPHRASIS_TYPES,
   SE_SAMPLE_BANK,
   SE_VALUES,
+  SE_VERBAL_STRUCTURES,
 } from "./data";
 import type {
   Difficulty,
@@ -16,6 +21,12 @@ import type {
   MorfoSettings,
   MorfoStrategy,
   PairSummaryRow,
+  PeriphrasisAttempt,
+  PeriphrasisEvaluation,
+  PeriphrasisItem,
+  PeriphrasisProfile,
+  PeriphrasisSettings,
+  PeriphrasisStrategy,
   SeAttempt,
   SeEvaluation,
   SeItem,
@@ -47,6 +58,8 @@ function defaultSeSettings(): SeSettings {
     difficulty: 2,
     personalized: true,
     focusValues: [],
+    customValues: [],
+    customPeriphrasisTypes: [],
     targetWeight: 40,
     normalWeight: 60,
     hideHistory: false,
@@ -66,13 +79,99 @@ function defaultMorfoSettings(): MorfoSettings {
   };
 }
 
+function defaultPeriphrasisSettings(): PeriphrasisSettings {
+  return {
+    profileId: "alumno",
+    modelName: DEFAULT_MODEL,
+    difficulty: 2,
+    personalized: true,
+    focusStructures: [],
+    customPeriphrasisTypes: [],
+    targetWeight: 40,
+    normalWeight: 60,
+    hideHistory: false,
+  };
+}
+
+function sanitizeStoredSeAttempt(attempt: unknown): SeAttempt | null {
+  if (!attempt || typeof attempt !== "object") {
+    return null;
+  }
+
+  const raw = attempt as Partial<SeAttempt>;
+  const expectedVerbalStructure = typeof raw.expectedVerbalStructure === "string" && raw.expectedVerbalStructure.trim()
+    ? raw.expectedVerbalStructure
+    : "Verbo simple";
+  const expectedPeriphrasisType = typeof raw.expectedPeriphrasisType === "string" && raw.expectedPeriphrasisType.trim()
+    ? raw.expectedPeriphrasisType
+    : "No aplica";
+  const guessVerbalStructure = typeof raw.guessVerbalStructure === "string" && raw.guessVerbalStructure.trim()
+    ? raw.guessVerbalStructure
+    : expectedVerbalStructure;
+  const guessPeriphrasisType = typeof raw.guessPeriphrasisType === "string" && raw.guessPeriphrasisType.trim()
+    ? raw.guessPeriphrasisType
+    : expectedPeriphrasisType;
+  const verbalStructureOk = typeof raw.verbalStructureOk === "boolean" ? raw.verbalStructureOk : true;
+  const periphrasisTypeOk = typeof raw.periphrasisTypeOk === "boolean" ? raw.periphrasisTypeOk : true;
+  const valueOk = Boolean(raw.valueOk);
+  const functionOk = Boolean(raw.functionOk);
+
+  return {
+    ...(raw as SeAttempt),
+    expectedVerbalStructure,
+    expectedPeriphrasisType,
+    guessVerbalStructure,
+    guessPeriphrasisType,
+    verbalStructureOk,
+    periphrasisTypeOk,
+    overallOk:
+      typeof raw.overallOk === "boolean" ? raw.overallOk : valueOk && functionOk && verbalStructureOk && periphrasisTypeOk,
+  };
+}
+
+function sanitizeStoredPeriphrasisAttempt(attempt: unknown): PeriphrasisAttempt | null {
+  if (!attempt || typeof attempt !== "object") {
+    return null;
+  }
+
+  const raw = attempt as Partial<PeriphrasisAttempt>;
+  const expectedStructure = typeof raw.expectedStructure === "string" && raw.expectedStructure.trim()
+    ? raw.expectedStructure
+    : "Dos verbos";
+  const expectedPeriphrasisType = typeof raw.expectedPeriphrasisType === "string" && raw.expectedPeriphrasisType.trim()
+    ? raw.expectedPeriphrasisType
+    : "No aplica";
+  const guessStructure = typeof raw.guessStructure === "string" && raw.guessStructure.trim()
+    ? raw.guessStructure
+    : expectedStructure;
+  const guessPeriphrasisType = typeof raw.guessPeriphrasisType === "string" && raw.guessPeriphrasisType.trim()
+    ? raw.guessPeriphrasisType
+    : expectedPeriphrasisType;
+  const structureOk = typeof raw.structureOk === "boolean" ? raw.structureOk : true;
+  const periphrasisTypeOk = typeof raw.periphrasisTypeOk === "boolean" ? raw.periphrasisTypeOk : true;
+
+  return {
+    ...(raw as PeriphrasisAttempt),
+    expectedStructure,
+    expectedPeriphrasisType,
+    guessStructure,
+    guessPeriphrasisType,
+    structureOk,
+    periphrasisTypeOk,
+    overallOk:
+      typeof raw.overallOk === "boolean" ? raw.overallOk : structureOk && periphrasisTypeOk,
+  };
+}
+
 export function createDefaultStorageState(): StorageState {
   return {
     version: 1,
     geminiApiKey: "",
     seSettings: defaultSeSettings(),
+    periphrasisSettings: defaultPeriphrasisSettings(),
     morfoSettings: defaultMorfoSettings(),
     seAttempts: [],
+    periphrasisAttempts: [],
     morfoAttempts: [],
   };
 }
@@ -89,12 +188,50 @@ export function loadStorageState(): StorageState {
     }
 
     const parsed = JSON.parse(raw) as Partial<StorageState>;
+    const parsedSeSettings = (parsed.seSettings ?? {}) as Partial<SeSettings>;
+    const parsedPeriphrasisSettings = (parsed.periphrasisSettings ?? {}) as Partial<PeriphrasisSettings>;
+    const parsedMorfoSettings = (parsed.morfoSettings ?? {}) as Partial<MorfoSettings>;
     return {
       version: 1,
       geminiApiKey: typeof parsed.geminiApiKey === "string" ? parsed.geminiApiKey : "",
-      seSettings: { ...defaultSeSettings(), ...(parsed.seSettings ?? {}) },
-      morfoSettings: { ...defaultMorfoSettings(), ...(parsed.morfoSettings ?? {}) },
-      seAttempts: Array.isArray(parsed.seAttempts) ? parsed.seAttempts : [],
+      seSettings: {
+        ...defaultSeSettings(),
+        ...parsedSeSettings,
+        focusValues: Array.isArray(parsedSeSettings.focusValues)
+          ? parsedSeSettings.focusValues.filter((entry): entry is string => typeof entry === "string")
+          : [],
+        customValues: Array.isArray(parsedSeSettings.customValues)
+          ? parsedSeSettings.customValues.filter((entry): entry is string => typeof entry === "string")
+          : [],
+        customPeriphrasisTypes: Array.isArray(parsedSeSettings.customPeriphrasisTypes)
+          ? parsedSeSettings.customPeriphrasisTypes.filter((entry): entry is string => typeof entry === "string")
+          : [],
+      },
+      periphrasisSettings: {
+        ...defaultPeriphrasisSettings(),
+        ...parsedPeriphrasisSettings,
+        focusStructures: Array.isArray(parsedPeriphrasisSettings.focusStructures)
+          ? parsedPeriphrasisSettings.focusStructures.filter((entry): entry is string => typeof entry === "string")
+          : [],
+        customPeriphrasisTypes: Array.isArray(parsedPeriphrasisSettings.customPeriphrasisTypes)
+          ? parsedPeriphrasisSettings.customPeriphrasisTypes.filter((entry): entry is string => typeof entry === "string")
+          : [],
+      },
+      morfoSettings: {
+        ...defaultMorfoSettings(),
+        ...parsedMorfoSettings,
+        focusWordTypes: Array.isArray(parsedMorfoSettings.focusWordTypes)
+          ? parsedMorfoSettings.focusWordTypes.filter((entry): entry is string => typeof entry === "string")
+          : [],
+      },
+      seAttempts: Array.isArray(parsed.seAttempts)
+        ? parsed.seAttempts.map((attempt) => sanitizeStoredSeAttempt(attempt)).filter((attempt): attempt is SeAttempt => attempt !== null)
+        : [],
+      periphrasisAttempts: Array.isArray(parsed.periphrasisAttempts)
+        ? parsed.periphrasisAttempts
+            .map((attempt) => sanitizeStoredPeriphrasisAttempt(attempt))
+            .filter((attempt): attempt is PeriphrasisAttempt => attempt !== null)
+        : [],
       morfoAttempts: Array.isArray(parsed.morfoAttempts) ? parsed.morfoAttempts : [],
     };
   } catch {
@@ -107,6 +244,28 @@ export function saveStorageState(state: StorageState): void {
     return;
   }
   window.localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
+}
+
+function uniqueLabels(items: string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  items.forEach((item) => {
+    const cleaned = item.trim();
+    const key = normalizeTextToken(cleaned);
+    if (!cleaned || !key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    result.push(cleaned);
+  });
+  return result;
+}
+
+function normalizeLabelAgainstOptions(value: string, options: readonly string[]): string {
+  const cleaned = value.trim();
+  const key = normalizeTextToken(cleaned);
+  const match = options.find((option) => normalizeTextToken(option) === key);
+  return match ?? cleaned;
 }
 
 function emptyAxis(labels: readonly string[]): Record<string, { ok: number; fail: number }> {
@@ -218,22 +377,34 @@ function pairSummary(
 
 export function seLearningProfile(attempts: SeAttempt[], profileId: string): SeProfile {
   const filtered = attempts.filter((attempt) => attempt.profileId === profileId);
-  const valueStats = emptyAxis(SE_VALUES);
+  const valueStats = emptyAxis(uniqueLabels([...SE_VALUES, ...filtered.map((attempt) => attempt.expectedValue)]));
   const functionStats = emptyAxis(SE_FUNCTIONS);
+  const verbalStructureStats = emptyAxis(
+    uniqueLabels([...SE_VERBAL_STRUCTURES, ...filtered.map((attempt) => attempt.expectedVerbalStructure)]),
+  );
+  const periphrasisTypeStats = emptyAxis(
+    uniqueLabels([...SE_PERIPHRASIS_TYPES, ...filtered.map((attempt) => attempt.expectedPeriphrasisType)]),
+  );
   const pairStats: Record<string, { ok: number; fail: number }> = {};
 
   filtered.forEach((attempt) => {
     valueStats[attempt.expectedValue] ??= { ok: 0, fail: 0 };
     functionStats[attempt.expectedFunction] ??= { ok: 0, fail: 0 };
+    verbalStructureStats[attempt.expectedVerbalStructure] ??= { ok: 0, fail: 0 };
+    periphrasisTypeStats[attempt.expectedPeriphrasisType] ??= { ok: 0, fail: 0 };
     valueStats[attempt.expectedValue][attempt.valueOk ? "ok" : "fail"] += 1;
     functionStats[attempt.expectedFunction][attempt.functionOk ? "ok" : "fail"] += 1;
+    verbalStructureStats[attempt.expectedVerbalStructure][attempt.verbalStructureOk ? "ok" : "fail"] += 1;
+    periphrasisTypeStats[attempt.expectedPeriphrasisType][attempt.periphrasisTypeOk ? "ok" : "fail"] += 1;
     const pairKey = `${attempt.expectedValue} || ${attempt.expectedFunction}`;
     pairStats[pairKey] ??= { ok: 0, fail: 0 };
-    pairStats[pairKey][attempt.valueOk && attempt.functionOk ? "ok" : "fail"] += 1;
+    pairStats[pairKey][attempt.overallOk ? "ok" : "fail"] += 1;
   });
 
   const [weakValues, strongValues] = axisSummary(valueStats);
   const [weakFunctions, strongFunctions] = axisSummary(functionStats);
+  const [weakVerbalStructures, strongVerbalStructures] = axisSummary(verbalStructureStats);
+  const [weakPeriphrasisTypes, strongPeriphrasisTypes] = axisSummary(periphrasisTypeStats);
 
   return {
     totalAttempts: filtered.length,
@@ -241,8 +412,47 @@ export function seLearningProfile(attempts: SeAttempt[], profileId: string): SeP
     strongValues,
     weakFunctions,
     strongFunctions,
+    weakVerbalStructures,
+    strongVerbalStructures,
+    weakPeriphrasisTypes,
+    strongPeriphrasisTypes,
     valueOverview: axisOverview(valueStats),
     functionOverview: axisOverview(functionStats),
+    verbalStructureOverview: axisOverview(verbalStructureStats),
+    periphrasisTypeOverview: axisOverview(periphrasisTypeStats),
+    weakPairs: pairSummary(pairStats),
+  };
+}
+
+export function periphrasisLearningProfile(attempts: PeriphrasisAttempt[], profileId: string): PeriphrasisProfile {
+  const filtered = attempts.filter((attempt) => attempt.profileId === profileId);
+  const structureStats = emptyAxis(uniqueLabels([...PERIPHRASIS_STRUCTURES, ...filtered.map((attempt) => attempt.expectedStructure)]));
+  const periphrasisTypeStats = emptyAxis(
+    uniqueLabels([...PERIPHRASIS_TYPES, ...filtered.map((attempt) => attempt.expectedPeriphrasisType)]),
+  );
+  const pairStats: Record<string, { ok: number; fail: number }> = {};
+
+  filtered.forEach((attempt) => {
+    structureStats[attempt.expectedStructure] ??= { ok: 0, fail: 0 };
+    periphrasisTypeStats[attempt.expectedPeriphrasisType] ??= { ok: 0, fail: 0 };
+    structureStats[attempt.expectedStructure][attempt.structureOk ? "ok" : "fail"] += 1;
+    periphrasisTypeStats[attempt.expectedPeriphrasisType][attempt.periphrasisTypeOk ? "ok" : "fail"] += 1;
+    const pairKey = `${attempt.expectedStructure} || ${attempt.expectedPeriphrasisType}`;
+    pairStats[pairKey] ??= { ok: 0, fail: 0 };
+    pairStats[pairKey][attempt.overallOk ? "ok" : "fail"] += 1;
+  });
+
+  const [weakStructures, strongStructures] = axisSummary(structureStats);
+  const [weakPeriphrasisTypes, strongPeriphrasisTypes] = axisSummary(periphrasisTypeStats);
+
+  return {
+    totalAttempts: filtered.length,
+    weakStructures,
+    strongStructures,
+    weakPeriphrasisTypes,
+    strongPeriphrasisTypes,
+    structureOverview: axisOverview(structureStats),
+    periphrasisTypeOverview: axisOverview(periphrasisTypeStats),
     weakPairs: pairSummary(pairStats),
   };
 }
@@ -398,6 +608,75 @@ export function chooseSeTarget(
   };
 }
 
+export function choosePeriphrasisTarget(
+  profile: PeriphrasisProfile,
+  focusStructures: string[],
+  personalized: boolean,
+  forceTargeted?: boolean,
+  mixLabel = "40% debilidades / 60% normal",
+): PeriphrasisStrategy {
+  if (focusStructures.length > 0) {
+    return {
+      mode: "foco_usuario",
+      targeted: true,
+      focusStructures,
+      targetStructure: focusStructures[Math.floor(Math.random() * focusStructures.length)] ?? "",
+      targetPeriphrasisType: "",
+      ratioHint: "100% foco",
+    };
+  }
+
+  if (!personalized) {
+    return {
+      mode: "normal",
+      targeted: false,
+      focusStructures: [],
+      targetStructure: "",
+      targetPeriphrasisType: "",
+      ratioHint: "0% personalizado",
+    };
+  }
+
+  const hasWeakness = profile.weakStructures.length > 0 || profile.weakPeriphrasisTypes.length > 0;
+  const targeted = hasWeakness && (forceTargeted ?? Math.random() < 0.4);
+  if (!targeted) {
+    return {
+      mode: "personalizado_mixto",
+      targeted: false,
+      focusStructures: [],
+      targetStructure: "",
+      targetPeriphrasisType: "",
+      ratioHint: mixLabel,
+    };
+  }
+
+  let targetStructure = "";
+  let targetPeriphrasisType = "";
+
+  if (profile.weakPairs.length > 0 && Math.random() < 0.65) {
+    const picked = weightedPairPick(profile.weakPairs);
+    const [structure, periphrasisType = ""] = picked.split(" || ", 2);
+    targetStructure = structure?.trim() ?? "";
+    targetPeriphrasisType = periphrasisType.trim();
+  } else {
+    if (profile.weakStructures.length > 0) {
+      targetStructure = weightedPick(profile.weakStructures);
+    }
+    if (profile.weakPeriphrasisTypes.length > 0) {
+      targetPeriphrasisType = weightedPick(profile.weakPeriphrasisTypes);
+    }
+  }
+
+  return {
+    mode: "personalizado_objetivo",
+    targeted: true,
+    focusStructures: targetStructure ? [targetStructure] : [],
+    targetStructure,
+    targetPeriphrasisType,
+    ratioHint: mixLabel,
+  };
+}
+
 export function chooseMorfoTarget(
   profile: MorfoProfile,
   focusWordTypes: string[],
@@ -511,12 +790,57 @@ export function fetchRecentSeSentences(attempts: SeAttempt[], profileId: string,
   return results;
 }
 
-export function fetchRecentSeLabels(attempts: SeAttempt[], profileId: string, limit = 10): Array<{ value: string; function: string }> {
+export function fetchRecentSeLabels(
+  attempts: SeAttempt[],
+  profileId: string,
+  limit = 10,
+): Array<{ value: string; function: string; verbalStructure: string; periphrasisType: string }> {
   return attempts
     .filter((attempt) => attempt.profileId === profileId)
     .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
     .slice(0, limit)
-    .map((attempt) => ({ value: attempt.expectedValue, function: attempt.expectedFunction }));
+    .map((attempt) => ({
+      value: attempt.expectedValue,
+      function: attempt.expectedFunction,
+      verbalStructure: attempt.expectedVerbalStructure,
+      periphrasisType: attempt.expectedPeriphrasisType,
+    }));
+}
+
+export function fetchRecentPeriphrasisSentences(
+  attempts: PeriphrasisAttempt[],
+  profileId: string,
+  limit = 12,
+): string[] {
+  const seen = new Set<string>();
+  const results: string[] = [];
+  attempts
+    .filter((attempt) => attempt.profileId === profileId)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .forEach((attempt) => {
+      const key = attempt.sentence.trim().toLowerCase();
+      if (!key || seen.has(key) || results.length >= limit) {
+        return;
+      }
+      seen.add(key);
+      results.push(attempt.sentence);
+    });
+  return results;
+}
+
+export function fetchRecentPeriphrasisLabels(
+  attempts: PeriphrasisAttempt[],
+  profileId: string,
+  limit = 10,
+): Array<{ structure: string; periphrasisType: string }> {
+  return attempts
+    .filter((attempt) => attempt.profileId === profileId)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .slice(0, limit)
+    .map((attempt) => ({
+      structure: attempt.expectedStructure,
+      periphrasisType: attempt.expectedPeriphrasisType,
+    }));
 }
 
 export function fetchRecentMorfoWords(attempts: MorfoAttempt[], profileId: string, limit = 12): string[] {
@@ -584,6 +908,42 @@ export function fallbackSeBatch(
   });
 }
 
+export function fallbackPeriphrasisBatch(
+  difficulty: Difficulty,
+  strategies: PeriphrasisStrategy[],
+  recentSentences: string[],
+): PeriphrasisItem[] {
+  const memory = [...recentSentences];
+  return strategies.map((strategy) => {
+    let pool = [...PERIPHRASIS_SAMPLE_BANK[difficulty]];
+    const targetStructures =
+      strategy.focusStructures.length > 0 ? strategy.focusStructures : strategy.targetStructure ? [strategy.targetStructure] : [];
+    if (targetStructures.length > 0) {
+      const filtered = pool.filter((item) => targetStructures.includes(item.verbalStructure));
+      if (filtered.length > 0) {
+        pool = filtered;
+      }
+    }
+    if (strategy.targetPeriphrasisType) {
+      const filtered = pool.filter((item) => item.periphrasisType === strategy.targetPeriphrasisType);
+      if (filtered.length > 0) {
+        pool = filtered;
+      }
+    }
+    const novel = pool.filter((item) => isNovelSentence(item.sentence, memory, 0.75));
+    if (novel.length > 0) {
+      pool = novel;
+    }
+    const chosen = randomItem(pool);
+    memory.push(chosen.sentence);
+    return {
+      ...chosen,
+      id: createId("perifrasis"),
+      mode: strategy.mode,
+    };
+  });
+}
+
 export function fallbackMorfoBatch(
   difficulty: Difficulty,
   strategies: MorfoStrategy[],
@@ -634,12 +994,34 @@ export function normalizeFunctionLabel(value: string): string {
   return mapping[key] ?? value.trim();
 }
 
+export function normalizeSeValueLabel(value: string, options: readonly string[] = SE_VALUES): string {
+  return normalizeLabelAgainstOptions(value, options);
+}
+
 export function normalizeTextToken(value: string): string {
   return value.trim().toLowerCase().normalize("NFD").replace(/[\u0300-\u036f]/g, "");
 }
 
 export function normalizePieceToken(value: string): string {
   return normalizeTextToken(value).replace(/\s+/g, "");
+}
+
+export function normalizeVerbalStructureLabel(value: string, options: readonly string[] = SE_VERBAL_STRUCTURES): string {
+  return normalizeLabelAgainstOptions(value, options);
+}
+
+export function normalizePeriphrasisStructureLabel(
+  value: string,
+  options: readonly string[] = PERIPHRASIS_STRUCTURES,
+): string {
+  return normalizeLabelAgainstOptions(value, options);
+}
+
+export function normalizePeriphrasisTypeLabel(
+  value: string,
+  options: readonly string[] = SE_PERIPHRASIS_TYPES,
+): string {
+  return normalizeLabelAgainstOptions(value, options);
 }
 
 export function normalizeMorphemeTypeLabel(value: string): string {
@@ -661,15 +1043,45 @@ export function parseGuessList(rawText: string): string[] {
     .filter(Boolean);
 }
 
-export function evaluateSeGuess(item: SeItem, guessValue: string, guessFunction: string): SeEvaluation {
-  const valueOk = guessValue === item.seValue;
-  const functionOk = item.acceptedFunctions.includes(guessFunction);
+export function evaluateSeGuess(
+  item: SeItem,
+  guessValue: string,
+  guessFunction: string,
+  guessVerbalStructure = item.verbalStructure,
+  guessPeriphrasisType = item.periphrasisType,
+): SeEvaluation {
+  const valueOk = normalizeTextToken(guessValue) === normalizeTextToken(item.seValue);
+  const functionOk = item.acceptedFunctions.map(normalizeFunctionLabel).includes(normalizeFunctionLabel(guessFunction));
+  const verbalStructureOk =
+    normalizeTextToken(guessVerbalStructure) === normalizeTextToken(item.verbalStructure);
+  const periphrasisTypeOk =
+    normalizeTextToken(guessPeriphrasisType) === normalizeTextToken(item.periphrasisType);
   return {
     guessValue,
     guessFunction,
+    guessVerbalStructure,
+    guessPeriphrasisType,
     valueOk,
     functionOk,
-    overallOk: valueOk && functionOk,
+    verbalStructureOk,
+    periphrasisTypeOk,
+    overallOk: valueOk && functionOk && verbalStructureOk && periphrasisTypeOk,
+  };
+}
+
+export function evaluatePeriphrasisGuess(
+  item: PeriphrasisItem,
+  guessStructure: string,
+  guessPeriphrasisType: string,
+): PeriphrasisEvaluation {
+  const structureOk = normalizeTextToken(guessStructure) === normalizeTextToken(item.verbalStructure);
+  const periphrasisTypeOk = normalizeTextToken(guessPeriphrasisType) === normalizeTextToken(item.periphrasisType);
+  return {
+    guessStructure,
+    guessPeriphrasisType,
+    structureOk,
+    periphrasisTypeOk,
+    overallOk: structureOk && periphrasisTypeOk,
   };
 }
 
@@ -727,10 +1139,41 @@ export function makeSeAttempt(item: SeItem, settings: SeSettings, evaluation: Se
     sentence: item.sentence,
     expectedValue: item.seValue,
     expectedFunction: item.seFunction,
+    expectedVerbalStructure: item.verbalStructure,
+    expectedPeriphrasisType: item.periphrasisType,
     guessValue: evaluation.guessValue,
     guessFunction: evaluation.guessFunction,
+    guessVerbalStructure: evaluation.guessVerbalStructure,
+    guessPeriphrasisType: evaluation.guessPeriphrasisType,
     valueOk: evaluation.valueOk,
     functionOk: evaluation.functionOk,
+    verbalStructureOk: evaluation.verbalStructureOk,
+    periphrasisTypeOk: evaluation.periphrasisTypeOk,
+    overallOk: evaluation.overallOk,
+    phraseType: item.phraseType,
+    explanation: item.explanation,
+    mode: item.mode,
+  };
+}
+
+export function makePeriphrasisAttempt(
+  item: PeriphrasisItem,
+  settings: PeriphrasisSettings,
+  evaluation: PeriphrasisEvaluation,
+): PeriphrasisAttempt {
+  return {
+    id: item.id,
+    profileId: settings.profileId.trim() || "alumno",
+    createdAt: nowIso(),
+    difficulty: item.difficulty,
+    sentence: item.sentence,
+    expectedStructure: item.verbalStructure,
+    expectedPeriphrasisType: item.periphrasisType,
+    guessStructure: evaluation.guessStructure,
+    guessPeriphrasisType: evaluation.guessPeriphrasisType,
+    structureOk: evaluation.structureOk,
+    periphrasisTypeOk: evaluation.periphrasisTypeOk,
+    overallOk: evaluation.overallOk,
     phraseType: item.phraseType,
     explanation: item.explanation,
     mode: item.mode,
@@ -769,11 +1212,23 @@ export function seAccuracy(attempts: SeAttempt[]): number {
   if (attempts.length === 0) {
     return 0;
   }
-  const hits = attempts.filter((attempt) => attempt.valueOk && attempt.functionOk).length;
+  const hits = attempts.filter((attempt) => attempt.overallOk).length;
+  return (hits / attempts.length) * 100;
+}
+
+export function periphrasisAccuracy(attempts: PeriphrasisAttempt[]): number {
+  if (attempts.length === 0) {
+    return 0;
+  }
+  const hits = attempts.filter((attempt) => attempt.overallOk).length;
   return (hits / attempts.length) * 100;
 }
 
 export function resetSeAttempts(attempts: SeAttempt[], profileId: string): SeAttempt[] {
+  return attempts.filter((attempt) => attempt.profileId !== profileId);
+}
+
+export function resetPeriphrasisAttempts(attempts: PeriphrasisAttempt[], profileId: string): PeriphrasisAttempt[] {
   return attempts.filter((attempt) => attempt.profileId !== profileId);
 }
 

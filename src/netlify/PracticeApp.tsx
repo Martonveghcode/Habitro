@@ -4,27 +4,40 @@ import {
   MODEL_OPTIONS,
   MORFO_MORPHEME_TYPES,
   MORFO_WORD_TYPES,
+  PERIPHRASIS_STRUCTURES,
+  PERIPHRASIS_TYPES,
   SE_FUNCTIONS,
+  SE_PERIPHRASIS_TYPES,
   SE_VALUES,
+  SE_VERBAL_STRUCTURES,
 } from "./data";
 import {
   chooseMorfoTarget,
+  choosePeriphrasisTarget,
   chooseSeTarget,
   createId,
   evaluateMorfoGuess,
+  evaluatePeriphrasisGuess,
   evaluateSeGuess,
   fallbackMorfoBatch,
+  fallbackPeriphrasisBatch,
   fallbackSeBatch,
   fetchRecentMorfoLabels,
   fetchRecentMorfoWords,
+  fetchRecentPeriphrasisSentences,
   fetchRecentSeLabels,
   fetchRecentSeSentences,
   loadStorageState,
   makeMorfoAttempt,
+  makePeriphrasisAttempt,
   makeSeAttempt,
   morfoLearningProfile,
+  normalizeTextToken,
+  periphrasisAccuracy,
+  periphrasisLearningProfile,
   popMixTargeted,
   resetMorfoAttempts,
+  resetPeriphrasisAttempts,
   resetSeAttempts,
   saveStorageState,
   seAccuracy,
@@ -44,6 +57,11 @@ import type {
   MorfoItem,
   MorfoSettings,
   MorfoStrategy,
+  PeriphrasisAttempt,
+  PeriphrasisEvaluation,
+  PeriphrasisItem,
+  PeriphrasisSettings,
+  PeriphrasisStrategy,
   QuestionResult,
   RecheckResultMorfo,
   RecheckResultSe,
@@ -56,7 +74,7 @@ import type {
   SummaryRow,
 } from "./types";
 
-type SectionName = "se" | "morfologia";
+type SectionName = "se" | "perifrasis" | "morfologia";
 type PageName = "practice" | "history" | "settings";
 
 function cx(...tokens: Array<string | false | null | undefined>): string {
@@ -170,6 +188,44 @@ function MultiToggleList({
   );
 }
 
+function uniqueLabels(items: readonly string[]): string[] {
+  const seen = new Set<string>();
+  const result: string[] = [];
+  items.forEach((item) => {
+    const cleaned = item.trim();
+    const key = normalizeTextToken(cleaned);
+    if (!cleaned || !key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    result.push(cleaned);
+  });
+  return result;
+}
+
+function mergeLabelGroups(...groups: ReadonlyArray<readonly string[]>): string[] {
+  return uniqueLabels(groups.flatMap((group) => [...group]));
+}
+
+function hasLabel(items: readonly string[], value: string): boolean {
+  const key = normalizeTextToken(value);
+  return items.some((item) => normalizeTextToken(item) === key);
+}
+
+function toggleLabel(items: readonly string[], value: string): string[] {
+  return hasLabel(items, value)
+    ? items.filter((item) => normalizeTextToken(item) !== normalizeTextToken(value))
+    : [...items, value];
+}
+
+function parseCustomList(rawText: string): string[] {
+  return uniqueLabels(rawText.split(",").map((entry) => entry.trim()).filter(Boolean));
+}
+
+function stripBaseLabels(customLabels: readonly string[], baseLabels: readonly string[]): string[] {
+  return customLabels.filter((label) => !hasLabel(baseLabels, label));
+}
+
 function GeminiKeyPanel({
   apiKey,
   onApiKeyChange,
@@ -232,8 +288,8 @@ export function NetlifyPracticeApp() {
   const [storageState, setStorageState] = useState<StorageState>(() => loadStorageState());
   const [activeSection, setActiveSection] = useState<SectionName>("se");
   const [sePage, setSePage] = useState<PageName>("practice");
+  const [periphrasisPage, setPeriphrasisPage] = useState<PageName>("practice");
   const [morfoPage, setMorfoPage] = useState<PageName>("practice");
-  const hasLocalApiKey = storageState.geminiApiKey.trim().length > 0;
 
   useEffect(() => {
     saveStorageState(storageState);
@@ -247,6 +303,10 @@ export function NetlifyPracticeApp() {
     setStorageState((current) => ({ ...current, morfoSettings: next }));
   };
 
+  const updatePeriphrasisSettings = (next: PeriphrasisSettings) => {
+    setStorageState((current) => ({ ...current, periphrasisSettings: next }));
+  };
+
   const updateSeAttempts = (next: SeAttempt[]) => {
     setStorageState((current) => ({ ...current, seAttempts: next }));
   };
@@ -255,11 +315,16 @@ export function NetlifyPracticeApp() {
     setStorageState((current) => ({ ...current, morfoAttempts: next }));
   };
 
+  const updatePeriphrasisAttempts = (next: PeriphrasisAttempt[]) => {
+    setStorageState((current) => ({ ...current, periphrasisAttempts: next }));
+  };
+
   const updateGeminiApiKey = (next: string) => {
     setStorageState((current) => ({ ...current, geminiApiKey: next }));
   };
 
-  const currentPage = activeSection === "se" ? sePage : morfoPage;
+  const currentPage =
+    activeSection === "se" ? sePage : activeSection === "perifrasis" ? periphrasisPage : morfoPage;
 
   return (
     <div className="practice-shell">
@@ -277,6 +342,11 @@ export function NetlifyPracticeApp() {
           <div className="stack">
             <ChoicePill active={activeSection === "se"} label="Valores del se" onClick={() => setActiveSection("se")} />
             <ChoicePill
+              active={activeSection === "perifrasis"}
+              label="Perifrasis"
+              onClick={() => setActiveSection("perifrasis")}
+            />
+            <ChoicePill
               active={activeSection === "morfologia"}
               label="Morfologia"
               onClick={() => setActiveSection("morfologia")}
@@ -290,32 +360,37 @@ export function NetlifyPracticeApp() {
             <ChoicePill
               active={currentPage === "practice"}
               label="Practicar"
-              onClick={() => (activeSection === "se" ? setSePage("practice") : setMorfoPage("practice"))}
+              onClick={() =>
+                activeSection === "se"
+                  ? setSePage("practice")
+                  : activeSection === "perifrasis"
+                    ? setPeriphrasisPage("practice")
+                    : setMorfoPage("practice")
+              }
             />
             <ChoicePill
               active={currentPage === "history"}
               label="Historial"
-              onClick={() => (activeSection === "se" ? setSePage("history") : setMorfoPage("history"))}
+              onClick={() =>
+                activeSection === "se"
+                  ? setSePage("history")
+                  : activeSection === "perifrasis"
+                    ? setPeriphrasisPage("history")
+                    : setMorfoPage("history")
+              }
             />
             <ChoicePill
               active={currentPage === "settings"}
               label="Ajustes"
-              onClick={() => (activeSection === "se" ? setSePage("settings") : setMorfoPage("settings"))}
+              onClick={() =>
+                activeSection === "se"
+                  ? setSePage("settings")
+                  : activeSection === "perifrasis"
+                    ? setPeriphrasisPage("settings")
+                    : setMorfoPage("settings")
+              }
             />
           </div>
-        </div>
-
-        <div className="panel side-panel status-panel">
-          <p className="panel-kicker">Persistencia</p>
-          <p className="muted-line">
-            El historial ya no usa SQLite. Se guarda en el navegador actual para que Netlify pueda servir la app como sitio
-            estatico.
-          </p>
-          <p className="muted-line">
-            {hasLocalApiKey
-              ? "Hay una clave Gemini guardada en este navegador. La app la enviara solo a /api/ai cuando uses generacion, recheck o preguntas."
-              : "Puedes pegar una GEMINI_API_KEY en Ajustes. Si no hay clave local ni clave del sitio en Netlify, la app usa el banco local."}
-          </p>
         </div>
       </aside>
 
@@ -329,6 +404,14 @@ export function NetlifyPracticeApp() {
           onApiKeyChange={updateGeminiApiKey}
           onSettingsChange={updateSeSettings}
           onAttemptsChange={updateSeAttempts}
+        />
+        <PeriphrasisWorkspace
+          active={activeSection === "perifrasis"}
+          page={periphrasisPage}
+          settings={storageState.periphrasisSettings}
+          attempts={storageState.periphrasisAttempts}
+          onSettingsChange={updatePeriphrasisSettings}
+          onAttemptsChange={updatePeriphrasisAttempts}
         />
         <MorfoWorkspace
           active={activeSection === "morfologia"}
@@ -369,6 +452,7 @@ function SeWorkspace({
     () => attempts.filter((attempt) => attempt.profileId === settings.profileId),
     [attempts, settings.profileId],
   );
+  const availableSeValues = useMemo(() => mergeLabelGroups(SE_VALUES, settings.customValues), [settings.customValues]);
   const [currentItem, setCurrentItem] = useState<SeItem | null>(null);
   const [queue, setQueue] = useState<SeItem[]>([]);
   const [checkedItemId, setCheckedItemId] = useState<string | null>(null);
@@ -393,19 +477,19 @@ function SeWorkspace({
   const [customModelDraft, setCustomModelDraft] = useState(
     MODEL_OPTIONS.some((option) => option.value === settings.modelName) ? "" : settings.modelName,
   );
+  const [customValuesDraft, setCustomValuesDraft] = useState(settings.customValues.join(", "));
+  const [customValueInput, setCustomValueInput] = useState("");
 
   const mixText = ratioLabel(settings.targetWeight, settings.normalWeight);
   const weakValueLabels = profile.weakValues.map((row) => row.label);
   const weakFunctionLabels = profile.weakFunctions.map((row) => row.label);
-  const visibleAttempts = historyOnlyErrors
-    ? profileAttempts.filter((attempt) => !attempt.valueOk || !attempt.functionOk)
-    : profileAttempts;
+  const visibleAttempts = historyOnlyErrors ? profileAttempts.filter((attempt) => !attempt.overallOk) : profileAttempts;
 
   useEffect(() => {
-    setGuessValue(SE_VALUES[0]);
+    setGuessValue(availableSeValues[0] ?? SE_VALUES[0]);
     setGuessFunction(SE_FUNCTIONS[0]);
     setQuestionInput("");
-  }, [currentItem?.id]);
+  }, [availableSeValues, currentItem?.id]);
 
   useEffect(() => {
     setProfileDraft(settings.profileId);
@@ -416,17 +500,29 @@ function SeWorkspace({
       setSelectedModelDraft("custom");
       setCustomModelDraft(settings.modelName);
     }
-  }, [settings.profileId, settings.modelName]);
+    setCustomValuesDraft(settings.customValues.join(", "));
+  }, [settings.customValues, settings.profileId, settings.modelName]);
 
   useEffect(() => {
     setMixBucket([]);
   }, [settings.targetWeight, settings.normalWeight]);
 
   const toggleFocusValue = (value: string) => {
-    const nextFocusValues = settings.focusValues.includes(value)
-      ? settings.focusValues.filter((entry) => entry !== value)
-      : [...settings.focusValues, value];
+    const nextFocusValues = toggleLabel(settings.focusValues, value);
     onSettingsChange({ ...settings, focusValues: nextFocusValues });
+  };
+
+  const addCustomValue = () => {
+    const cleaned = customValueInput.trim();
+    if (!cleaned || hasLabel(availableSeValues, cleaned)) {
+      return;
+    }
+    onSettingsChange({
+      ...settings,
+      customValues: [...settings.customValues, cleaned],
+      focusValues: [...settings.focusValues, cleaned],
+    });
+    setCustomValueInput("");
   };
 
   const handleGenerate = async () => {
@@ -476,6 +572,10 @@ function SeWorkspace({
             profile,
             recentSentences,
             recentLabels,
+            allowedValues: availableSeValues,
+            allowedFunctions: [...SE_FUNCTIONS],
+            allowedVerbalStructures: [...SE_VERBAL_STRUCTURES],
+            allowedPeriphrasisTypes: [...SE_PERIPHRASIS_TYPES],
           });
           remoteItems.forEach(pushCandidate);
           fallbackItems.forEach(pushCandidate);
@@ -512,7 +612,7 @@ function SeWorkspace({
     if (!currentItem) {
       return;
     }
-    const evaluation = evaluateSeGuess(currentItem, guessValue, guessFunction);
+    const evaluation = evaluateSeGuess(currentItem, guessValue, guessFunction, currentItem.verbalStructure, currentItem.periphrasisType);
     setEvaluations((current) => ({ ...current, [currentItem.id]: evaluation }));
 
     if (checkedItemId !== currentItem.id) {
@@ -534,8 +634,14 @@ function SeWorkspace({
         seValue: currentItem.seValue,
         seFunction: currentItem.seFunction,
         acceptedFunctions: currentItem.acceptedFunctions,
+        verbalStructure: currentItem.verbalStructure,
+        periphrasisType: currentItem.periphrasisType,
         phraseType: currentItem.phraseType,
         explanation: currentItem.explanation,
+        allowedValues: availableSeValues,
+        allowedFunctions: [...SE_FUNCTIONS],
+        allowedVerbalStructures: [...SE_VERBAL_STRUCTURES],
+        allowedPeriphrasisTypes: [...SE_PERIPHRASIS_TYPES],
       });
       setRechecks((current) => ({ ...current, [currentItem.id]: result }));
     } catch (error) {
@@ -547,6 +653,8 @@ function SeWorkspace({
           isCorrect: true,
           correctedValue: currentItem.seValue,
           correctedFunction: currentItem.seFunction,
+          correctedVerbalStructure: currentItem.verbalStructure,
+          correctedPeriphrasisType: currentItem.periphrasisType,
           issues: [],
           correctionNote:
             error instanceof Error
@@ -572,6 +680,8 @@ function SeWorkspace({
           sentence: currentItem.sentence,
           seValue: currentItem.seValue,
           seFunction: currentItem.seFunction,
+          verbalStructure: currentItem.verbalStructure,
+          periphrasisType: currentItem.periphrasisType,
           phraseType: currentItem.phraseType,
           explanation: currentItem.explanation,
         },
@@ -599,10 +709,15 @@ function SeWorkspace({
 
   const saveSettingsDraft = () => {
     const resolvedModel = selectedModelDraft === "custom" ? customModelDraft.trim() || MODEL_OPTIONS[0].value : selectedModelDraft;
+    const nextCustomValues = stripBaseLabels(parseCustomList(customValuesDraft), SE_VALUES);
+    const nextAllowedValues = mergeLabelGroups(SE_VALUES, nextCustomValues);
+    const nextFocusValues = settings.focusValues.filter((value) => hasLabel(nextAllowedValues, value));
     onSettingsChange({
       ...settings,
       profileId: profileDraft.trim() || "alumno",
       modelName: resolvedModel,
+      focusValues: nextFocusValues,
+      customValues: nextCustomValues,
     });
   };
 
@@ -656,8 +771,32 @@ function SeWorkspace({
 
             <div className="field-block">
               <FieldLabel label="Foco manual" hint="Selecciona uno o varios valores para forzar el lote." />
-              <MultiToggleList options={SE_VALUES} selected={settings.focusValues} onToggle={toggleFocusValue} />
+              <MultiToggleList options={availableSeValues} selected={settings.focusValues} onToggle={toggleFocusValue} />
             </div>
+
+            <div className="field-block">
+              <FieldLabel label="Anadir valor personalizado" hint="Ej. Enfatica. Se guarda en esta seccion." />
+              <div className="field-grid compact-grid">
+                <input
+                  placeholder="Ej. Enfatica"
+                  value={customValueInput}
+                  onChange={(event) => setCustomValueInput(event.target.value)}
+                />
+                <button className="ghost-btn" type="button" onClick={addCustomValue}>
+                  Anadir valor
+                </button>
+              </div>
+            </div>
+
+            <details className="details-panel">
+              <summary>
+                <span className="panel-kicker">Taxonomias activas</span>
+              </summary>
+              <div className="details-content">
+                <p className="muted-line">Valores disponibles: {availableSeValues.join(", ")}</p>
+                <p className="muted-line">Tambien puedes editar la lista completa en Pagina {" > "} Ajustes.</p>
+              </div>
+            </details>
 
             <div className="field-grid compact-grid">
               <div>
@@ -723,7 +862,7 @@ function SeWorkspace({
                   <div>
                     <FieldLabel label="Valor de se" />
                     <select value={guessValue} onChange={(event) => setGuessValue(event.target.value)}>
-                      {SE_VALUES.map((value) => (
+                      {availableSeValues.map((value) => (
                         <option key={value} value={value}>
                           {value}
                         </option>
@@ -928,7 +1067,7 @@ function SeWorkspace({
                         attempt.sentence,
                         `${attempt.expectedValue} / ${attempt.expectedFunction}`,
                         `${attempt.guessValue} / ${attempt.guessFunction}`,
-                        attempt.valueOk && attempt.functionOk ? "OK" : "Fallo",
+                        attempt.overallOk ? "OK" : "Fallo",
                         attempt.mode,
                       ])}
                     />
@@ -992,6 +1131,20 @@ function SeWorkspace({
               />
             </div>
 
+            <div className="field-grid">
+              <div>
+                <FieldLabel
+                  label="Valores de se personalizados"
+                  hint="Separados por comas. Ej.: Enfatica, expresiva. Tambien aparecen en Practicar."
+                />
+                <input
+                  placeholder="Ej. Enfatica, expresiva"
+                  value={customValuesDraft}
+                  onChange={(event) => setCustomValuesDraft(event.target.value)}
+                />
+              </div>
+            </div>
+
             <button className="primary-btn" type="button" onClick={saveSettingsDraft}>
               Guardar ajustes
             </button>
@@ -1007,6 +1160,531 @@ function SeWorkspace({
               {settings.modelName.toLowerCase().startsWith("gemma") ? (
                 <p className="muted-line">Compatibilidad Gemma activa: el servidor enviara prompt inline cuando corresponda.</p>
               ) : null}
+            </div>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function PeriphrasisWorkspace({
+  active,
+  page,
+  settings,
+  attempts,
+  onSettingsChange,
+  onAttemptsChange,
+}: {
+  active: boolean;
+  page: PageName;
+  settings: PeriphrasisSettings;
+  attempts: PeriphrasisAttempt[];
+  onSettingsChange: (settings: PeriphrasisSettings) => void;
+  onAttemptsChange: (attempts: PeriphrasisAttempt[]) => void;
+}) {
+  const profile = useMemo(() => periphrasisLearningProfile(attempts, settings.profileId), [attempts, settings.profileId]);
+  const profileAttempts = useMemo(
+    () => attempts.filter((attempt) => attempt.profileId === settings.profileId),
+    [attempts, settings.profileId],
+  );
+  const availablePeriphrasisTypes = useMemo(
+    () => mergeLabelGroups(PERIPHRASIS_TYPES, settings.customPeriphrasisTypes),
+    [settings.customPeriphrasisTypes],
+  );
+  const noAplicaPeriphrasisType = useMemo(
+    () => availablePeriphrasisTypes.find((value) => normalizeTextToken(value) === normalizeTextToken("No aplica")) ?? "No aplica",
+    [availablePeriphrasisTypes],
+  );
+
+  const [currentItem, setCurrentItem] = useState<PeriphrasisItem | null>(null);
+  const [queue, setQueue] = useState<PeriphrasisItem[]>([]);
+  const [checkedItemId, setCheckedItemId] = useState<string | null>(null);
+  const [evaluations, setEvaluations] = useState<Record<string, PeriphrasisEvaluation>>({});
+  const [guessStructure, setGuessStructure] = useState<string>(PERIPHRASIS_STRUCTURES[0]);
+  const [guessPeriphrasisType, setGuessPeriphrasisType] = useState<string>(PERIPHRASIS_TYPES[0]);
+  const [mixBucket, setMixBucket] = useState<boolean[]>([]);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [historyOnlyErrors, setHistoryOnlyErrors] = useState(true);
+  const [resetConfirmed, setResetConfirmed] = useState(false);
+  const [statusNote, setStatusNote] = useState("Listo para generar lote.");
+  const [profileDraft, setProfileDraft] = useState(settings.profileId);
+  const [customTypesDraft, setCustomTypesDraft] = useState(settings.customPeriphrasisTypes.join(", "));
+  const [customTypeInput, setCustomTypeInput] = useState("");
+
+  const mixText = ratioLabel(settings.targetWeight, settings.normalWeight);
+  const weakStructureLabels = profile.weakStructures.map((row) => row.label);
+  const weakPeriphrasisTypeLabels = profile.weakPeriphrasisTypes.map((row) => row.label);
+  const visibleAttempts = historyOnlyErrors ? profileAttempts.filter((attempt) => !attempt.overallOk) : profileAttempts;
+
+  useEffect(() => {
+    setGuessStructure(PERIPHRASIS_STRUCTURES[0]);
+    setGuessPeriphrasisType(noAplicaPeriphrasisType);
+  }, [currentItem?.id, noAplicaPeriphrasisType]);
+
+  useEffect(() => {
+    setProfileDraft(settings.profileId);
+    setCustomTypesDraft(settings.customPeriphrasisTypes.join(", "));
+  }, [settings.customPeriphrasisTypes, settings.profileId]);
+
+  useEffect(() => {
+    setMixBucket([]);
+  }, [settings.targetWeight, settings.normalWeight]);
+
+  const toggleFocusStructure = (value: string) => {
+    onSettingsChange({
+      ...settings,
+      focusStructures: toggleLabel(settings.focusStructures, value),
+    });
+  };
+
+  const addCustomPeriphrasisType = () => {
+    const cleaned = customTypeInput.trim();
+    if (!cleaned || hasLabel(availablePeriphrasisTypes, cleaned)) {
+      return;
+    }
+    onSettingsChange({
+      ...settings,
+      customPeriphrasisTypes: [...settings.customPeriphrasisTypes, cleaned],
+    });
+    setCustomTypeInput("");
+  };
+
+  const handleGenerate = () => {
+    setIsGenerating(true);
+    try {
+      let nextQueue = [...queue];
+      if (nextQueue.length === 0) {
+        const batchSize = settings.personalized ? 3 : 10;
+        let workingBucket = [...mixBucket];
+        const strategies: PeriphrasisStrategy[] = [];
+
+        for (let index = 0; index < batchSize; index += 1) {
+          let forceTargeted: boolean | undefined;
+          if (
+            settings.personalized &&
+            settings.focusStructures.length === 0 &&
+            (weakStructureLabels.length > 0 || weakPeriphrasisTypeLabels.length > 0)
+          ) {
+            const [targeted, nextBucket] = popMixTargeted(workingBucket, settings.targetWeight, settings.normalWeight);
+            forceTargeted = targeted;
+            workingBucket = nextBucket;
+          }
+
+          strategies.push(
+            choosePeriphrasisTarget(profile, settings.focusStructures, settings.personalized, forceTargeted, mixText),
+          );
+        }
+
+        setMixBucket(workingBucket);
+        const recentSentences = fetchRecentPeriphrasisSentences(attempts, settings.profileId, 14);
+        nextQueue = settings.personalized
+          ? fallbackPeriphrasisBatch(settings.difficulty, strategies, recentSentences)
+          : shuffleList(fallbackPeriphrasisBatch(settings.difficulty, strategies, recentSentences));
+        setStatusNote("Lote preparado desde el banco local.");
+      }
+
+      const [nextItem, ...rest] = nextQueue;
+      setCurrentItem(nextItem ?? null);
+      setQueue(rest);
+      setCheckedItemId(null);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleCheck = () => {
+    if (!currentItem) {
+      return;
+    }
+    const evaluation = evaluatePeriphrasisGuess(currentItem, guessStructure, guessPeriphrasisType);
+    setEvaluations((current) => ({ ...current, [currentItem.id]: evaluation }));
+
+    if (checkedItemId !== currentItem.id) {
+      onAttemptsChange([...attempts, makePeriphrasisAttempt(currentItem, settings, evaluation)]);
+      setCheckedItemId(currentItem.id);
+    }
+  };
+
+  const saveSettingsDraft = () => {
+    const nextCustomTypes = stripBaseLabels(parseCustomList(customTypesDraft), PERIPHRASIS_TYPES);
+    onSettingsChange({
+      ...settings,
+      profileId: profileDraft.trim() || "alumno",
+      customPeriphrasisTypes: nextCustomTypes,
+    });
+  };
+
+  const evaluation = currentItem ? evaluations[currentItem.id] : null;
+
+  return (
+    <section className={cx("workspace", !active && "hidden-workspace")}>
+      <header className="workspace-header">
+        <div>
+          <p className="eyebrow">Perifrasis</p>
+          <h2>Construcciones verbales</h2>
+        </div>
+        <div className="meta-strip">
+          <span>Perfil: {settings.profileId}</span>
+          <span>Intentos: {profile.totalAttempts}</span>
+        </div>
+      </header>
+
+      {page === "practice" ? (
+        <div className="page-grid">
+          <div className="panel control-panel">
+            <p className="panel-kicker">Configuracion</p>
+            <div className="field-block">
+              <FieldLabel label="Dificultad" hint="Se mantiene por seccion." />
+              <div className="chip-cloud">
+                {[1, 2, 3].map((difficulty) => (
+                  <ChoicePill
+                    key={difficulty}
+                    active={settings.difficulty === difficulty}
+                    label={`D${difficulty}`}
+                    onClick={() => onSettingsChange({ ...settings, difficulty: difficulty as 1 | 2 | 3 })}
+                  />
+                ))}
+              </div>
+            </div>
+
+            <div className="field-block">
+              <FieldLabel label="Modo" hint="Usa refuerzo de debilidades cuando hay historial." />
+              <label className="checkbox-line">
+                <input
+                  checked={settings.personalized}
+                  onChange={(event) => onSettingsChange({ ...settings, personalized: event.target.checked })}
+                  type="checkbox"
+                />
+                <span>Personalizado</span>
+              </label>
+            </div>
+
+            <div className="field-block">
+              <FieldLabel label="Foco manual" hint="Selecciona la construccion verbal que quieres practicar." />
+              <MultiToggleList options={PERIPHRASIS_STRUCTURES} selected={settings.focusStructures} onToggle={toggleFocusStructure} />
+            </div>
+
+            <div className="field-block">
+              <FieldLabel label="Anadir tipo personalizado" hint="Ej. Obligacion atenuada. Se guarda en esta seccion." />
+              <div className="field-grid compact-grid">
+                <input
+                  placeholder="Ej. Obligacion atenuada"
+                  value={customTypeInput}
+                  onChange={(event) => setCustomTypeInput(event.target.value)}
+                />
+                <button className="ghost-btn" type="button" onClick={addCustomPeriphrasisType}>
+                  Anadir tipo
+                </button>
+              </div>
+            </div>
+
+            <details className="details-panel">
+              <summary>
+                <span className="panel-kicker">Taxonomias activas</span>
+              </summary>
+              <div className="details-content">
+                <p className="muted-line">
+                  Construcciones: {PERIPHRASIS_STRUCTURES.join(", ")}
+                  <br />
+                  Tipos de perifrasis: {availablePeriphrasisTypes.join(", ")}
+                </p>
+                <p className="muted-line">Tambien puedes editar la lista completa en Pagina {" > "} Ajustes.</p>
+              </div>
+            </details>
+
+            <div className="field-grid compact-grid">
+              <div>
+                <FieldLabel label="Peso debilidades" />
+                <input
+                  max={100}
+                  min={0}
+                  step={5}
+                  type="number"
+                  value={settings.targetWeight}
+                  onChange={(event) => onSettingsChange({ ...settings, targetWeight: Number(event.target.value) || 0 })}
+                />
+              </div>
+              <div>
+                <FieldLabel label="Peso normal" />
+                <input
+                  max={100}
+                  min={0}
+                  step={5}
+                  type="number"
+                  value={settings.normalWeight}
+                  onChange={(event) => onSettingsChange({ ...settings, normalWeight: Number(event.target.value) || 0 })}
+                />
+              </div>
+            </div>
+
+            <p className="muted-line">Mezcla actual: {mixText}</p>
+            <div className="inline-banner">{statusNote}</div>
+
+            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
+              {isGenerating ? "Preparando lote..." : queue.length > 0 ? "Siguiente frase" : "Generar lote"}
+            </button>
+
+            {settings.personalized && (weakStructureLabels.length > 0 || weakPeriphrasisTypeLabels.length > 0) ? (
+              <div className="info-block">
+                <p className="panel-kicker">Refuerzo activo</p>
+                <p className="muted-line">
+                  Construcciones: {weakStructureLabels.join(", ") || "-"}
+                  <br />
+                  Tipos de perifrasis: {weakPeriphrasisTypeLabels.join(", ") || "-"}
+                </p>
+              </div>
+            ) : null}
+          </div>
+
+          <div className="panel practice-panel">
+            {!currentItem ? (
+              <div className="empty-state">
+                <h3>Genera una frase para empezar.</h3>
+                <p className="muted-line">Esta seccion usa ahora mismo un banco local de frases.</p>
+              </div>
+            ) : (
+              <>
+                <p className="panel-kicker">Frase</p>
+                <h3 className="prompt-text">{currentItem.sentence}</h3>
+                <div className="meta-strip">
+                  <span>Modo: {currentItem.mode}</span>
+                  <span>Restantes en cola: {queue.length}</span>
+                </div>
+
+                <div className="field-grid">
+                  <div>
+                    <FieldLabel label="Construccion verbal" />
+                    <select
+                      value={guessStructure}
+                      onChange={(event) => {
+                        const nextValue = event.target.value;
+                        setGuessStructure(nextValue);
+                        if (nextValue !== "Perifrasis verbal") {
+                          setGuessPeriphrasisType(noAplicaPeriphrasisType);
+                        }
+                      }}
+                    >
+                      {PERIPHRASIS_STRUCTURES.map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <FieldLabel label="Tipo de perifrasis" hint="Si no hay perifrasis, usa 'No aplica'." />
+                    <select
+                      disabled={guessStructure !== "Perifrasis verbal"}
+                      value={guessPeriphrasisType}
+                      onChange={(event) => setGuessPeriphrasisType(event.target.value)}
+                    >
+                      {availablePeriphrasisTypes.map((value) => (
+                        <option key={value} value={value}>
+                          {value}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                </div>
+
+                <button className="primary-btn" type="button" onClick={handleCheck}>
+                  Comprobar respuesta
+                </button>
+
+                {evaluation ? (
+                  <>
+                    <div className="result-panel">
+                      <p>
+                        Construccion verbal:{" "}
+                        <strong className={evaluation.structureOk ? "result-ok" : "result-bad"}>
+                          {evaluation.structureOk ? "correcta" : `incorrecta (correcta: ${currentItem.verbalStructure})`}
+                        </strong>
+                      </p>
+                      <p>
+                        Tipo de perifrasis:{" "}
+                        <strong className={evaluation.periphrasisTypeOk ? "result-ok" : "result-bad"}>
+                          {evaluation.periphrasisTypeOk ? "correcto" : `incorrecto (correcto: ${currentItem.periphrasisType})`}
+                        </strong>
+                      </p>
+                      <p>
+                        Estado global:{" "}
+                        <strong className={evaluation.overallOk ? "result-ok" : "result-bad"}>
+                          {evaluation.overallOk ? "acierto" : "revisar"}
+                        </strong>
+                      </p>
+                    </div>
+
+                    <div className="info-block">
+                      <p className="panel-kicker">Explicacion</p>
+                      <p>{currentItem.phraseType}</p>
+                      <p className="muted-line">{currentItem.explanation}</p>
+                    </div>
+                  </>
+                ) : null}
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {page === "history" ? (
+        <div className="page-grid single-column">
+          <div className="panel">
+            <div className="row-between">
+              <div>
+                <p className="panel-kicker">Historial</p>
+                <h3>Aprendizaje local por perfil</h3>
+              </div>
+              <label className="checkbox-line">
+                <input
+                  checked={settings.hideHistory}
+                  onChange={(event) => onSettingsChange({ ...settings, hideHistory: event.target.checked })}
+                  type="checkbox"
+                />
+                <span>Ocultar historial</span>
+              </label>
+            </div>
+
+            {settings.hideHistory ? (
+              <p className="muted-line">Historial oculto para esta seccion.</p>
+            ) : (
+              <>
+                <div className="row-between">
+                  <p className="muted-line">
+                    Intentos totales: {profile.totalAttempts} | Acierto completo: {periphrasisAccuracy(profileAttempts).toFixed(1)}%
+                  </p>
+                  <label className="checkbox-line">
+                    <input checked={historyOnlyErrors} onChange={(event) => setHistoryOnlyErrors(event.target.checked)} type="checkbox" />
+                    <span>Mostrar solo fallos</span>
+                  </label>
+                </div>
+
+                <div className="stats-grid">
+                  <div className="info-block">
+                    <p className="panel-kicker">Mas dificiles (estructura)</p>
+                    <SummaryList rows={profile.weakStructures} />
+                  </div>
+                  <div className="info-block">
+                    <p className="panel-kicker">Mas dificiles (tipo)</p>
+                    <SummaryList rows={profile.weakPeriphrasisTypes} />
+                  </div>
+                  <div className="info-block">
+                    <p className="panel-kicker">Mejores (estructura)</p>
+                    <SummaryList rows={profile.strongStructures} />
+                  </div>
+                  <div className="info-block">
+                    <p className="panel-kicker">Mejores (tipo)</p>
+                    <SummaryList rows={profile.strongPeriphrasisTypes} />
+                  </div>
+                </div>
+
+                <div className="stack-lg">
+                  <div>
+                    <p className="panel-kicker">Rendimiento exacto por eje</p>
+                    <DataTable
+                      headers={["Eje", "Item", "OK", "Fallos", "Intentos", "Tasa fallo"]}
+                      rows={[
+                        ...profile.structureOverview.map((row) => [
+                          "estructura",
+                          row.label,
+                          row.ok,
+                          row.fail,
+                          row.attempts,
+                          `${(row.failRate * 100).toFixed(1)}%`,
+                        ]),
+                        ...profile.periphrasisTypeOverview.map((row) => [
+                          "tipo",
+                          row.label,
+                          row.ok,
+                          row.fail,
+                          row.attempts,
+                          `${(row.failRate * 100).toFixed(1)}%`,
+                        ]),
+                      ]}
+                    />
+                  </div>
+
+                  <div>
+                    <p className="panel-kicker">Combinaciones donde mas fallas</p>
+                    <DataTable
+                      headers={["Par", "OK", "Fallos", "Intentos", "Tasa fallo"]}
+                      rows={profile.weakPairs.map((row) => [row.pair, row.ok, row.fail, row.attempts, `${(row.failRate * 100).toFixed(1)}%`])}
+                    />
+                  </div>
+
+                  <div>
+                    <p className="panel-kicker">Intentos guardados</p>
+                    <DataTable
+                      headers={["Fecha", "Frase", "Esperado", "Tu respuesta", "Estado", "Modo"]}
+                      rows={visibleAttempts.map((attempt) => [
+                        new Date(attempt.createdAt).toLocaleString(),
+                        attempt.sentence,
+                        `${attempt.expectedStructure} / ${attempt.expectedPeriphrasisType}`,
+                        `${attempt.guessStructure} / ${attempt.guessPeriphrasisType}`,
+                        attempt.overallOk ? "OK" : "Fallo",
+                        attempt.mode,
+                      ])}
+                    />
+                  </div>
+                </div>
+
+                <div className="danger-zone">
+                  <label className="checkbox-line">
+                    <input checked={resetConfirmed} onChange={(event) => setResetConfirmed(event.target.checked)} type="checkbox" />
+                    <span>Confirmo que quiero borrar todo el historial de este perfil</span>
+                  </label>
+                  <button
+                    className="danger-btn"
+                    disabled={!resetConfirmed}
+                    type="button"
+                    onClick={() => {
+                      onAttemptsChange(resetPeriphrasisAttempts(attempts, settings.profileId));
+                      setResetConfirmed(false);
+                    }}
+                  >
+                    Resetear historial
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {page === "settings" ? (
+        <div className="page-grid single-column">
+          <div className="panel">
+            <p className="panel-kicker">Ajustes</p>
+            <h3>Perfil y tipos personalizados</h3>
+
+            <div className="field-grid">
+              <div>
+                <FieldLabel label="Perfil" hint="Afecta el historial local y el refuerzo personalizado." />
+                <input value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} />
+              </div>
+              <div>
+                <FieldLabel
+                  label="Tipos de perifrasis personalizados"
+                  hint="Separados por comas. Se suman a la lista base y tambien aparecen en Practicar."
+                />
+                <input
+                  placeholder="Ej. Obligacion atenuada, enfatica"
+                  value={customTypesDraft}
+                  onChange={(event) => setCustomTypesDraft(event.target.value)}
+                />
+              </div>
+            </div>
+
+            <button className="primary-btn" type="button" onClick={saveSettingsDraft}>
+              Guardar ajustes
+            </button>
+
+            <div className="info-block">
+              <p className="panel-kicker">Estado</p>
+              <p className="muted-line">
+                Esta seccion funciona con un banco local de frases y usa los tipos personalizados que guardes aqui.
+              </p>
             </div>
           </div>
         </div>
