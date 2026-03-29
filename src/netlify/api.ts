@@ -131,7 +131,7 @@ export async function requestSeGeneration(input: {
   allowedFunctions: string[];
   allowedVerbalStructures: string[];
   allowedPeriphrasisTypes: string[];
-}): Promise<Array<Omit<SeItem, "id">>> {
+}): Promise<Array<Omit<SeItem, "id"> | null>> {
   const payload = await postAi<{ items?: Array<Record<string, unknown>> }>(
     {
       action: "generate-se",
@@ -151,15 +151,18 @@ export async function requestSeGeneration(input: {
     input.apiKey,
   );
 
-  return (payload.items ?? [])
-    .map((item, index) =>
-      sanitizeSeItem(item, input.strategies[index] ?? input.strategies[0], {
+  const rawItems = Array.isArray(payload.items) ? payload.items : [];
+  return input.strategies.map((strategy, index) => {
+    const item = rawItems[index];
+    if (!item || typeof item !== "object") {
+      return null;
+    }
+    return sanitizeSeItem(item, strategy, {
         allowedValues: input.allowedValues,
         allowedVerbalStructures: input.allowedVerbalStructures,
         allowedPeriphrasisTypes: input.allowedPeriphrasisTypes,
-      }),
-    )
-    .filter((item): item is Omit<SeItem, "id"> => item !== null);
+      });
+  });
 }
 
 export async function requestMorfoGeneration(input: {

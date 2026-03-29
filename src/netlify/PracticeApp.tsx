@@ -284,6 +284,41 @@ function shuffleList<T>(items: T[]): T[] {
   return next;
 }
 
+function orderSeCoverageValues(
+  values: readonly string[],
+  recentLabels: Array<{ value: string }>,
+): string[] {
+  const recentPositions = new Map<string, number>();
+  recentLabels.forEach((entry, index) => {
+    const key = normalizeTextToken(entry.value);
+    if (!key || recentPositions.has(key)) {
+      return;
+    }
+    recentPositions.set(key, index);
+  });
+
+  return uniqueLabels(values).sort((left, right) => {
+    const leftPosition = recentPositions.get(normalizeTextToken(left)) ?? Number.MAX_SAFE_INTEGER;
+    const rightPosition = recentPositions.get(normalizeTextToken(right)) ?? Number.MAX_SAFE_INTEGER;
+    if (leftPosition !== rightPosition) {
+      return rightPosition - leftPosition;
+    }
+    return left.localeCompare(right, "es", { sensitivity: "base" });
+  });
+}
+
+function buildRequiredSeStrategy(value: string, mode: SeStrategy["mode"], ratioHint: string): SeStrategy {
+  return {
+    mode,
+    targeted: true,
+    focusValues: [value],
+    requiredValue: value,
+    targetValue: value,
+    targetFunction: "",
+    ratioHint,
+  };
+}
+
 export function NetlifyPracticeApp() {
   const [storageState, setStorageState] = useState<StorageState>(() => loadStorageState());
   const [activeSection, setActiveSection] = useState<SectionName>("se");
@@ -530,11 +565,35 @@ function SeWorkspace({
     try {
       let nextQueue = [...queue];
       if (nextQueue.length === 0) {
-        const batchSize = settings.personalized ? 3 : 10;
+        const recentSentences = fetchRecentSeSentences(attempts, settings.profileId, 14);
+        const recentLabels = fetchRecentSeLabels(attempts, settings.profileId, 10);
+        const coverageValues = settings.focusValues.length > 0
+          ? orderSeCoverageValues(settings.focusValues, recentLabels)
+          : settings.personalized
+            ? []
+            : orderSeCoverageValues(availableSeValues, recentLabels);
+        const baseBatchSize = settings.personalized ? 3 : 10;
+        const batchSize = Math.max(baseBatchSize, coverageValues.length);
         let workingBucket = [...mixBucket];
         const strategies: SeStrategy[] = [];
 
         for (let index = 0; index < batchSize; index += 1) {
+          if (settings.focusValues.length > 0) {
+            const requiredValue = coverageValues[index % coverageValues.length] ?? coverageValues[0];
+            if (requiredValue) {
+              strategies.push(buildRequiredSeStrategy(requiredValue, "foco_usuario", "100% foco"));
+              continue;
+            }
+          }
+
+          if (!settings.personalized) {
+            const requiredValue = coverageValues[index];
+            if (requiredValue) {
+              strategies.push(buildRequiredSeStrategy(requiredValue, "normal", "Cobertura equilibrada del lote"));
+              continue;
+            }
+          }
+
           let forceTargeted: boolean | undefined;
           if (settings.personalized && settings.focusValues.length === 0 && (weakValueLabels.length > 0 || weakFunctionLabels.length > 0)) {
             const [targeted, nextBucket] = popMixTargeted(workingBucket, settings.targetWeight, settings.normalWeight);
@@ -549,18 +608,19 @@ function SeWorkspace({
 
         setMixBucket(workingBucket);
 
-        const recentSentences = fetchRecentSeSentences(attempts, settings.profileId, 14);
-        const recentLabels = fetchRecentSeLabels(attempts, settings.profileId, 10);
         const fallbackItems = fallbackSeBatch(settings.difficulty, strategies, recentSentences);
-        const prepared: SeItem[] = [];
+        const prepared: Array<SeItem | null> = Array.from({ length: batchSize }, () => null);
         const seen = new Set<string>();
-        const pushCandidate = (candidate: Omit<SeItem, "id"> | SeItem) => {
+        const assignCandidate = (slotIndex: number, candidate: Omit<SeItem, "id"> | SeItem | null) => {
+          if (!candidate || prepared[slotIndex]) {
+            return;
+          }
           const key = candidate.sentence.trim().toLowerCase();
-          if (!key || seen.has(key) || prepared.length >= batchSize) {
+          if (!key || seen.has(key)) {
             return;
           }
           seen.add(key);
-          prepared.push("id" in candidate ? candidate : { ...candidate, id: createId("se") });
+          prepared[slotIndex] = "id" in candidate ? candidate : { ...candidate, id: createId("se") };
         };
 
         try {
@@ -577,26 +637,40 @@ function SeWorkspace({
             allowedVerbalStructures: [...SE_VERBAL_STRUCTURES],
             allowedPeriphrasisTypes: [...SE_PERIPHRASIS_TYPES],
           });
-          remoteItems.forEach(pushCandidate);
-          fallbackItems.forEach(pushCandidate);
-          setStatusNote(remoteItems.length > 0 ? "Lote servido por Gemini con relleno local de seguridad." : "Gemini no devolvio items validos. Modo local activado.");
-          setStatusTone(remoteItems.length > 0 ? "info" : "warn");
+          strategies.forEach((_, index) => {
+            assignCandidate(index, remoteItems[index] ?? null);
+            assignCandidate(index, fallbackItems[index] ?? null);
+          });
+          const remoteValidCount = remoteItems.filter((item) => item !== null).length;
+          setStatusNote(
+            remoteValidCount > 0
+              ? "Lote servido por Gemini con reemplazo local en los huecos o desajustes."
+              : "Gemini no devolvio items validos para este plan. Modo local activado.",
+          );
+          setStatusTone(remoteValidCount > 0 ? "info" : "warn");
         } catch (error) {
-          fallbackItems.forEach(pushCandidate);
+          fallbackItems.forEach((item, index) => assignCandidate(index, item));
           setStatusNote(error instanceof Error ? `${error.message} Se uso el banco local.` : "Fallo de Gemini. Se uso el banco local.");
           setStatusTone("warn");
         }
 
-        while (prepared.length < batchSize) {
+        while (prepared.some((item) => item === null)) {
           const extraFallback = fallbackSeBatch(settings.difficulty, strategies, recentSentences);
-          const beforeLength = prepared.length;
-          extraFallback.forEach(pushCandidate);
-          if (prepared.length === beforeLength) {
+          const beforeMissing = prepared.filter((item) => item === null).length;
+          extraFallback.forEach((item, index) => assignCandidate(index, item));
+          const afterMissing = prepared.filter((item) => item === null).length;
+          if (afterMissing === beforeMissing) {
             break;
           }
         }
 
-        nextQueue = settings.personalized ? prepared : shuffleList(prepared);
+        const finalized = prepared.filter((item): item is SeItem => item !== null);
+        if (finalized.length < batchSize) {
+          setStatusNote("No se pudo completar toda la cobertura planificada. Se genero el maximo lote valido disponible.");
+          setStatusTone("warn");
+        }
+
+        nextQueue = settings.personalized ? finalized : shuffleList(finalized);
       }
 
       const [nextItem, ...rest] = nextQueue;

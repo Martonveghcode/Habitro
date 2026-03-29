@@ -220,6 +220,7 @@ export interface SeStrategy {
   mode: Mode;
   targeted: boolean;
   focusValues: string[];
+  requiredValue: string;
   targetValue: string;
   targetFunction: string;
   ratioHint: string;

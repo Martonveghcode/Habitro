@@ -61,6 +61,9 @@ Tambien debes clasificar cada frase por:
 Reglas obligatorias:
 - La frase debe contener "se" de forma clara.
 - Si se solicita batch_size > 1, devuelve exactamente ese numero de frases.
+- Cada item del schedule corresponde a un slot concreto del lote y debes mantener el orden.
+- Si un slot incluye required_value, el campo se_value de ese item debe ser exactamente ese valor.
+- Si hay varios required_values y el lote tiene hueco suficiente, cubre todos al menos una vez antes de repetir valores.
 - Devuelve tambien la respuesta correcta (valor + funcion + analisis verbal) y una explicacion breve.
 - Incluye tipo de oracion.
 - Ajusta dificultad:
@@ -145,6 +148,7 @@ const seStrategySchema = z.object({
   mode: strategyModeSchema,
   targeted: z.boolean(),
   focusValues: z.array(z.string()).default([]),
+  requiredValue: z.string().default(""),
   targetValue: z.string().default(""),
   targetFunction: z.string().default(""),
   ratioHint: z.string().default(""),
@@ -494,6 +498,10 @@ function buildSeGenerationPrompt(payload) {
   const recentFunctions = payload.recentLabels.map((entry) => entry.function);
   const recentStructures = payload.recentLabels.map((entry) => entry.verbalStructure).filter(Boolean);
   const recentPeriphrasisTypes = payload.recentLabels.map((entry) => entry.periphrasisType).filter(Boolean);
+  const requiredValues = payload.strategies
+    .map((strategy) => normalizeLabelAgainstOptions(strategy.requiredValue || "", payload.allowedValues))
+    .filter(Boolean)
+    .filter((value, index, values) => values.findIndex((entry) => normalizeTextToken(entry) === normalizeTextToken(value)) === index);
   const avoidValues = recentValues.length >= 2 && recentValues[0] === recentValues[1] ? [recentValues[0]] : [];
   const avoidFunctions =
     recentFunctions.length >= 3 && new Set(recentFunctions.slice(0, 3)).size === 1 ? [recentFunctions[0]] : [];
@@ -514,11 +522,18 @@ function buildSeGenerationPrompt(payload) {
           slot: index + 1,
           mode: strategy.mode,
           targeted: strategy.targeted,
+          required_value: strategy.requiredValue || null,
           target_value: strategy.targetValue || null,
           target_function: strategy.targetFunction || null,
           focus_values: strategy.focusValues,
         })),
         ratio_hint: payload.strategies[0]?.ratioHint || "sin ratio",
+      },
+      coverage_requirements: {
+        required_values: requiredValues,
+        must_cover_each_required_value_at_least_once: requiredValues.length > 0,
+        keep_schedule_order: true,
+        slot_count_is_enough_for_required_values: requiredValues.length <= payload.strategies.length,
       },
       learning_profile: payload.profile,
       allowed_values: payload.allowedValues,
@@ -539,11 +554,13 @@ function buildSeGenerationPrompt(payload) {
         vary_subject_and_context: true,
         avoid_only_single_word_changes: true,
         vary_sentence_length: true,
+        avoid_repeating_same_se_value_when_other_required_values_remain: true,
       },
       constraints: {
         must_contain_se: true,
         must_return_exact_count: payload.strategies.length,
         no_internal_duplicates: true,
+        respect_schedule_slot_by_slot: true,
       },
       output_schema: {
         items: [
@@ -623,6 +640,19 @@ function buildMorfoGenerationPrompt(payload) {
   );
 }
 
+function expectedSeValueForStrategy(strategy, allowedValues) {
+  const rawValue = strategy.requiredValue || (strategy.targeted ? strategy.targetValue : "");
+  return rawValue ? normalizeLabelAgainstOptions(rawValue, allowedValues) : "";
+}
+
+function seItemMatchesStrategy(item, strategy, allowedValues) {
+  const expectedValue = expectedSeValueForStrategy(strategy, allowedValues);
+  if (!expectedValue) {
+    return true;
+  }
+  return normalizeTextToken(item.seValue) === normalizeTextToken(expectedValue);
+}
+
 async function handleGenerateSe(apiKey, requestBody) {
   const prompt = buildSeGenerationPrompt(requestBody.payload);
   const result = await requestWithFallback({
@@ -635,29 +665,35 @@ async function handleGenerateSe(apiKey, requestBody) {
   });
 
   const parsed = extractJson(result.text);
-  const items = extractCandidateItems(parsed)
-    .slice(0, requestBody.payload.strategies.length)
-    .map((item, index) =>
-      normalizeSeItem(item, requestBody.payload.difficulty, requestBody.payload.strategies[index], {
+  const rawItems = extractCandidateItems(parsed);
+  const items = requestBody.payload.strategies.map((strategy, index) => {
+    const rawItem = rawItems[index];
+    if (!rawItem) {
+      return null;
+    }
+
+    const item = normalizeSeItem(rawItem, requestBody.payload.difficulty, strategy, {
         allowedValues: requestBody.payload.allowedValues,
         allowedVerbalStructures: requestBody.payload.allowedVerbalStructures,
         allowedPeriphrasisTypes: requestBody.payload.allowedPeriphrasisTypes,
-      }),
-    )
-    .filter(
-      (item) =>
-        item.sentence &&
-        item.seValue &&
-        item.seFunction &&
-        item.verbalStructure &&
-        item.periphrasisType &&
-        item.phraseType &&
-        item.explanation &&
-        requestBody.payload.allowedValues.includes(item.seValue) &&
-        requestBody.payload.allowedFunctions.includes(item.seFunction) &&
-        requestBody.payload.allowedVerbalStructures.includes(item.verbalStructure) &&
-        requestBody.payload.allowedPeriphrasisTypes.includes(item.periphrasisType),
-    );
+      });
+
+    const itemIsValid =
+      item.sentence &&
+      item.seValue &&
+      item.seFunction &&
+      item.verbalStructure &&
+      item.periphrasisType &&
+      item.phraseType &&
+      item.explanation &&
+      requestBody.payload.allowedValues.includes(item.seValue) &&
+      requestBody.payload.allowedFunctions.includes(item.seFunction) &&
+      requestBody.payload.allowedVerbalStructures.includes(item.verbalStructure) &&
+      requestBody.payload.allowedPeriphrasisTypes.includes(item.periphrasisType) &&
+      seItemMatchesStrategy(item, strategy, requestBody.payload.allowedValues);
+
+    return itemIsValid ? item : null;
+  });
 
   return jsonResponse(200, { model: result.model, items });
 }

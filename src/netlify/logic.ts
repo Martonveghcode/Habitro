@@ -551,6 +551,7 @@ export function chooseSeTarget(
       mode: "foco_usuario",
       targeted: true,
       focusValues,
+      requiredValue: "",
       targetValue: focusValues[Math.floor(Math.random() * focusValues.length)] ?? "",
       targetFunction: "",
       ratioHint: "100% foco",
@@ -562,6 +563,7 @@ export function chooseSeTarget(
       mode: "normal",
       targeted: false,
       focusValues: [],
+      requiredValue: "",
       targetValue: "",
       targetFunction: "",
       ratioHint: "0% personalizado",
@@ -575,6 +577,7 @@ export function chooseSeTarget(
       mode: "personalizado_mixto",
       targeted: false,
       focusValues: [],
+      requiredValue: "",
       targetValue: "",
       targetFunction: "",
       ratioHint: mixLabel,
@@ -602,6 +605,7 @@ export function chooseSeTarget(
     mode: "personalizado_objetivo",
     targeted: true,
     focusValues: targetValue ? [targetValue] : [],
+    requiredValue: "",
     targetValue,
     targetFunction,
     ratioHint: mixLabel,
@@ -887,7 +891,13 @@ export function fallbackSeBatch(
   const memory = [...recentSentences];
   return strategies.map((strategy) => {
     let pool = [...SE_SAMPLE_BANK[difficulty]];
-    const targetValues = strategy.focusValues.length > 0 ? strategy.focusValues : strategy.targetValue ? [strategy.targetValue] : [];
+    const targetValues = strategy.requiredValue
+      ? [strategy.requiredValue]
+      : strategy.focusValues.length > 0
+        ? strategy.focusValues
+        : strategy.targetValue
+          ? [strategy.targetValue]
+          : [];
     if (targetValues.length > 0) {
       const filtered = pool.filter((item) => targetValues.includes(item.seValue));
       if (filtered.length > 0) {
