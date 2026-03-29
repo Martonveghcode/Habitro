@@ -86,16 +86,18 @@ function sanitizeSeItem(
 
 function sanitizeMorfoItem(raw: Record<string, unknown>, strategy: MorfoStrategy): Omit<MorfoItem, "id"> | null {
   const word = String(raw.word ?? "").trim();
-  const wordType = String(raw.wordType ?? "").trim();
+  const wordType = String(raw.wordType ?? raw.word_type ?? "").trim();
   const lexeme = String(raw.lexeme ?? "").trim();
-  const acceptedLexemes = Array.isArray(raw.acceptedLexemes)
-    ? raw.acceptedLexemes.map((entry) => String(entry).trim()).filter(Boolean)
+  const rawAcceptedLexemes = raw.acceptedLexemes ?? raw.accepted_lexemes;
+  const acceptedLexemes = Array.isArray(rawAcceptedLexemes)
+    ? rawAcceptedLexemes.map((entry) => String(entry).trim()).filter(Boolean)
     : [];
   const morphemes = Array.isArray(raw.morphemes) ? raw.morphemes.map((entry) => String(entry).trim()).filter(Boolean) : [];
-  const morphemeTypes = Array.isArray(raw.morphemeTypes)
-    ? raw.morphemeTypes.map((entry) => normalizeMorphemeTypeLabel(String(entry).trim())).filter(Boolean)
+  const rawMorphemeTypes = raw.morphemeTypes ?? raw.morpheme_types;
+  const morphemeTypes = Array.isArray(rawMorphemeTypes)
+    ? rawMorphemeTypes.map((entry) => normalizeMorphemeTypeLabel(String(entry).trim())).filter(Boolean)
     : [];
-  const analysisType = String(raw.analysisType ?? "").trim();
+  const analysisType = String(raw.analysisType ?? raw.analysis_type ?? "").trim();
   const explanation = String(raw.explanation ?? "").trim();
   const difficulty = Number(raw.difficulty ?? 0) as MorfoItem["difficulty"];
 

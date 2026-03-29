@@ -403,11 +403,36 @@ function normalizeLabelAgainstOptions(value, options) {
   return match || raw;
 }
 
+function normalizeWordType(value) {
+  return normalizeLabelAgainstOptions(value, MORFO_WORD_TYPES);
+}
+
 function normalizeMorphemeType(value) {
   const raw = String(value || "").trim();
-  const normalized = raw.toLowerCase();
-  const match = MORFO_MORPHEME_TYPES.find((item) => item.toLowerCase() === normalized);
-  return match || raw;
+  const aliasMap = {
+    prefijo: "Prefijo derivativo",
+    "prefijo derivativo": "Prefijo derivativo",
+    interfijo: "Interfijo",
+    sufijo: "Sufijo derivativo",
+    "sufijo derivativo": "Sufijo derivativo",
+    genero: "Morfema flexivo nominal (genero)",
+    "morfema de genero": "Morfema flexivo nominal (genero)",
+    "morfema flexivo nominal (genero)": "Morfema flexivo nominal (genero)",
+    numero: "Morfema flexivo nominal (numero)",
+    "morfema de numero": "Morfema flexivo nominal (numero)",
+    "morfema flexivo nominal (numero)": "Morfema flexivo nominal (numero)",
+    "vocal tematica": "Vocal tematica",
+    vt: "Vocal tematica",
+    "morfema verbal tma": "Morfema flexivo verbal (tiempo/modo/aspecto)",
+    "tiempo/modo/aspecto": "Morfema flexivo verbal (tiempo/modo/aspecto)",
+    "morfema flexivo verbal (tiempo/modo/aspecto)": "Morfema flexivo verbal (tiempo/modo/aspecto)",
+    "persona y numero": "Morfema flexivo verbal (persona/numero)",
+    "persona/numero": "Morfema flexivo verbal (persona/numero)",
+    "morfema flexivo verbal (persona y numero)": "Morfema flexivo verbal (persona/numero)",
+    "morfema flexivo verbal (persona/numero)": "Morfema flexivo verbal (persona/numero)",
+  };
+  const aliasMatch = aliasMap[normalizeTextToken(raw)];
+  return aliasMatch || normalizeLabelAgainstOptions(raw, MORFO_MORPHEME_TYPES);
 }
 
 function normalizeSeItem(item, difficulty, strategy, options) {
@@ -430,21 +455,35 @@ function normalizeSeItem(item, difficulty, strategy, options) {
 }
 
 function normalizeMorfoItem(item, difficulty, strategy) {
-  const morphemes = Array.isArray(item.morphemes) ? item.morphemes.map((entry) => String(entry).trim()).filter(Boolean) : [];
-  const morphemeTypes = Array.isArray(item.morpheme_types)
-    ? item.morpheme_types.map((entry) => normalizeMorphemeType(entry)).filter(Boolean)
+  const morphemesRaw = item.morphemes ?? item.morpheme_list ?? [];
+  const morphemeTypesRaw = item.morpheme_types ?? item.morphemeTypes ?? [];
+  const morphemes = Array.isArray(morphemesRaw) ? morphemesRaw.map((entry) => String(entry).trim()).filter(Boolean) : [];
+  const morphemeTypes = Array.isArray(morphemeTypesRaw)
+    ? morphemeTypesRaw.map((entry) => normalizeMorphemeType(entry)).filter(Boolean)
     : [];
+  const lexeme = String(item.lexeme || "").trim();
+  const acceptedLexemesRaw = item.accepted_lexemes ?? item.acceptedLexemes ?? [];
+  const acceptedLexemes = Array.isArray(acceptedLexemesRaw)
+    ? acceptedLexemesRaw.map((entry) => String(entry).trim()).filter(Boolean)
+    : [];
+  if (!acceptedLexemes.length && lexeme) {
+    acceptedLexemes.push(lexeme);
+  }
+  if (morphemeTypes.length > morphemes.length) {
+    morphemeTypes.length = morphemes.length;
+  } else if (morphemes.length > morphemeTypes.length && morphemeTypes.length > 0) {
+    morphemes.length = morphemeTypes.length;
+  }
+
   return {
     word: String(item.word || "").trim(),
     difficulty: Number(item.difficulty || difficulty),
-    wordType: String(item.word_type || "").trim(),
-    lexeme: String(item.lexeme || "").trim(),
-    acceptedLexemes: Array.isArray(item.accepted_lexemes)
-      ? item.accepted_lexemes.map((entry) => String(entry).trim()).filter(Boolean)
-      : [],
+    wordType: normalizeWordType(item.word_type ?? item.wordType),
+    lexeme,
+    acceptedLexemes,
     morphemes,
     morphemeTypes,
-    analysisType: String(item.analysis_type || "").trim(),
+    analysisType: String(item.analysis_type ?? item.analysisType ?? "").trim(),
     explanation: String(item.explanation || "").trim(),
     mode: strategy.mode,
   };
