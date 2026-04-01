@@ -77,8 +77,122 @@ import type {
 type SectionName = "se" | "perifrasis" | "morfologia";
 type PageName = "practice" | "history" | "settings";
 
+interface SectionMeta {
+  eyebrow: string;
+  navLabel: string;
+  title: string;
+  subhead: string;
+  theme?: "light" | "dark";
+}
+
+interface PageMeta {
+  label: string;
+}
+
+interface SectionSnapshot {
+  profileId: string;
+  modelName: string;
+  difficulty: number;
+  attempts: number;
+  accuracy: number;
+  focusCount: number;
+  personalized: boolean;
+}
+
+const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia"];
+
+const PAGE_META: Record<PageName, PageMeta> = {
+  practice: {
+    label: "Practicar",
+  },
+  history: {
+    label: "Historial",
+  },
+  settings: {
+    label: "Ajustes",
+  },
+};
+
+const SECTION_META: Record<SectionName, SectionMeta> = {
+  se: {
+    eyebrow: "Sintaxis",
+    navLabel: "Valores del se",
+    title: "Practica guiada del se",
+    subhead: "Una experiencia mas serena y centrada para distinguir valor, funcion y justificacion en cada frase.",
+  },
+  perifrasis: {
+    eyebrow: "Perifrasis",
+    navLabel: "Construcciones verbales",
+    title: "Lectura clara de la periferasis verbal",
+    subhead: "Menos densidad de interfaz y mas foco en decidir si hay construccion verbal y de que tipo se trata.",
+  },
+  morfologia: {
+    eyebrow: "Morfologia",
+    navLabel: "Analisis de palabras",
+    title: "Analisis morfologico con presencia editorial",
+    subhead: "Palabra, lexema y morfemas pasan al centro con un flujo amplio, legible y consistente.",
+    theme: "dark",
+  },
+};
+
 function cx(...tokens: Array<string | false | null | undefined>): string {
   return tokens.filter(Boolean).join(" ");
+}
+
+function formatAccuracyLabel(accuracy: number, attempts: number): string {
+  return attempts > 0 ? `${accuracy.toFixed(1)}% acierto` : "Sin historial";
+}
+
+function morfoAccuracy(attempts: MorfoAttempt[]): number {
+  if (attempts.length === 0) {
+    return 0;
+  }
+  const okCount = attempts.filter(
+    (attempt) => attempt.wordTypeOk && attempt.lexemeOk && attempt.morphemesOk && attempt.morphemeTypesOk,
+  ).length;
+  return (okCount / attempts.length) * 100;
+}
+
+function buildSectionSnapshot(section: SectionName, storageState: StorageState): SectionSnapshot {
+  if (section === "se") {
+    const { seSettings, seAttempts } = storageState;
+    const scopedAttempts = seAttempts.filter((attempt) => attempt.profileId === seSettings.profileId);
+    return {
+      profileId: seSettings.profileId,
+      modelName: seSettings.modelName,
+      difficulty: seSettings.difficulty,
+      attempts: scopedAttempts.length,
+      accuracy: seAccuracy(scopedAttempts),
+      focusCount: seSettings.focusValues.length,
+      personalized: seSettings.personalized,
+    };
+  }
+
+  if (section === "perifrasis") {
+    const { periphrasisSettings, periphrasisAttempts } = storageState;
+    const scopedAttempts = periphrasisAttempts.filter((attempt) => attempt.profileId === periphrasisSettings.profileId);
+    return {
+      profileId: periphrasisSettings.profileId,
+      modelName: periphrasisSettings.modelName,
+      difficulty: periphrasisSettings.difficulty,
+      attempts: scopedAttempts.length,
+      accuracy: periphrasisAccuracy(scopedAttempts),
+      focusCount: periphrasisSettings.focusStructures.length,
+      personalized: periphrasisSettings.personalized,
+    };
+  }
+
+  const { morfoSettings, morfoAttempts } = storageState;
+  const scopedAttempts = morfoAttempts.filter((attempt) => attempt.profileId === morfoSettings.profileId);
+  return {
+    profileId: morfoSettings.profileId,
+    modelName: morfoSettings.modelName,
+    difficulty: morfoSettings.difficulty,
+    attempts: scopedAttempts.length,
+    accuracy: morfoAccuracy(scopedAttempts),
+    focusCount: morfoSettings.focusWordTypes.length,
+    personalized: morfoSettings.personalized,
+  };
 }
 
 function ratioLabel(targetWeight: number, normalWeight: number): string {
@@ -88,11 +202,10 @@ function ratioLabel(targetWeight: number, normalWeight: number): string {
   return `${((safeTarget / total) * 100).toFixed(1)}% debilidades / ${((safeNormal / total) * 100).toFixed(1)}% normal`;
 }
 
-function FieldLabel({ label, hint }: { label: string; hint?: string }) {
+function FieldLabel({ label, hint: _hint }: { label: string; hint?: string }) {
   return (
     <label className="field">
       <span>{label}</span>
-      {hint ? <small>{hint}</small> : null}
     </label>
   );
 }
@@ -107,15 +220,36 @@ function ChoicePill({
   onClick: () => void;
 }) {
   return (
-    <button className={cx("choice-pill", active && "active")} type="button" onClick={onClick}>
+    <button aria-pressed={active} className={cx("choice-pill", active && "active")} type="button" onClick={onClick}>
       {label}
+    </button>
+  );
+}
+
+function PageAction({
+  active,
+  label,
+  onClick,
+}: {
+  active: boolean;
+  label: string;
+  onClick: () => void;
+}) {
+  return (
+    <button
+      aria-pressed={active}
+      className={cx("page-action", active && "page-action--active")}
+      type="button"
+      onClick={onClick}
+    >
+      <span>{label}</span>
     </button>
   );
 }
 
 function SummaryList({ rows }: { rows: SummaryRow[] }) {
   if (rows.length === 0) {
-    return <p className="muted-line">-</p>;
+    return <p>-</p>;
   }
   return (
     <div className="chip-cloud">
@@ -137,7 +271,7 @@ function DataTable({
   rows: Array<Array<string | number>>;
 }) {
   if (rows.length === 0) {
-    return <p className="muted-line">Sin datos todavia.</p>;
+    return <p>Sin datos todavia.</p>;
   }
   return (
     <div className="table-shell">
@@ -240,10 +374,7 @@ function GeminiKeyPanel({
     <div className="info-block">
       <p className="panel-kicker">Gemini API Key</p>
       <div className="field-block">
-        <FieldLabel
-          label="Clave local del navegador"
-          hint="Se guarda automaticamente solo en este navegador y se envia solo a /api/ai cuando pides ayuda a Gemini."
-        />
+        <FieldLabel label="Clave local del navegador" />
         <input
           autoComplete="off"
           className="mono-input"
@@ -264,11 +395,6 @@ function GeminiKeyPanel({
         </button>
       </div>
 
-      <p className="muted-line">
-        {hasSavedKey
-          ? "Clave local guardada. Tiene prioridad sobre la configuracion del sitio en Netlify para este navegador."
-          : "Sin clave local. Pega una aqui para activar Gemini sin tocar variables de entorno en Netlify."}
-      </p>
     </div>
   );
 }
@@ -360,105 +486,132 @@ export function NetlifyPracticeApp() {
 
   const currentPage =
     activeSection === "se" ? sePage : activeSection === "perifrasis" ? periphrasisPage : morfoPage;
+  const activeSectionMeta = SECTION_META[activeSection];
+  const activePageMeta = PAGE_META[currentPage];
+  const activeSnapshot = buildSectionSnapshot(activeSection, storageState);
+  const hasLocalGeminiKey = storageState.geminiApiKey.trim().length > 0;
+
+  const setPageForSection = (section: SectionName, page: PageName) => {
+    if (section === "se") {
+      setSePage(page);
+      return;
+    }
+    if (section === "perifrasis") {
+      setPeriphrasisPage(page);
+      return;
+    }
+    setMorfoPage(page);
+  };
 
   return (
-    <div className="practice-shell">
-      <aside className="sidebar">
-        <div className="brand">
-          <p className="eyebrow">Netlify Edition</p>
-          <h1>Sintaxis + Morfologia</h1>
-          <p className="muted-line">
-            Reescritura del Streamlit original para hosting estatico con funciones serverless.
-          </p>
-        </div>
+    <div className="app-shell">
+      <header className="globalnav">
+        <div className="globalnav__inner">
+          <button
+            className="globalnav__brand"
+            type="button"
+            onClick={() => {
+              setActiveSection("se");
+              setSePage("practice");
+            }}
+          >
+            <span className="globalnav__glyph">S</span>
+            <span>Sintaxis WebApp</span>
+          </button>
 
-        <div className="panel side-panel">
-          <p className="panel-kicker">Seccion</p>
-          <div className="stack">
-            <ChoicePill active={activeSection === "se"} label="Valores del se" onClick={() => setActiveSection("se")} />
-            <ChoicePill
-              active={activeSection === "perifrasis"}
-              label="Perifrasis"
-              onClick={() => setActiveSection("perifrasis")}
-            />
-            <ChoicePill
-              active={activeSection === "morfologia"}
-              label="Morfologia"
-              onClick={() => setActiveSection("morfologia")}
-            />
+          <nav className="globalnav__menu" aria-label="Secciones">
+            {SECTION_ORDER.map((section) => (
+              <button
+                key={section}
+                aria-pressed={activeSection === section}
+                className={cx("globalnav__link", activeSection === section && "globalnav__link--current")}
+                type="button"
+                onClick={() => setActiveSection(section)}
+              >
+                {SECTION_META[section].navLabel}
+              </button>
+            ))}
+          </nav>
+
+          <div className="globalnav__status" aria-label="Estado">
+            <span className="globalnav__meta">Netlify Edition</span>
+            <span className="globalnav__meta">{hasLocalGeminiKey ? "Clave Gemini local lista" : "Banco local activo"}</span>
           </div>
         </div>
+      </header>
 
-        <div className="panel side-panel">
-          <p className="panel-kicker">Pagina</p>
-          <div className="stack">
-            <ChoicePill
-              active={currentPage === "practice"}
-              label="Practicar"
-              onClick={() =>
-                activeSection === "se"
-                  ? setSePage("practice")
-                  : activeSection === "perifrasis"
-                    ? setPeriphrasisPage("practice")
-                    : setMorfoPage("practice")
-              }
-            />
-            <ChoicePill
-              active={currentPage === "history"}
-              label="Historial"
-              onClick={() =>
-                activeSection === "se"
-                  ? setSePage("history")
-                  : activeSection === "perifrasis"
-                    ? setPeriphrasisPage("history")
-                    : setMorfoPage("history")
-              }
-            />
-            <ChoicePill
-              active={currentPage === "settings"}
-              label="Ajustes"
-              onClick={() =>
-                activeSection === "se"
-                  ? setSePage("settings")
-                  : activeSection === "perifrasis"
-                    ? setPeriphrasisPage("settings")
-                    : setMorfoPage("settings")
-              }
-            />
+      <div className="app-frame">
+        <section className={cx("hero-banner", activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
+          <div className="hero-banner__copy">
+            <p className="eyebrow">{activeSectionMeta.eyebrow}</p>
+            <h1>{activeSectionMeta.title}</h1>
+            <p className="hero-banner__subhead">{activeSectionMeta.subhead}</p>
+            <div className="cta-links">
+              {(Object.entries(PAGE_META) as Array<[PageName, PageMeta]>).map(([pageKey, pageMeta]) => (
+                <PageAction
+                  key={pageKey}
+                  active={currentPage === pageKey}
+                  label={pageMeta.label}
+                  onClick={() => setPageForSection(activeSection, pageKey)}
+                />
+              ))}
+            </div>
           </div>
-        </div>
-      </aside>
 
-      <main className="main-stage">
-        <SeWorkspace
-          active={activeSection === "se"}
-          page={sePage}
-          settings={storageState.seSettings}
-          attempts={storageState.seAttempts}
-          apiKey={storageState.geminiApiKey}
-          onApiKeyChange={updateGeminiApiKey}
-          onSettingsChange={updateSeSettings}
-          onAttemptsChange={updateSeAttempts}
-        />
-        <PeriphrasisWorkspace
-          active={activeSection === "perifrasis"}
-          page={periphrasisPage}
-          settings={storageState.periphrasisSettings}
-          attempts={storageState.periphrasisAttempts}
-          onSettingsChange={updatePeriphrasisSettings}
-          onAttemptsChange={updatePeriphrasisAttempts}
-        />
-        <MorfoWorkspace
-          active={activeSection === "morfologia"}
-          page={morfoPage}
-          settings={storageState.morfoSettings}
-          attempts={storageState.morfoAttempts}
-          apiKey={storageState.geminiApiKey}
-          onApiKeyChange={updateGeminiApiKey}
-          onSettingsChange={updateMorfoSettings}
-          onAttemptsChange={updateMorfoAttempts}
-        />
-      </main>
+          <div className="hero-banner__aside">
+            <p className="hero-banner__label">Ahora: {activePageMeta.label}</p>
+            <div className="hero-metrics">
+              <div className="hero-metric">
+                <span>Perfil</span>
+                <strong>{activeSnapshot.profileId}</strong>
+              </div>
+              <div className="hero-metric">
+                <span>Dificultad</span>
+                <strong>D{activeSnapshot.difficulty}</strong>
+              </div>
+              <div className="hero-metric">
+                <span>Rendimiento</span>
+                <strong>{formatAccuracyLabel(activeSnapshot.accuracy, activeSnapshot.attempts)}</strong>
+              </div>
+              <div className="hero-metric">
+                <span>Motor</span>
+                <strong>{activeSnapshot.modelName}</strong>
+              </div>
+            </div>
+          </div>
+        </section>
+
+        <main className="main-stage">
+          <SeWorkspace
+            active={activeSection === "se"}
+            page={sePage}
+            settings={storageState.seSettings}
+            attempts={storageState.seAttempts}
+            apiKey={storageState.geminiApiKey}
+            onApiKeyChange={updateGeminiApiKey}
+            onSettingsChange={updateSeSettings}
+            onAttemptsChange={updateSeAttempts}
+          />
+          <PeriphrasisWorkspace
+            active={activeSection === "perifrasis"}
+            page={periphrasisPage}
+            settings={storageState.periphrasisSettings}
+            attempts={storageState.periphrasisAttempts}
+            onSettingsChange={updatePeriphrasisSettings}
+            onAttemptsChange={updatePeriphrasisAttempts}
+          />
+          <MorfoWorkspace
+            active={activeSection === "morfologia"}
+            page={morfoPage}
+            settings={storageState.morfoSettings}
+            attempts={storageState.morfoAttempts}
+            apiKey={storageState.geminiApiKey}
+            onApiKeyChange={updateGeminiApiKey}
+            onSettingsChange={updateMorfoSettings}
+            onAttemptsChange={updateMorfoAttempts}
+          />
+        </main>
+      </div>
     </div>
   );
 }
@@ -801,18 +954,6 @@ function SeWorkspace({
 
   return (
     <section className={cx("workspace", !active && "hidden-workspace")}>
-      <header className="workspace-header">
-        <div>
-          <p className="eyebrow">Valores del se</p>
-          <h2>Practica guiada</h2>
-        </div>
-        <div className="meta-strip">
-          <span>Perfil: {settings.profileId}</span>
-          <span>Modelo: {settings.modelName}</span>
-          <span>Intentos: {profile.totalAttempts}</span>
-        </div>
-      </header>
-
       {page === "practice" ? (
         <div className="page-grid">
           <div className="panel control-panel">
@@ -862,16 +1003,6 @@ function SeWorkspace({
               </div>
             </div>
 
-            <details className="details-panel">
-              <summary>
-                <span className="panel-kicker">Taxonomias activas</span>
-              </summary>
-              <div className="details-content">
-                <p className="muted-line">Valores disponibles: {availableSeValues.join(", ")}</p>
-                <p className="muted-line">Tambien puedes editar la lista completa en Pagina {" > "} Ajustes.</p>
-              </div>
-            </details>
-
             <div className="field-grid compact-grid">
               <div>
                 <FieldLabel label="Peso debilidades" />
@@ -897,8 +1028,6 @@ function SeWorkspace({
               </div>
             </div>
 
-            <p className="muted-line">Mezcla actual: {mixText}</p>
-
             <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div>
 
             <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
@@ -908,7 +1037,7 @@ function SeWorkspace({
             {settings.personalized && (weakValueLabels.length > 0 || weakFunctionLabels.length > 0) ? (
               <div className="info-block">
                 <p className="panel-kicker">Refuerzo activo</p>
-                <p className="muted-line">
+                <p>
                   Valores: {weakValueLabels.join(", ") || "-"}
                   <br />
                   Funciones: {weakFunctionLabels.join(", ") || "-"}
@@ -921,7 +1050,6 @@ function SeWorkspace({
             {!currentItem ? (
               <div className="empty-state">
                 <h3>Genera una frase para empezar.</h3>
-                <p className="muted-line">Si Gemini falla o no tiene clave, el banco local sigue funcionando.</p>
               </div>
             ) : (
               <>
@@ -985,7 +1113,7 @@ function SeWorkspace({
                     <div className="info-block">
                       <p className="panel-kicker">Explicacion</p>
                       <p>{currentItem.phraseType}</p>
-                      <p className="muted-line">{currentItem.explanation}</p>
+                      <p>{currentItem.explanation}</p>
                     </div>
 
                     <details className="details-panel">
@@ -1008,7 +1136,7 @@ function SeWorkspace({
                                     : `Recheck con ${recheck.model}: se detectaron discrepancias.`}
                                 </p>
                                 {!recheck.isCorrect ? (
-                                  <p className="muted-line">
+                                  <p>
                                     Correccion sugerida: valor={recheck.correctedValue} | funcion={recheck.correctedFunction}
                                   </p>
                                 ) : null}
@@ -1019,7 +1147,7 @@ function SeWorkspace({
                                     ))}
                                   </ul>
                                 ) : null}
-                                {recheck.correctionNote ? <p className="muted-line">{recheck.correctionNote}</p> : null}
+                                {recheck.correctionNote ? <p>{recheck.correctionNote}</p> : null}
                               </>
                             ) : (
                               <p className="result-bad">{recheck.error}</p>
@@ -1042,7 +1170,6 @@ function SeWorkspace({
                       {answer ? (
                         <div className="info-block">
                           {answer.success ? <p>{answer.answer}</p> : <p className="result-bad">{answer.error}</p>}
-                          {answer.success && answer.model ? <p className="muted-line">Modelo: {answer.model}</p> : null}
                         </div>
                       ) : null}
                     </div>
@@ -1073,11 +1200,11 @@ function SeWorkspace({
             </div>
 
             {settings.hideHistory ? (
-              <p className="muted-line">Historial oculto para esta seccion.</p>
+              <p>Historial oculto para esta seccion.</p>
             ) : (
               <>
                 <div className="row-between">
-                  <p className="muted-line">
+                  <p>
                     Intentos totales: {profile.totalAttempts} | Acierto completo: {seAccuracy(profileAttempts).toFixed(1)}%
                   </p>
                   <label className="checkbox-line">
@@ -1225,16 +1352,12 @@ function SeWorkspace({
 
             <GeminiKeyPanel apiKey={apiKey} onApiKeyChange={onApiKeyChange} />
 
-            <div className="info-block">
-              <p className="panel-kicker">Estado</p>
-              <p className="muted-line">
-                La app intentara usar primero la clave local que pegues aqui. Si no existe, usara la configuracion del sitio en
-                Netlify. Si ambas faltan o fallan, practica con el banco local.
-              </p>
-              {settings.modelName.toLowerCase().startsWith("gemma") ? (
-                <p className="muted-line">Compatibilidad Gemma activa: el servidor enviara prompt inline cuando corresponda.</p>
-              ) : null}
-            </div>
+            {settings.modelName.toLowerCase().startsWith("gemma") ? (
+              <div className="info-block">
+                <p className="panel-kicker">Compatibilidad</p>
+                <p>Gemma activa.</p>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
@@ -1393,17 +1516,6 @@ function PeriphrasisWorkspace({
 
   return (
     <section className={cx("workspace", !active && "hidden-workspace")}>
-      <header className="workspace-header">
-        <div>
-          <p className="eyebrow">Perifrasis</p>
-          <h2>Construcciones verbales</h2>
-        </div>
-        <div className="meta-strip">
-          <span>Perfil: {settings.profileId}</span>
-          <span>Intentos: {profile.totalAttempts}</span>
-        </div>
-      </header>
-
       {page === "practice" ? (
         <div className="page-grid">
           <div className="panel control-panel">
@@ -1453,20 +1565,6 @@ function PeriphrasisWorkspace({
               </div>
             </div>
 
-            <details className="details-panel">
-              <summary>
-                <span className="panel-kicker">Taxonomias activas</span>
-              </summary>
-              <div className="details-content">
-                <p className="muted-line">
-                  Construcciones: {PERIPHRASIS_STRUCTURES.join(", ")}
-                  <br />
-                  Tipos de perifrasis: {availablePeriphrasisTypes.join(", ")}
-                </p>
-                <p className="muted-line">Tambien puedes editar la lista completa en Pagina {" > "} Ajustes.</p>
-              </div>
-            </details>
-
             <div className="field-grid compact-grid">
               <div>
                 <FieldLabel label="Peso debilidades" />
@@ -1492,7 +1590,6 @@ function PeriphrasisWorkspace({
               </div>
             </div>
 
-            <p className="muted-line">Mezcla actual: {mixText}</p>
             <div className="inline-banner">{statusNote}</div>
 
             <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
@@ -1502,7 +1599,7 @@ function PeriphrasisWorkspace({
             {settings.personalized && (weakStructureLabels.length > 0 || weakPeriphrasisTypeLabels.length > 0) ? (
               <div className="info-block">
                 <p className="panel-kicker">Refuerzo activo</p>
-                <p className="muted-line">
+                <p>
                   Construcciones: {weakStructureLabels.join(", ") || "-"}
                   <br />
                   Tipos de perifrasis: {weakPeriphrasisTypeLabels.join(", ") || "-"}
@@ -1515,7 +1612,6 @@ function PeriphrasisWorkspace({
             {!currentItem ? (
               <div className="empty-state">
                 <h3>Genera una frase para empezar.</h3>
-                <p className="muted-line">Esta seccion usa ahora mismo un banco local de frases.</p>
               </div>
             ) : (
               <>
@@ -1592,7 +1688,7 @@ function PeriphrasisWorkspace({
                     <div className="info-block">
                       <p className="panel-kicker">Explicacion</p>
                       <p>{currentItem.phraseType}</p>
-                      <p className="muted-line">{currentItem.explanation}</p>
+                      <p>{currentItem.explanation}</p>
                     </div>
                   </>
                 ) : null}
@@ -1621,11 +1717,11 @@ function PeriphrasisWorkspace({
             </div>
 
             {settings.hideHistory ? (
-              <p className="muted-line">Historial oculto para esta seccion.</p>
+              <p>Historial oculto para esta seccion.</p>
             ) : (
               <>
                 <div className="row-between">
-                  <p className="muted-line">
+                  <p>
                     Intentos totales: {profile.totalAttempts} | Acierto completo: {periphrasisAccuracy(profileAttempts).toFixed(1)}%
                   </p>
                   <label className="checkbox-line">
@@ -1754,12 +1850,6 @@ function PeriphrasisWorkspace({
               Guardar ajustes
             </button>
 
-            <div className="info-block">
-              <p className="panel-kicker">Estado</p>
-              <p className="muted-line">
-                Esta seccion funciona con un banco local de frases y usa los tipos personalizados que guardes aqui.
-              </p>
-            </div>
           </div>
         </div>
       ) : null}
@@ -2049,18 +2139,6 @@ function MorfoWorkspace({
 
   return (
     <section className={cx("workspace", !active && "hidden-workspace")}>
-      <header className="workspace-header">
-        <div>
-          <p className="eyebrow">Morfologia</p>
-          <h2>Analisis de palabras</h2>
-        </div>
-        <div className="meta-strip">
-          <span>Perfil: {settings.profileId}</span>
-          <span>Modelo: {settings.modelName}</span>
-          <span>Intentos: {profile.totalAttempts}</span>
-        </div>
-      </header>
-
       {page === "practice" ? (
         <div className="page-grid">
           <div className="panel control-panel">
@@ -2121,7 +2199,6 @@ function MorfoWorkspace({
               </div>
             </div>
 
-            <p className="muted-line">Mezcla actual: {mixText}</p>
             <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div>
 
             <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
@@ -2131,7 +2208,7 @@ function MorfoWorkspace({
             {settings.personalized && (weakWordTypeLabels.length > 0 || weakMorphemeTypeLabels.length > 0) ? (
               <div className="info-block">
                 <p className="panel-kicker">Refuerzo activo</p>
-                <p className="muted-line">
+                <p>
                   Tipos de palabra: {weakWordTypeLabels.join(", ") || "-"}
                   <br />
                   Tipos de morfema: {weakMorphemeTypeLabels.join(", ") || "-"}
@@ -2144,7 +2221,6 @@ function MorfoWorkspace({
             {!currentItem ? (
               <div className="empty-state">
                 <h3>Genera una palabra para empezar.</h3>
-                <p className="muted-line">Si Gemini falla o no tiene clave, el banco local sigue funcionando.</p>
               </div>
             ) : (
               <>
@@ -2239,7 +2315,7 @@ function MorfoWorkspace({
                     <div className="info-block">
                       <p className="panel-kicker">Explicacion</p>
                       <p>{currentItem.analysisType}</p>
-                      <p className="muted-line">{currentItem.explanation}</p>
+                      <p>{currentItem.explanation}</p>
                     </div>
 
                     <details className="details-panel">
@@ -2263,15 +2339,15 @@ function MorfoWorkspace({
                                     : `Recheck con ${recheck.model}: se detectaron discrepancias.`}
                                 </p>
                                 {!recheck.isCorrect ? (
-                                  <p className="muted-line">
+                                  <p>
                                     Correccion sugerida: tipo={recheck.correctedWordType} | lexema={recheck.correctedLexeme}
                                   </p>
                                 ) : null}
                                 {recheck.correctedMorphemes && recheck.correctedMorphemes.length > 0 ? (
-                                  <p className="muted-line">Morfemas sugeridos: {recheck.correctedMorphemes.join(", ")}</p>
+                                  <p>Morfemas sugeridos: {recheck.correctedMorphemes.join(", ")}</p>
                                 ) : null}
                                 {recheck.correctedMorphemeTypes && recheck.correctedMorphemeTypes.length > 0 ? (
-                                  <p className="muted-line">Tipos sugeridos: {recheck.correctedMorphemeTypes.join(", ")}</p>
+                                  <p>Tipos sugeridos: {recheck.correctedMorphemeTypes.join(", ")}</p>
                                 ) : null}
                                 {recheck.issues && recheck.issues.length > 0 ? (
                                   <ul>
@@ -2280,7 +2356,7 @@ function MorfoWorkspace({
                                     ))}
                                   </ul>
                                 ) : null}
-                                {recheck.correctionNote ? <p className="muted-line">{recheck.correctionNote}</p> : null}
+                                {recheck.correctionNote ? <p>{recheck.correctionNote}</p> : null}
                               </>
                             ) : (
                               <p className="result-bad">{recheck.error}</p>
@@ -2303,7 +2379,6 @@ function MorfoWorkspace({
                       {answer ? (
                         <div className="info-block">
                           {answer.success ? <p>{answer.answer}</p> : <p className="result-bad">{answer.error}</p>}
-                          {answer.success && answer.model ? <p className="muted-line">Modelo: {answer.model}</p> : null}
                         </div>
                       ) : null}
                     </div>
@@ -2334,11 +2409,11 @@ function MorfoWorkspace({
             </div>
 
             {settings.hideHistory ? (
-              <p className="muted-line">Historial oculto para esta seccion.</p>
+              <p>Historial oculto para esta seccion.</p>
             ) : (
               <>
                 <div className="row-between">
-                  <p className="muted-line">Intentos totales: {profile.totalAttempts}</p>
+                  <p>Intentos totales: {profile.totalAttempts}</p>
                   <label className="checkbox-line">
                     <input checked={historyOnlyErrors} onChange={(event) => setHistoryOnlyErrors(event.target.checked)} type="checkbox" />
                     <span>Mostrar solo fallos</span>
@@ -2470,16 +2545,12 @@ function MorfoWorkspace({
 
             <GeminiKeyPanel apiKey={apiKey} onApiKeyChange={onApiKeyChange} />
 
-            <div className="info-block">
-              <p className="panel-kicker">Estado</p>
-              <p className="muted-line">
-                La app intentara usar primero la clave local que pegues aqui. Si no existe, usara la configuracion del sitio en
-                Netlify. Si ambas faltan o fallan, practica con el banco local.
-              </p>
-              {settings.modelName.toLowerCase().startsWith("gemma") ? (
-                <p className="muted-line">Compatibilidad Gemma activa: el servidor enviara prompt inline cuando corresponda.</p>
-              ) : null}
-            </div>
+            {settings.modelName.toLowerCase().startsWith("gemma") ? (
+              <div className="info-block">
+                <p className="panel-kicker">Compatibilidad</p>
+                <p>Gemma activa.</p>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}
