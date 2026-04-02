@@ -1,443 +1,425 @@
-
+# Sintaxis WebApp Design Language
 
 ## 1. Direction
 
-This product should feel Apple-inspired, but more reduced than a typical Apple marketing page.
+The product should now follow a GitHub-inspired design language, adapted for this learning tool.
 
-The reference qualities are:
+The target feel is:
 
-- premium
-- spacious
-- typography-led
-- calm
-- image-light but still cinematic through layout and surface treatment
-- highly restrained in color
-- clear in hierarchy
+- minimal
+- utilitarian
+- dense but calm
+- content-first
+- border-led rather than decoration-led
+- predictable in state behavior
 
-The product is not a homepage with many modules. It is a focused learning tool. That changes the design language in an important way:
+This is not a marketing site. It is a working interface. The design should prioritize scanability, control clarity, and fast orientation over spectacle.
 
-- one framing layer is enough
-- one primary task surface should dominate
-- secondary explanatory chrome should be removed
+## 2. Product-Specific Constraints
 
-The UI should feel considered, not decorated.
+These constraints from the current product still stand:
 
-## 2. Non-Negotiable Rules
+- one framing layer below the global nav
+- one hero banner for orientation
+- no section card rail below the hero
+- no duplicate workspace headers inside each section
+- no helper-copy clutter under controls
 
-### One framing layer only
+The GitHub-inspired system should be applied inside those constraints.
 
-The top of the app has two structural layers:
+## 3. Core Principles
 
-1. sticky global navigation
-2. one hero banner
+### Content first
 
-Nothing else should compete with those.
+Content should carry the contrast.
 
 That means:
 
-- no section grid under the hero
-- no extra workspace header inside each section
-- no repeated page-introduction blocks once the hero already establishes context
+- the current prompt is visually primary
+- control chrome stays quieter than the task content
+- borders separate regions more than shadows do
+- status and metadata stay compact
 
-The hero is the single high-level orientation surface.
+### Progressive disclosure
 
-### No gray helper-copy clutter
+Not every concept needs a visible explanation up front.
 
-Small gray description text should not be used as a default pattern.
+Prefer:
 
-Remove or avoid:
-
-- helper sentences under labels
-- small descriptive text under page actions
-- gray “how to use this” blurbs
-- explanatory footnotes under major surfaces
-- “current mix” microcopy when the state is already visible elsewhere
-- empty-state subtitle filler
-
-Allowed exceptions:
-
-- actual exercise explanations after an answer is checked
-- explicit error text
-- correction text in recheck flows
-- concise status messaging when an async action needs it
-
-If text does not help a decision or explain a result, it should probably not exist.
-
-### One clear task per area
-
-Each screen area should present one job:
-
-- hero: orient the user
-- left control panel: configure the session
-- main practice panel: complete the current task
-- history: review outcomes
-- settings: change durable preferences
-
-Do not mix orientation, explanation, and interaction in the same visual block unless necessary.
-
-## 3. Experience Model
-
-### Overall shell
-
-The shell should follow this sequence:
-
-1. sticky global nav
-2. hero banner with section and page state
-3. main content stage
-
-The main content stage changes by page:
-
-- practice: split view with sticky controls and one large task surface
-- history: single-column analysis surface
-- settings: single-column configuration surface
-
-### Navigation behavior
-
-Navigation should stay shallow:
-
-- top nav changes section
-- hero actions change page within the active section
-
-This keeps the information architecture legible and avoids sidebars competing with the hero.
-
-## 4. Visual Principles
-
-### Typography first
-
-Typography should do most of the hierarchy work.
-
-Use:
-
-- large headlines
-- short subheads
-- compact uppercase labels
-- normal-weight body copy
+- concise labels
+- one visible primary action
+- result detail after interaction
+- optional detail panels when needed
 
 Avoid:
 
-- stacked layers of sublabels
-- dense paragraph blocks
-- repeated explanatory text under controls
+- long instructional copy
+- repeated “how this works” text
+- layered intro sections
 
-Recommended hierarchy:
+### Calm density
 
-- Hero title: `clamp(2.8rem, 6vw, 4.8rem)`, weight 600, line-height near 1.02
-- Hero subhead: `clamp(1.25rem, 2.2vw, 1.85rem)`, weight 400, line-height near 1.2
-- Prompt title: `clamp(2rem, 4.2vw, 3.6rem)`, weight 600
-- Panel titles: around `1.65rem` to `2rem`
-- Labels / kickers: `0.72rem`, uppercase, wide tracking
-- Body: around `0.95rem` to `1rem`
+GitHub-like density does not mean cramped.
 
-Font stack:
+It means:
 
-```css
-"SF Pro Display", "SF Pro Text", -apple-system, BlinkMacSystemFont, "Segoe UI", Helvetica, Arial, sans-serif
-```
+- 14px controls
+- 16px primary reading text
+- 12px labels and metadata
+- compact but readable spacing
+- short vertical travel between decision points
 
-Mono stack:
+## 4. Color Rules
 
-```css
-"SF Mono", ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace
-```
+### Semantic token model
 
-### Color discipline
+All colors should be treated semantically.
 
-Color should stay mostly neutral.
+Use semantic roles like:
 
-Primary palette:
+- `fg-default`
+- `fg-muted`
+- `bg-default`
+- `bg-muted`
+- `border-default`
+- `accent-emphasis`
+- `success-emphasis`
+- `danger-emphasis`
 
-- text primary: `#1d1d1f`
-- text secondary: `#6e6e73`
-- text tertiary: `#86868b`
+Do not hard-code decorative color per component.
+
+### Base palette
+
+Primary reference values:
+
+- text default: `#1f2328`
+- text muted: `#59636e`
+- text subtle: `#818b98`
 - page background: `#ffffff`
-- section background: `#f5f5f7`
-- soft card background: `#fbfbfd`
-- accent blue: `#0071e3`
-- accent blue hover: `#0077ed`
-- accent blue dark: `#2997ff`
-- dark surface: `#000000`
-- dark elevated surface: `#1d1d1f`
+- muted background: `#f6f8fa`
+- inset background: `#eef1f4`
+- border default: `#d1d9e0`
+- border muted: `#d8dee4`
+- emphasis surface: `#25292e`
+- accent emphasis: `#25292e`
+- success emphasis: `#1f883d`
+- danger emphasis: `#cf222e`
 
-Rules:
+### No blue ambient treatment
 
-- black, white, and gray do most of the work
-- blue is for action and emphasis, not decoration
-- red appears only for destructive or incorrect states
-- green appears only for success states
+This is now a hard rule.
 
-### Surface behavior
+Do not use:
 
-The interface should feel layered through material and spacing, not through many borders or shadows.
+- blue gradients in the page background
+- blue hero glows
+- blue-tinted cards
+- pale blue selected surfaces
+- blue informational banners as default treatment
 
-Use:
+Use black or charcoal for emphasis instead.
 
-- large radii
-- subtle borders
-- soft blur-backed surfaces
-- gentle gradients
-- minimal but present shadows
+Default surfaces should stay neutral gray/white.
 
-Avoid:
+### State treatment
 
-- hard card stacks everywhere
-- heavy outlines
-- high-contrast separators
-- loud glow effects
+States should be predictable:
 
-## 5. Layout System
+- default: neutral border and default background
+- hover: slightly darker neutral surface or border
+- selected: neutral fill with stronger border or emphasis surface
+- focus-visible: charcoal ring
+- disabled: muted foreground and muted surface
+- success: green foreground or green-muted background
+- danger: red foreground or red-muted background
 
-### Global structure
+## 5. Typography
 
-- max app width: `1440px`
-- outer padding: generous on desktop, compressed on mobile
-- hero and major panels use large radii
-- practice layout is 2-column on desktop and 1-column on smaller widths
+### Font stacks
 
-### Practice layout
+Sans:
 
-Desktop:
+```css
+-apple-system, BlinkMacSystemFont, "Segoe UI", "Noto Sans", Helvetica, Arial, sans-serif, "Apple Color Emoji", "Segoe UI Emoji"
+```
 
-- left: sticky control panel
-- right: large practice panel
+Monospace:
 
-The right panel is the star. The left panel supports it.
+```css
+"Monaspace Neon", ui-monospace, SFMono-Regular, "SF Mono", Menlo, Consolas, "Liberation Mono", monospace
+```
 
-The control panel should feel like a secondary surface, not the primary experience.
+### Hierarchy
 
-### History and settings
+The app should use a GitHub-like cadence:
 
-These pages should use a single-column layout.
+- hero title: `clamp(1.75rem, 3vw, 2.5rem)`, weight 600
+- hero subhead: `16px`, weight 400
+- prompt title: `clamp(1.5rem, 3vw, 2rem)`, weight 600
+- panel title: `20px`, weight 600
+- body: `14px` default, `16px` for more important reading
+- labels / kickers: `12px`, weight 600
+- code: `13px` monospace
 
-They are not dashboards made of many little cards. They are broad, readable management views.
-
-## 6. Component Language
-
-### Global nav
-
-Use a compact sticky bar with blur and a translucent white material.
-
-The nav should contain:
-
-- brand
-- section switching
-- concise system state
-
-The nav should stay visually quiet.
-
-### Hero banner
-
-The hero is the only page-introduction block in the app.
-
-It should contain:
-
-- section eyebrow
-- large title
-- one short subhead
-- page-switch actions
-- compact current-state metrics
-
-It should not contain:
-
-- long explanations
-- secondary footnotes
-- another row of cards below it
-
-One hero is enough.
-
-### Page actions
-
-Page actions should be large pill-like surfaces with strong active state.
-
-Use:
-
-- 3 clear actions max
-- short labels only
-- no mini descriptions under each action
-
-### Panels
-
-Panels should be soft, rounded, lightly elevated surfaces.
-
-Use panels for:
-
-- controls
-- practice area
-- history sections
-- settings sections
-
-Do not create panels just to hold explanatory copy.
-
-### Choice pills
-
-Choice pills should be rounded, quiet by default, and clearly active when selected.
-
-They should communicate state through:
-
-- subtle border change
-- subtle blue tint
-- clearer text color
-
-Not through loud fills or oversized effects.
-
-### Primary buttons
-
-Primary buttons should be blue, pill-shaped, and singular in emphasis.
-
-Rules:
-
-- usually only one strong primary action should be visible per area
-- secondary actions should be ghost buttons
-- destructive actions should use soft red treatment, not oversized danger blocks
-
-### Status banners
-
-Status banners are allowed, but they must stay short.
-
-Good:
-
-- “Lote servido por Gemini.”
-- “Modo local activado.”
-- “Preparando lote...”
-
-Bad:
-
-- instructional paragraphs
-- repeated implementation detail
-- verbose fallback explanations
-
-### Tables
-
-Tables should be clean, scrollable, and calm.
-
-Use:
-
-- sticky headers
-- subtle borders
-- uppercase micro-labels in headers
-- generous cell padding
-
-Avoid turning tables into heavily styled admin grids.
-
-## 7. Copy Rules
-
-### Preferred copy style
+### Copy style
 
 Copy should be:
 
 - short
 - direct
-- structural
-- confident
+- operational
+- unadorned
 
-### Labels
+The product should sound like a well-designed tool, not a landing page.
 
-Form labels should usually stand alone.
+## 6. Spacing and Layout
 
-Do not add help text unless the user cannot reasonably understand the control without it.
+### Scale
 
-### Empty states
+Primary spacing rhythm:
 
-Empty states should be one short line when possible.
+- 4
+- 8
+- 12
+- 16
+- 24
+- 32
+- 48
 
-Good:
+Default usage:
 
-- “Genera una frase para empezar.”
-- “Genera una palabra para empezar.”
+- 8px for compact control gaps
+- 12px for field spacing
+- 16px for panel padding
+- 24px for section padding and structural gaps
 
-Bad:
+### Shell
 
-- extra reassurance
-- tool fallback descriptions
-- setup instructions embedded in the empty state
+The shell should remain:
 
-### Explanation text
+1. sticky global nav
+2. hero banner
+3. main content stage
 
-Explanation text belongs after evaluation, not before interaction.
+The app can stay centered to a practical working width, but it should feel like an application pane, not a cinematic canvas.
 
-That means:
+Recommended max width:
 
-- keep explanatory content in result areas
-- avoid previewing theory before the user acts
+- around `1280px`
 
-### Settings text
+### Page layouts
 
-Settings should be label-led, not paragraph-led.
+Practice:
 
-Prefer:
+- left sticky control panel
+- right main task surface
 
-- field label
-- input
-- save action
+History and settings:
 
-Only add extra copy when compatibility or constraints genuinely need to be stated.
+- single column
+- one broad content pane
 
-## 8. Motion
+## 7. Surface Language
 
-Motion should be soft and sparse.
+### Boxes over cards
 
-Allowed:
+The dominant surface pattern should be a GitHub-like box:
 
-- subtle rise-in on major surfaces
-- small lift on hover
-- quick state transitions on pills and buttons
+- white or muted surface
+- 1px border
+- 6px to 8px radius
+- little or no default shadow
 
-Avoid:
+But this applies to major structural containers, not every nested element inside them.
 
-- bouncing
-- exaggerated parallax
-- constant micro-animation
-- attention-seeking transitions
+Avoid card-inside-card composition.
 
-## 9. Responsive Behavior
+If a section already sits inside a bordered surface, prefer:
 
-On smaller screens:
+- spacing
+- typography
+- simple separators
 
-- nav wraps cleanly
-- hero collapses to one column
-- hero actions stack
-- practice layout becomes one column
-- sticky control behavior turns off
+over adding another full box around its contents.
 
-The mobile version should feel like a compacted version of the desktop experience, not a different product.
+Use shadows only for:
 
-## 10. Implementation Notes
+- overlays
+- floating layers if introduced later
 
-The current CSS architecture should remain token-led and component-scoped.
+Do not use:
 
-Prefer:
+- heavy elevation
+- blur-backed glass panels
+- decorative gradients
 
-- semantic tokens in `:root`
-- section-level classes
-- a small set of modifiers
+### Radius
 
-Avoid:
+Default radii:
 
-- utility-first looking markup
-- extra wrappers only for styling
-- duplicating orientation copy in multiple places
+- controls: `6px`
+- panels: `8px`
+- larger shell surfaces: `8px` to `12px` if needed
 
-## 11. What This Design Language Rejects
+Do not use oversized rounded marketing shapes as the default language.
 
-This system should explicitly avoid:
+## 8. Components
 
-- dashboard density
-- stacked intro blocks
-- repeated page headers
-- section-card rails under the hero
-- floating explanatory notes everywhere
-- gray helper text under every control
-- too many borders
-- too much shadow
-- more than one dominant focal area on screen
+### Global nav
 
-## 12. Final Standard
+The top nav should be:
 
-If a new screen or component is added, it should pass this test:
+- compact
+- text-first
+- lightly bordered
+- muted by default
 
-1. Is there only one main framing layer below the nav?
-2. Is the primary action obvious within two seconds?
-3. Did typography and spacing create hierarchy without extra explanation?
-4. Can any gray helper text be deleted without losing meaning?
-5. Does the screen feel calm, premium, and reduced?
+Active section state should be shown with:
 
-If the answer to any of those is no, the screen is not aligned with this design language yet.
+- stronger text
+- neutral selected surface
+- border clarity
+
+Not with a pale blue fill.
+
+### Hero banner
+
+The hero stays, but it should behave like a GitHub-style repository overview box rather than an Apple marketing hero.
+
+It should contain:
+
+- title
+- page actions
+- compact state metrics
+
+It should not contain:
+
+- gradients
+- glow effects
+- decorative wash color
+- secondary explanatory copy
+- mini-cards for each metric
+
+### Page actions
+
+Page actions should look like compact GitHub buttons.
+
+Rules:
+
+- 32px-ish height
+- 6px radius
+- bordered neutral default state
+- darker selected state
+- no large pill treatment
+- no supporting subtitle text
+
+### Buttons
+
+Button language:
+
+- primary: black or charcoal emphasis fill
+- secondary: white / neutral with border
+- danger: red-emphasis text with restrained background behavior
+
+Default control height:
+
+- around `32px`
+
+### Inputs
+
+Inputs should be understated:
+
+- white background
+- 1px border
+- 6px radius
+- 14px text
+- charcoal focus ring
+
+### Choice pills
+
+Choice controls should become compact segmented-like buttons, not soft promotional chips.
+
+Active state should be neutral and structural:
+
+- muted gray fill
+- stronger border
+- darker text
+
+Avoid blue-tinted active backgrounds.
+
+### Status banners
+
+Default informational banners should be neutral.
+
+Use:
+
+- gray border
+- muted gray background
+- default foreground
+
+Reserve colored fills for:
+
+- warnings
+- destructive/error states
+- explicit success confirmation if needed
+
+### Result and detail panels
+
+These should read as content boxes:
+
+- neutral background
+- clear border
+- modest padding
+- no decorative treatment
+
+Where possible, flatten them further:
+
+- use a top divider instead of a full border
+- avoid rounded sub-cards inside larger panels
+
+### Tables
+
+Tables should follow GitHub-like conventions:
+
+- muted header background
+- compact cell padding
+- thin borders
+- strong alignment
+- no decorative row effects
+
+## 9. What This System Rejects
+
+This design language should explicitly avoid:
+
+- Apple-like glassmorphism
+- large-radius luxury surfaces
+- ambient blue page coloration
+- pale blue active chips
+- glowing hero sections
+- oversized pill navigation
+- decorative shadow stacks
+- explanatory microcopy under every control
+
+## 10. Accessibility and Interaction
+
+The interface should keep strong GitHub-like defaults:
+
+- visible focus ring
+- clear hover states
+- strong disabled styling
+- semantic structure
+- readable contrast
+
+If a state exists, it should be obvious without relying only on color.
+
+## 11. Final Standard
+
+Any new screen or component should pass this check:
+
+1. Does it feel like a working tool rather than a landing page?
+2. Are borders and spacing doing more work than decoration?
+3. Is emphasis black/charcoal rather than blue or pale blue?
+4. Can the screen be scanned quickly at 14px body size?
+5. Is any visible helper copy strictly necessary?
+
+If the answer to any of those is no, it is not aligned with this design language yet.

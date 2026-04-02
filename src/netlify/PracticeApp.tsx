@@ -78,25 +78,13 @@ type SectionName = "se" | "perifrasis" | "morfologia";
 type PageName = "practice" | "history" | "settings";
 
 interface SectionMeta {
-  eyebrow: string;
   navLabel: string;
   title: string;
-  subhead: string;
   theme?: "light" | "dark";
 }
 
 interface PageMeta {
   label: string;
-}
-
-interface SectionSnapshot {
-  profileId: string;
-  modelName: string;
-  difficulty: number;
-  attempts: number;
-  accuracy: number;
-  focusCount: number;
-  personalized: boolean;
 }
 
 const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia"];
@@ -115,84 +103,22 @@ const PAGE_META: Record<PageName, PageMeta> = {
 
 const SECTION_META: Record<SectionName, SectionMeta> = {
   se: {
-    eyebrow: "Sintaxis",
     navLabel: "Valores del se",
-    title: "Practica guiada del se",
-    subhead: "Una experiencia mas serena y centrada para distinguir valor, funcion y justificacion en cada frase.",
+    title: "Valores del se",
   },
   perifrasis: {
-    eyebrow: "Perifrasis",
-    navLabel: "Construcciones verbales",
-    title: "Lectura clara de la periferasis verbal",
-    subhead: "Menos densidad de interfaz y mas foco en decidir si hay construccion verbal y de que tipo se trata.",
+    navLabel: "Perifrasis",
+    title: "Perifrasis",
   },
   morfologia: {
-    eyebrow: "Morfologia",
-    navLabel: "Analisis de palabras",
-    title: "Analisis morfologico con presencia editorial",
-    subhead: "Palabra, lexema y morfemas pasan al centro con un flujo amplio, legible y consistente.",
+    navLabel: "Morfologia",
+    title: "Morfologia",
     theme: "dark",
   },
 };
 
 function cx(...tokens: Array<string | false | null | undefined>): string {
   return tokens.filter(Boolean).join(" ");
-}
-
-function formatAccuracyLabel(accuracy: number, attempts: number): string {
-  return attempts > 0 ? `${accuracy.toFixed(1)}% acierto` : "Sin historial";
-}
-
-function morfoAccuracy(attempts: MorfoAttempt[]): number {
-  if (attempts.length === 0) {
-    return 0;
-  }
-  const okCount = attempts.filter(
-    (attempt) => attempt.wordTypeOk && attempt.lexemeOk && attempt.morphemesOk && attempt.morphemeTypesOk,
-  ).length;
-  return (okCount / attempts.length) * 100;
-}
-
-function buildSectionSnapshot(section: SectionName, storageState: StorageState): SectionSnapshot {
-  if (section === "se") {
-    const { seSettings, seAttempts } = storageState;
-    const scopedAttempts = seAttempts.filter((attempt) => attempt.profileId === seSettings.profileId);
-    return {
-      profileId: seSettings.profileId,
-      modelName: seSettings.modelName,
-      difficulty: seSettings.difficulty,
-      attempts: scopedAttempts.length,
-      accuracy: seAccuracy(scopedAttempts),
-      focusCount: seSettings.focusValues.length,
-      personalized: seSettings.personalized,
-    };
-  }
-
-  if (section === "perifrasis") {
-    const { periphrasisSettings, periphrasisAttempts } = storageState;
-    const scopedAttempts = periphrasisAttempts.filter((attempt) => attempt.profileId === periphrasisSettings.profileId);
-    return {
-      profileId: periphrasisSettings.profileId,
-      modelName: periphrasisSettings.modelName,
-      difficulty: periphrasisSettings.difficulty,
-      attempts: scopedAttempts.length,
-      accuracy: periphrasisAccuracy(scopedAttempts),
-      focusCount: periphrasisSettings.focusStructures.length,
-      personalized: periphrasisSettings.personalized,
-    };
-  }
-
-  const { morfoSettings, morfoAttempts } = storageState;
-  const scopedAttempts = morfoAttempts.filter((attempt) => attempt.profileId === morfoSettings.profileId);
-  return {
-    profileId: morfoSettings.profileId,
-    modelName: morfoSettings.modelName,
-    difficulty: morfoSettings.difficulty,
-    attempts: scopedAttempts.length,
-    accuracy: morfoAccuracy(scopedAttempts),
-    focusCount: morfoSettings.focusWordTypes.length,
-    personalized: morfoSettings.personalized,
-  };
 }
 
 function ratioLabel(targetWeight: number, normalWeight: number): string {
@@ -372,7 +298,6 @@ function GeminiKeyPanel({
 
   return (
     <div className="info-block">
-      <p className="panel-kicker">Gemini API Key</p>
       <div className="field-block">
         <FieldLabel label="Clave local del navegador" />
         <input
@@ -487,9 +412,6 @@ export function NetlifyPracticeApp() {
   const currentPage =
     activeSection === "se" ? sePage : activeSection === "perifrasis" ? periphrasisPage : morfoPage;
   const activeSectionMeta = SECTION_META[activeSection];
-  const activePageMeta = PAGE_META[currentPage];
-  const activeSnapshot = buildSectionSnapshot(activeSection, storageState);
-  const hasLocalGeminiKey = storageState.geminiApiKey.trim().length > 0;
 
   const setPageForSection = (section: SectionName, page: PageName) => {
     if (section === "se") {
@@ -533,84 +455,58 @@ export function NetlifyPracticeApp() {
             ))}
           </nav>
 
-          <div className="globalnav__status" aria-label="Estado">
-            <span className="globalnav__meta">Netlify Edition</span>
-            <span className="globalnav__meta">{hasLocalGeminiKey ? "Clave Gemini local lista" : "Banco local activo"}</span>
-          </div>
         </div>
       </header>
 
       <div className="app-frame">
-        <section className={cx("hero-banner", activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
-          <div className="hero-banner__copy">
-            <p className="eyebrow">{activeSectionMeta.eyebrow}</p>
-            <h1>{activeSectionMeta.title}</h1>
-            <p className="hero-banner__subhead">{activeSectionMeta.subhead}</p>
-            <div className="cta-links">
-              {(Object.entries(PAGE_META) as Array<[PageName, PageMeta]>).map(([pageKey, pageMeta]) => (
-                <PageAction
-                  key={pageKey}
-                  active={currentPage === pageKey}
-                  label={pageMeta.label}
-                  onClick={() => setPageForSection(activeSection, pageKey)}
-                />
-              ))}
+        <section className="workspace-shell">
+          <section className={cx("hero-banner", activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
+            <div className="hero-banner__copy">
+              <h1>{activeSectionMeta.title}</h1>
+              <div className="cta-links">
+                {(Object.entries(PAGE_META) as Array<[PageName, PageMeta]>).map(([pageKey, pageMeta]) => (
+                  <PageAction
+                    key={pageKey}
+                    active={currentPage === pageKey}
+                    label={pageMeta.label}
+                    onClick={() => setPageForSection(activeSection, pageKey)}
+                  />
+                ))}
+              </div>
             </div>
-          </div>
+          </section>
 
-          <div className="hero-banner__aside">
-            <p className="hero-banner__label">Ahora: {activePageMeta.label}</p>
-            <div className="hero-metrics">
-              <div className="hero-metric">
-                <span>Perfil</span>
-                <strong>{activeSnapshot.profileId}</strong>
-              </div>
-              <div className="hero-metric">
-                <span>Dificultad</span>
-                <strong>D{activeSnapshot.difficulty}</strong>
-              </div>
-              <div className="hero-metric">
-                <span>Rendimiento</span>
-                <strong>{formatAccuracyLabel(activeSnapshot.accuracy, activeSnapshot.attempts)}</strong>
-              </div>
-              <div className="hero-metric">
-                <span>Motor</span>
-                <strong>{activeSnapshot.modelName}</strong>
-              </div>
-            </div>
-          </div>
+          <main className="main-stage">
+            <SeWorkspace
+              active={activeSection === "se"}
+              page={sePage}
+              settings={storageState.seSettings}
+              attempts={storageState.seAttempts}
+              apiKey={storageState.geminiApiKey}
+              onApiKeyChange={updateGeminiApiKey}
+              onSettingsChange={updateSeSettings}
+              onAttemptsChange={updateSeAttempts}
+            />
+            <PeriphrasisWorkspace
+              active={activeSection === "perifrasis"}
+              page={periphrasisPage}
+              settings={storageState.periphrasisSettings}
+              attempts={storageState.periphrasisAttempts}
+              onSettingsChange={updatePeriphrasisSettings}
+              onAttemptsChange={updatePeriphrasisAttempts}
+            />
+            <MorfoWorkspace
+              active={activeSection === "morfologia"}
+              page={morfoPage}
+              settings={storageState.morfoSettings}
+              attempts={storageState.morfoAttempts}
+              apiKey={storageState.geminiApiKey}
+              onApiKeyChange={updateGeminiApiKey}
+              onSettingsChange={updateMorfoSettings}
+              onAttemptsChange={updateMorfoAttempts}
+            />
+          </main>
         </section>
-
-        <main className="main-stage">
-          <SeWorkspace
-            active={activeSection === "se"}
-            page={sePage}
-            settings={storageState.seSettings}
-            attempts={storageState.seAttempts}
-            apiKey={storageState.geminiApiKey}
-            onApiKeyChange={updateGeminiApiKey}
-            onSettingsChange={updateSeSettings}
-            onAttemptsChange={updateSeAttempts}
-          />
-          <PeriphrasisWorkspace
-            active={activeSection === "perifrasis"}
-            page={periphrasisPage}
-            settings={storageState.periphrasisSettings}
-            attempts={storageState.periphrasisAttempts}
-            onSettingsChange={updatePeriphrasisSettings}
-            onAttemptsChange={updatePeriphrasisAttempts}
-          />
-          <MorfoWorkspace
-            active={activeSection === "morfologia"}
-            page={morfoPage}
-            settings={storageState.morfoSettings}
-            attempts={storageState.morfoAttempts}
-            apiKey={storageState.geminiApiKey}
-            onApiKeyChange={updateGeminiApiKey}
-            onSettingsChange={updateMorfoSettings}
-            onAttemptsChange={updateMorfoAttempts}
-          />
-        </main>
       </div>
     </div>
   );
@@ -957,7 +853,6 @@ function SeWorkspace({
       {page === "practice" ? (
         <div className="page-grid">
           <div className="panel control-panel">
-            <p className="panel-kicker">Configuracion</p>
             <div className="field-block">
               <FieldLabel label="Dificultad" hint="Se mantiene por seccion." />
               <div className="chip-cloud">
@@ -1036,7 +931,6 @@ function SeWorkspace({
 
             {settings.personalized && (weakValueLabels.length > 0 || weakFunctionLabels.length > 0) ? (
               <div className="info-block">
-                <p className="panel-kicker">Refuerzo activo</p>
                 <p>
                   Valores: {weakValueLabels.join(", ") || "-"}
                   <br />
@@ -1053,7 +947,6 @@ function SeWorkspace({
               </div>
             ) : (
               <>
-                <p className="panel-kicker">Frase</p>
                 <h3 className="prompt-text">{currentItem.sentence}</h3>
                 <div className="meta-strip">
                   <span>Modo: {currentItem.mode}</span>
@@ -1111,7 +1004,6 @@ function SeWorkspace({
                     </div>
 
                     <div className="info-block">
-                      <p className="panel-kicker">Explicacion</p>
                       <p>{currentItem.phraseType}</p>
                       <p>{currentItem.explanation}</p>
                     </div>
@@ -1186,7 +1078,6 @@ function SeWorkspace({
           <div className="panel">
             <div className="row-between">
               <div>
-                <p className="panel-kicker">Historial</p>
                 <h3>Aprendizaje local por perfil</h3>
               </div>
               <label className="checkbox-line">
@@ -1215,26 +1106,26 @@ function SeWorkspace({
 
                 <div className="stats-grid">
                   <div className="info-block">
-                    <p className="panel-kicker">Mas dificiles (valor)</p>
+                    <h4 className="section-heading">Mas dificiles (valor)</h4>
                     <SummaryList rows={profile.weakValues} />
                   </div>
                   <div className="info-block">
-                    <p className="panel-kicker">Mas dificiles (funcion)</p>
+                    <h4 className="section-heading">Mas dificiles (funcion)</h4>
                     <SummaryList rows={profile.weakFunctions} />
                   </div>
                   <div className="info-block">
-                    <p className="panel-kicker">Mejores (valor)</p>
+                    <h4 className="section-heading">Mejores (valor)</h4>
                     <SummaryList rows={profile.strongValues} />
                   </div>
                   <div className="info-block">
-                    <p className="panel-kicker">Mejores (funcion)</p>
+                    <h4 className="section-heading">Mejores (funcion)</h4>
                     <SummaryList rows={profile.strongFunctions} />
                   </div>
                 </div>
 
                 <div className="stack-lg">
                   <div>
-                    <p className="panel-kicker">Rendimiento exacto por valor y funcion</p>
+                    <h4 className="section-heading">Rendimiento exacto por valor y funcion</h4>
                     <DataTable
                       headers={["Eje", "Item", "OK", "Fallos", "Intentos", "Tasa fallo"]}
                       rows={[
@@ -1252,7 +1143,7 @@ function SeWorkspace({
                   </div>
 
                   <div>
-                    <p className="panel-kicker">Combinaciones donde mas fallas</p>
+                    <h4 className="section-heading">Combinaciones donde mas fallas</h4>
                     <DataTable
                       headers={["Par", "OK", "Fallos", "Intentos", "Tasa fallo"]}
                       rows={profile.weakPairs.map((row) => [row.pair, row.ok, row.fail, row.attempts, `${(row.failRate * 100).toFixed(1)}%`])}
@@ -1260,7 +1151,7 @@ function SeWorkspace({
                   </div>
 
                   <div>
-                    <p className="panel-kicker">Intentos guardados</p>
+                    <h4 className="section-heading">Intentos guardados</h4>
                     <DataTable
                       headers={["Fecha", "Frase", "Esperado", "Tu respuesta", "Estado", "Modo"]}
                       rows={visibleAttempts.map((attempt) => [
@@ -1301,7 +1192,6 @@ function SeWorkspace({
       {page === "settings" ? (
         <div className="page-grid single-column">
           <div className="panel">
-            <p className="panel-kicker">Ajustes</p>
             <h3>Perfil y modelo</h3>
 
             <div className="field-grid">
@@ -1354,7 +1244,6 @@ function SeWorkspace({
 
             {settings.modelName.toLowerCase().startsWith("gemma") ? (
               <div className="info-block">
-                <p className="panel-kicker">Compatibilidad</p>
                 <p>Gemma activa.</p>
               </div>
             ) : null}
@@ -1519,7 +1408,6 @@ function PeriphrasisWorkspace({
       {page === "practice" ? (
         <div className="page-grid">
           <div className="panel control-panel">
-            <p className="panel-kicker">Configuracion</p>
             <div className="field-block">
               <FieldLabel label="Dificultad" hint="Se mantiene por seccion." />
               <div className="chip-cloud">
@@ -1598,7 +1486,6 @@ function PeriphrasisWorkspace({
 
             {settings.personalized && (weakStructureLabels.length > 0 || weakPeriphrasisTypeLabels.length > 0) ? (
               <div className="info-block">
-                <p className="panel-kicker">Refuerzo activo</p>
                 <p>
                   Construcciones: {weakStructureLabels.join(", ") || "-"}
                   <br />
@@ -1615,7 +1502,6 @@ function PeriphrasisWorkspace({
               </div>
             ) : (
               <>
-                <p className="panel-kicker">Frase</p>
                 <h3 className="prompt-text">{currentItem.sentence}</h3>
                 <div className="meta-strip">
                   <span>Modo: {currentItem.mode}</span>
@@ -1686,7 +1572,6 @@ function PeriphrasisWorkspace({
                     </div>
 
                     <div className="info-block">
-                      <p className="panel-kicker">Explicacion</p>
                       <p>{currentItem.phraseType}</p>
                       <p>{currentItem.explanation}</p>
                     </div>
@@ -1703,7 +1588,6 @@ function PeriphrasisWorkspace({
           <div className="panel">
             <div className="row-between">
               <div>
-                <p className="panel-kicker">Historial</p>
                 <h3>Aprendizaje local por perfil</h3>
               </div>
               <label className="checkbox-line">
@@ -1732,26 +1616,26 @@ function PeriphrasisWorkspace({
 
                 <div className="stats-grid">
                   <div className="info-block">
-                    <p className="panel-kicker">Mas dificiles (estructura)</p>
+                    <h4 className="section-heading">Mas dificiles (estructura)</h4>
                     <SummaryList rows={profile.weakStructures} />
                   </div>
                   <div className="info-block">
-                    <p className="panel-kicker">Mas dificiles (tipo)</p>
+                    <h4 className="section-heading">Mas dificiles (tipo)</h4>
                     <SummaryList rows={profile.weakPeriphrasisTypes} />
                   </div>
                   <div className="info-block">
-                    <p className="panel-kicker">Mejores (estructura)</p>
+                    <h4 className="section-heading">Mejores (estructura)</h4>
                     <SummaryList rows={profile.strongStructures} />
                   </div>
                   <div className="info-block">
-                    <p className="panel-kicker">Mejores (tipo)</p>
+                    <h4 className="section-heading">Mejores (tipo)</h4>
                     <SummaryList rows={profile.strongPeriphrasisTypes} />
                   </div>
                 </div>
 
                 <div className="stack-lg">
                   <div>
-                    <p className="panel-kicker">Rendimiento exacto por eje</p>
+                    <h4 className="section-heading">Rendimiento exacto por eje</h4>
                     <DataTable
                       headers={["Eje", "Item", "OK", "Fallos", "Intentos", "Tasa fallo"]}
                       rows={[
@@ -1776,7 +1660,7 @@ function PeriphrasisWorkspace({
                   </div>
 
                   <div>
-                    <p className="panel-kicker">Combinaciones donde mas fallas</p>
+                    <h4 className="section-heading">Combinaciones donde mas fallas</h4>
                     <DataTable
                       headers={["Par", "OK", "Fallos", "Intentos", "Tasa fallo"]}
                       rows={profile.weakPairs.map((row) => [row.pair, row.ok, row.fail, row.attempts, `${(row.failRate * 100).toFixed(1)}%`])}
@@ -1784,7 +1668,7 @@ function PeriphrasisWorkspace({
                   </div>
 
                   <div>
-                    <p className="panel-kicker">Intentos guardados</p>
+                    <h4 className="section-heading">Intentos guardados</h4>
                     <DataTable
                       headers={["Fecha", "Frase", "Esperado", "Tu respuesta", "Estado", "Modo"]}
                       rows={visibleAttempts.map((attempt) => [
@@ -1825,7 +1709,6 @@ function PeriphrasisWorkspace({
       {page === "settings" ? (
         <div className="page-grid single-column">
           <div className="panel">
-            <p className="panel-kicker">Ajustes</p>
             <h3>Perfil y tipos personalizados</h3>
 
             <div className="field-grid">
@@ -2142,7 +2025,6 @@ function MorfoWorkspace({
       {page === "practice" ? (
         <div className="page-grid">
           <div className="panel control-panel">
-            <p className="panel-kicker">Configuracion</p>
             <div className="field-block">
               <FieldLabel label="Dificultad" hint="Se mantiene por seccion." />
               <div className="chip-cloud">
@@ -2207,7 +2089,6 @@ function MorfoWorkspace({
 
             {settings.personalized && (weakWordTypeLabels.length > 0 || weakMorphemeTypeLabels.length > 0) ? (
               <div className="info-block">
-                <p className="panel-kicker">Refuerzo activo</p>
                 <p>
                   Tipos de palabra: {weakWordTypeLabels.join(", ") || "-"}
                   <br />
@@ -2224,7 +2105,6 @@ function MorfoWorkspace({
               </div>
             ) : (
               <>
-                <p className="panel-kicker">Palabra</p>
                 <h3 className="prompt-text">{currentItem.word}</h3>
                 <div className="meta-strip">
                   <span>Modo: {currentItem.mode}</span>
@@ -2313,7 +2193,6 @@ function MorfoWorkspace({
                     </div>
 
                     <div className="info-block">
-                      <p className="panel-kicker">Explicacion</p>
                       <p>{currentItem.analysisType}</p>
                       <p>{currentItem.explanation}</p>
                     </div>
@@ -2395,7 +2274,6 @@ function MorfoWorkspace({
           <div className="panel">
             <div className="row-between">
               <div>
-                <p className="panel-kicker">Historial</p>
                 <h3>Aprendizaje local por perfil</h3>
               </div>
               <label className="checkbox-line">
@@ -2422,26 +2300,26 @@ function MorfoWorkspace({
 
                 <div className="stats-grid">
                   <div className="info-block">
-                    <p className="panel-kicker">Mas dificiles (tipo)</p>
+                    <h4 className="section-heading">Mas dificiles (tipo)</h4>
                     <SummaryList rows={profile.weakWordTypes} />
                   </div>
                   <div className="info-block">
-                    <p className="panel-kicker">Mas dificiles (morfema)</p>
+                    <h4 className="section-heading">Mas dificiles (morfema)</h4>
                     <SummaryList rows={profile.weakMorphemeTypes} />
                   </div>
                   <div className="info-block">
-                    <p className="panel-kicker">Mejores (tipo)</p>
+                    <h4 className="section-heading">Mejores (tipo)</h4>
                     <SummaryList rows={profile.strongWordTypes} />
                   </div>
                   <div className="info-block">
-                    <p className="panel-kicker">Mejores (morfema)</p>
+                    <h4 className="section-heading">Mejores (morfema)</h4>
                     <SummaryList rows={profile.strongMorphemeTypes} />
                   </div>
                 </div>
 
                 <div className="stack-lg">
                   <div>
-                    <p className="panel-kicker">Rendimiento exacto por tipo y morfema</p>
+                    <h4 className="section-heading">Rendimiento exacto por tipo y morfema</h4>
                     <DataTable
                       headers={["Eje", "Item", "OK", "Fallos", "Intentos", "Tasa fallo"]}
                       rows={[
@@ -2459,7 +2337,7 @@ function MorfoWorkspace({
                   </div>
 
                   <div>
-                    <p className="panel-kicker">Combinaciones donde mas fallas</p>
+                    <h4 className="section-heading">Combinaciones donde mas fallas</h4>
                     <DataTable
                       headers={["Par", "OK", "Fallos", "Intentos", "Tasa fallo"]}
                       rows={profile.weakPairs.map((row) => [row.pair, row.ok, row.fail, row.attempts, `${(row.failRate * 100).toFixed(1)}%`])}
@@ -2467,7 +2345,7 @@ function MorfoWorkspace({
                   </div>
 
                   <div>
-                    <p className="panel-kicker">Intentos guardados</p>
+                    <h4 className="section-heading">Intentos guardados</h4>
                     <DataTable
                       headers={["Fecha", "Palabra", "Esperado", "Tu respuesta", "Estado", "Modo"]}
                       rows={visibleAttempts.map((attempt) => [
@@ -2508,7 +2386,6 @@ function MorfoWorkspace({
       {page === "settings" ? (
         <div className="page-grid single-column">
           <div className="panel">
-            <p className="panel-kicker">Ajustes</p>
             <h3>Perfil y modelo</h3>
 
             <div className="field-grid">
@@ -2547,7 +2424,6 @@ function MorfoWorkspace({
 
             {settings.modelName.toLowerCase().startsWith("gemma") ? (
               <div className="info-block">
-                <p className="panel-kicker">Compatibilidad</p>
                 <p>Gemma activa.</p>
               </div>
             ) : null}
