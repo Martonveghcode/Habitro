@@ -1,8 +1,11 @@
 import {
   normalizeFunctionLabel,
   normalizeMorphemeTypeLabel,
+  normalizePieceToken,
   normalizePeriphrasisTypeLabel,
   normalizeSeValueLabel,
+  normalizeTextToken,
+  uniqueNormalizedItems,
   normalizeVerbalStructureLabel,
 } from "./logic";
 import type {
@@ -34,6 +37,12 @@ async function postAi<T>(body: unknown, apiKey?: string): Promise<T> {
     throw new Error(typeof payload.error === "string" ? payload.error : "AI request failed.");
   }
   return payload as T;
+}
+
+function cleanMorphemeToken(value: unknown): string {
+  return String(value ?? "")
+    .trim()
+    .replace(/^[\s\-\u2010\u2011\u2012\u2013\u2014]+|[\s\-\u2010\u2011\u2012\u2013\u2014]+$/g, "");
 }
 
 function sanitizeSeItem(
@@ -89,10 +98,14 @@ function sanitizeMorfoItem(raw: Record<string, unknown>, strategy: MorfoStrategy
   const wordType = String(raw.wordType ?? raw.word_type ?? "").trim();
   const lexeme = String(raw.lexeme ?? "").trim();
   const rawAcceptedLexemes = raw.acceptedLexemes ?? raw.accepted_lexemes;
-  const acceptedLexemes = Array.isArray(rawAcceptedLexemes)
-    ? rawAcceptedLexemes.map((entry) => String(entry).trim()).filter(Boolean)
-    : [];
-  const morphemes = Array.isArray(raw.morphemes) ? raw.morphemes.map((entry) => String(entry).trim()).filter(Boolean) : [];
+  const acceptedLexemes = uniqueNormalizedItems(
+    [
+      lexeme,
+      ...(Array.isArray(rawAcceptedLexemes) ? rawAcceptedLexemes.map((entry) => String(entry).trim()) : []),
+    ],
+    normalizeTextToken,
+  );
+  const morphemes = Array.isArray(raw.morphemes) ? raw.morphemes.map(cleanMorphemeToken).filter(Boolean) : [];
   const rawMorphemeTypes = raw.morphemeTypes ?? raw.morpheme_types;
   const morphemeTypes = Array.isArray(rawMorphemeTypes)
     ? rawMorphemeTypes.map((entry) => normalizeMorphemeTypeLabel(String(entry).trim())).filter(Boolean)
@@ -101,7 +114,17 @@ function sanitizeMorfoItem(raw: Record<string, unknown>, strategy: MorfoStrategy
   const explanation = String(raw.explanation ?? "").trim();
   const difficulty = Number(raw.difficulty ?? 0) as MorfoItem["difficulty"];
 
-  if (!word || !wordType || !lexeme || !analysisType || !explanation || !difficulty) {
+  if (
+    !word ||
+    !wordType ||
+    !lexeme ||
+    !analysisType ||
+    !explanation ||
+    !difficulty ||
+    morphemes.length === 0 ||
+    morphemes.length !== morphemeTypes.length ||
+    morphemes.some((morpheme) => normalizePieceToken(morpheme) === normalizePieceToken(lexeme))
+  ) {
     return null;
   }
 

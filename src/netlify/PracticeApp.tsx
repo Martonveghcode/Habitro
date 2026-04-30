@@ -12,6 +12,7 @@ import {
   SE_VERBAL_STRUCTURES,
 } from "./data";
 import {
+  acceptedLexemesForItem,
   chooseMorfoTarget,
   choosePeriphrasisTarget,
   chooseSeTarget,
@@ -272,9 +273,14 @@ function hasLabel(items: readonly string[], value: string): boolean {
   return items.some((item) => normalizeTextToken(item) === key);
 }
 
+function withoutLabel(items: readonly string[], value: string): string[] {
+  const key = normalizeTextToken(value);
+  return items.filter((item) => normalizeTextToken(item) !== key);
+}
+
 function toggleLabel(items: readonly string[], value: string): string[] {
   return hasLabel(items, value)
-    ? items.filter((item) => normalizeTextToken(item) !== normalizeTextToken(value))
+    ? withoutLabel(items, value)
     : [...items, value];
 }
 
@@ -368,6 +374,14 @@ function buildRequiredSeStrategy(value: string, mode: SeStrategy["mode"], ratioH
     targetFunction: "",
     ratioHint,
   };
+}
+
+function seStrategyValues(strategy: SeStrategy): string[] {
+  return uniqueLabels([
+    strategy.requiredValue,
+    strategy.targetValue,
+    ...strategy.focusValues,
+  ]);
 }
 
 export function NetlifyPracticeApp() {
@@ -552,7 +566,7 @@ function SeWorkspace({
   const [isAsking, setIsAsking] = useState(false);
   const [historyOnlyErrors, setHistoryOnlyErrors] = useState(true);
   const [resetConfirmed, setResetConfirmed] = useState(false);
-  const [statusNote, setStatusNote] = useState("Listo para generar lote.");
+  const [statusNote, setStatusNote] = useState("");
   const [statusTone, setStatusTone] = useState<"info" | "warn">("info");
   const [profileDraft, setProfileDraft] = useState(settings.profileId);
   const [selectedModelDraft, setSelectedModelDraft] = useState(
@@ -561,7 +575,6 @@ function SeWorkspace({
   const [customModelDraft, setCustomModelDraft] = useState(
     MODEL_OPTIONS.some((option) => option.value === settings.modelName) ? "" : settings.modelName,
   );
-  const [customValuesDraft, setCustomValuesDraft] = useState(settings.customValues.join(", "));
   const [customValueInput, setCustomValueInput] = useState("");
 
   const mixText = ratioLabel(settings.targetWeight, settings.normalWeight);
@@ -584,8 +597,7 @@ function SeWorkspace({
       setSelectedModelDraft("custom");
       setCustomModelDraft(settings.modelName);
     }
-    setCustomValuesDraft(settings.customValues.join(", "));
-  }, [settings.customValues, settings.profileId, settings.modelName]);
+  }, [settings.profileId, settings.modelName]);
 
   useEffect(() => {
     setMixBucket([]);
@@ -593,6 +605,7 @@ function SeWorkspace({
 
   const toggleFocusValue = (value: string) => {
     const nextFocusValues = toggleLabel(settings.focusValues, value);
+    setQueue([]);
     onSettingsChange({ ...settings, focusValues: nextFocusValues });
   };
 
@@ -603,10 +616,21 @@ function SeWorkspace({
     }
     onSettingsChange({
       ...settings,
-      customValues: [...settings.customValues, cleaned],
-      focusValues: [...settings.focusValues, cleaned],
+      customValues: uniqueLabels([...settings.customValues, cleaned]),
+      focusValues: uniqueLabels([...settings.focusValues, cleaned]),
     });
     setCustomValueInput("");
+    setQueue([]);
+  };
+
+  const removeCustomValue = (value: string) => {
+    const nextCustomValues = withoutLabel(settings.customValues, value);
+    onSettingsChange({
+      ...settings,
+      customValues: nextCustomValues,
+      focusValues: withoutLabel(settings.focusValues, value),
+    });
+    setQueue([]);
   };
 
   const handleGenerate = async () => {
@@ -657,6 +681,9 @@ function SeWorkspace({
 
         setMixBucket(workingBucket);
 
+        const customValuePlanned = strategies.some((strategy) =>
+          seStrategyValues(strategy).some((value) => value && !hasLabel(SE_VALUES, value)),
+        );
         const fallbackItems = fallbackSeBatch(settings.difficulty, strategies, recentSentences);
         const prepared: Array<SeItem | null> = Array.from({ length: batchSize }, () => null);
         const seen = new Set<string>();
@@ -691,15 +718,17 @@ function SeWorkspace({
             assignCandidate(index, fallbackItems[index] ?? null);
           });
           const remoteValidCount = remoteItems.filter((item) => item !== null).length;
-          setStatusNote(
-            remoteValidCount > 0
-              ? "Lote servido por Gemini con reemplazo local en los huecos o desajustes."
-              : "Gemini no devolvio items validos para este plan. Modo local activado.",
-          );
+          setStatusNote(remoteValidCount > 0 ? "" : "Gemini no devolvio valores validos.");
           setStatusTone(remoteValidCount > 0 ? "info" : "warn");
         } catch (error) {
           fallbackItems.forEach((item, index) => assignCandidate(index, item));
-          setStatusNote(error instanceof Error ? `${error.message} Se uso el banco local.` : "Fallo de Gemini. Se uso el banco local.");
+          setStatusNote(
+            customValuePlanned
+              ? "Los valores personalizados necesitan Gemini."
+              : error instanceof Error
+                ? `${error.message} Banco local.`
+                : "Banco local.",
+          );
           setStatusTone("warn");
         }
 
@@ -715,7 +744,7 @@ function SeWorkspace({
 
         const finalized = prepared.filter((item): item is SeItem => item !== null);
         if (finalized.length < batchSize) {
-          setStatusNote("No se pudo completar toda la cobertura planificada. Se genero el maximo lote valido disponible.");
+          setStatusNote(customValuePlanned ? "Los valores personalizados necesitan Gemini." : "Lote incompleto.");
           setStatusTone("warn");
         }
 
@@ -832,15 +861,10 @@ function SeWorkspace({
 
   const saveSettingsDraft = () => {
     const resolvedModel = selectedModelDraft === "custom" ? customModelDraft.trim() || MODEL_OPTIONS[0].value : selectedModelDraft;
-    const nextCustomValues = stripBaseLabels(parseCustomList(customValuesDraft), SE_VALUES);
-    const nextAllowedValues = mergeLabelGroups(SE_VALUES, nextCustomValues);
-    const nextFocusValues = settings.focusValues.filter((value) => hasLabel(nextAllowedValues, value));
     onSettingsChange({
       ...settings,
       profileId: profileDraft.trim() || "alumno",
       modelName: resolvedModel,
-      focusValues: nextFocusValues,
-      customValues: nextCustomValues,
     });
   };
 
@@ -880,21 +904,39 @@ function SeWorkspace({
             </div>
 
             <div className="field-block">
-              <FieldLabel label="Foco manual" hint="Selecciona uno o varios valores para forzar el lote." />
+              <FieldLabel label="Valores" />
               <MultiToggleList options={availableSeValues} selected={settings.focusValues} onToggle={toggleFocusValue} />
-            </div>
 
-            <div className="field-block">
-              <FieldLabel label="Anadir valor personalizado" hint="Ej. Enfatica. Se guarda en esta seccion." />
-              <div className="field-grid compact-grid">
-                <input
-                  placeholder="Ej. Enfatica"
-                  value={customValueInput}
-                  onChange={(event) => setCustomValueInput(event.target.value)}
-                />
-                <button className="ghost-btn" type="button" onClick={addCustomValue}>
-                  Anadir valor
-                </button>
+              <div className="custom-value-editor">
+                <div className="custom-value-form">
+                  <input
+                    aria-label="Valor personalizado"
+                    placeholder="Nuevo valor"
+                    value={customValueInput}
+                    onChange={(event) => setCustomValueInput(event.target.value)}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter") {
+                        event.preventDefault();
+                        addCustomValue();
+                      }
+                    }}
+                  />
+                  <button className="ghost-btn" disabled={!customValueInput.trim()} type="button" onClick={addCustomValue}>
+                    Anadir
+                  </button>
+                </div>
+                {settings.customValues.length > 0 ? (
+                  <div className="custom-value-list">
+                    {settings.customValues.map((value) => (
+                      <span className="custom-value-chip" key={value}>
+                        {value}
+                        <button aria-label={`Quitar ${value}`} type="button" onClick={() => removeCustomValue(value)}>
+                          x
+                        </button>
+                      </span>
+                    ))}
+                  </div>
+                ) : null}
               </div>
             </div>
 
@@ -923,21 +965,11 @@ function SeWorkspace({
               </div>
             </div>
 
-            <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div>
+            {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
             <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
               {isGenerating ? "Preparando lote..." : queue.length > 0 ? "Siguiente frase" : "Generar lote"}
             </button>
-
-            {settings.personalized && (weakValueLabels.length > 0 || weakFunctionLabels.length > 0) ? (
-              <div className="info-block">
-                <p>
-                  Valores: {weakValueLabels.join(", ") || "-"}
-                  <br />
-                  Funciones: {weakFunctionLabels.join(", ") || "-"}
-                </p>
-              </div>
-            ) : null}
           </div>
 
           <div className="panel practice-panel">
@@ -948,11 +980,6 @@ function SeWorkspace({
             ) : (
               <>
                 <h3 className="prompt-text">{currentItem.sentence}</h3>
-                <div className="meta-strip">
-                  <span>Modo: {currentItem.mode}</span>
-                  <span>Restantes en cola: {queue.length}</span>
-                </div>
-
                 <div className="field-grid">
                   <div>
                     <FieldLabel label="Valor de se" />
@@ -1008,46 +1035,38 @@ function SeWorkspace({
                       <p>{currentItem.explanation}</p>
                     </div>
 
-                    <details className="details-panel">
-                      <summary>Respuesta del modelo (inicial)</summary>
-                      <div className="details-content">
-                        <p>Valor propuesto: {currentItem.seValue}</p>
-                        <p>Funcion propuesta: {currentItem.seFunction}</p>
-                        <p>Tipo de oracion: {currentItem.phraseType}</p>
-                        <button className="ghost-btn" disabled={isRechecking} type="button" onClick={handleRecheck}>
-                          {isRechecking ? "Revisando..." : "Recheck"}
-                        </button>
+                    <div className="button-row">
+                      <button className="ghost-btn" disabled={isRechecking} type="button" onClick={handleRecheck}>
+                        {isRechecking ? "Revisando..." : "Revisar"}
+                      </button>
+                    </div>
 
-                        {recheck ? (
-                          <div className="info-block">
-                            {recheck.success ? (
-                              <>
-                                <p className={recheck.isCorrect ? "result-ok" : "result-bad"}>
-                                  {recheck.isCorrect
-                                    ? `Confirmado por ${recheck.model}: la respuesta inicial era correcta.`
-                                    : `Recheck con ${recheck.model}: se detectaron discrepancias.`}
-                                </p>
-                                {!recheck.isCorrect ? (
-                                  <p>
-                                    Correccion sugerida: valor={recheck.correctedValue} | funcion={recheck.correctedFunction}
-                                  </p>
-                                ) : null}
-                                {recheck.issues && recheck.issues.length > 0 ? (
-                                  <ul>
-                                    {recheck.issues.map((issue) => (
-                                      <li key={issue}>{issue}</li>
-                                    ))}
-                                  </ul>
-                                ) : null}
-                                {recheck.correctionNote ? <p>{recheck.correctionNote}</p> : null}
-                              </>
-                            ) : (
-                              <p className="result-bad">{recheck.error}</p>
-                            )}
-                          </div>
-                        ) : null}
+                    {recheck ? (
+                      <div className="info-block">
+                        {recheck.success ? (
+                          <>
+                            <p className={recheck.isCorrect ? "result-ok" : "result-bad"}>
+                              {recheck.isCorrect ? `OK (${recheck.model})` : `Revisar (${recheck.model})`}
+                            </p>
+                            {!recheck.isCorrect ? (
+                              <p>
+                                {recheck.correctedValue} | {recheck.correctedFunction}
+                              </p>
+                            ) : null}
+                            {recheck.issues && recheck.issues.length > 0 ? (
+                              <ul>
+                                {recheck.issues.map((issue) => (
+                                  <li key={issue}>{issue}</li>
+                                ))}
+                              </ul>
+                            ) : null}
+                            {recheck.correctionNote ? <p>{recheck.correctionNote}</p> : null}
+                          </>
+                        ) : (
+                          <p className="result-bad">{recheck.error}</p>
+                        )}
                       </div>
-                    </details>
+                    ) : null}
 
                     <div className="question-box">
                       <FieldLabel label="Pregunta sobre esta frase" hint="Opcional, con respuesta breve del modelo." />
@@ -1222,20 +1241,6 @@ function SeWorkspace({
               />
             </div>
 
-            <div className="field-grid">
-              <div>
-                <FieldLabel
-                  label="Valores de se personalizados"
-                  hint="Separados por comas. Ej.: Enfatica, expresiva. Tambien aparecen en Practicar."
-                />
-                <input
-                  placeholder="Ej. Enfatica, expresiva"
-                  value={customValuesDraft}
-                  onChange={(event) => setCustomValuesDraft(event.target.value)}
-                />
-              </div>
-            </div>
-
             <button className="primary-btn" type="button" onClick={saveSettingsDraft}>
               Guardar ajustes
             </button>
@@ -1293,7 +1298,7 @@ function PeriphrasisWorkspace({
   const [isGenerating, setIsGenerating] = useState(false);
   const [historyOnlyErrors, setHistoryOnlyErrors] = useState(true);
   const [resetConfirmed, setResetConfirmed] = useState(false);
-  const [statusNote, setStatusNote] = useState("Listo para generar lote.");
+  const [statusNote, setStatusNote] = useState("");
   const [profileDraft, setProfileDraft] = useState(settings.profileId);
   const [customTypesDraft, setCustomTypesDraft] = useState(settings.customPeriphrasisTypes.join(", "));
   const [customTypeInput, setCustomTypeInput] = useState("");
@@ -1367,7 +1372,7 @@ function PeriphrasisWorkspace({
         nextQueue = settings.personalized
           ? fallbackPeriphrasisBatch(settings.difficulty, strategies, recentSentences)
           : shuffleList(fallbackPeriphrasisBatch(settings.difficulty, strategies, recentSentences));
-        setStatusNote("Lote preparado desde el banco local.");
+        setStatusNote("");
       }
 
       const [nextItem, ...rest] = nextQueue;
@@ -1435,7 +1440,7 @@ function PeriphrasisWorkspace({
             </div>
 
             <div className="field-block">
-              <FieldLabel label="Foco manual" hint="Selecciona la construccion verbal que quieres practicar." />
+              <FieldLabel label="Estructuras" />
               <MultiToggleList options={PERIPHRASIS_STRUCTURES} selected={settings.focusStructures} onToggle={toggleFocusStructure} />
             </div>
 
@@ -1478,7 +1483,7 @@ function PeriphrasisWorkspace({
               </div>
             </div>
 
-            <div className="inline-banner">{statusNote}</div>
+            {statusNote ? <div className="inline-banner">{statusNote}</div> : null}
 
             <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
               {isGenerating ? "Preparando lote..." : queue.length > 0 ? "Siguiente frase" : "Generar lote"}
@@ -1503,11 +1508,6 @@ function PeriphrasisWorkspace({
             ) : (
               <>
                 <h3 className="prompt-text">{currentItem.sentence}</h3>
-                <div className="meta-strip">
-                  <span>Modo: {currentItem.mode}</span>
-                  <span>Restantes en cola: {queue.length}</span>
-                </div>
-
                 <div className="field-grid">
                   <div>
                     <FieldLabel label="Construccion verbal" />
@@ -1781,7 +1781,7 @@ function MorfoWorkspace({
   const [isAsking, setIsAsking] = useState(false);
   const [historyOnlyErrors, setHistoryOnlyErrors] = useState(true);
   const [resetConfirmed, setResetConfirmed] = useState(false);
-  const [statusNote, setStatusNote] = useState("Listo para generar lote.");
+  const [statusNote, setStatusNote] = useState("");
   const [statusTone, setStatusTone] = useState<"info" | "warn">("info");
   const [profileDraft, setProfileDraft] = useState(settings.profileId);
   const [selectedModelDraft, setSelectedModelDraft] = useState(
@@ -1884,11 +1884,11 @@ function MorfoWorkspace({
           });
           remoteItems.forEach(pushCandidate);
           fallbackItems.forEach(pushCandidate);
-          setStatusNote(remoteItems.length > 0 ? "Lote servido por Gemini con relleno local de seguridad." : "Gemini no devolvio items validos. Modo local activado.");
+          setStatusNote(remoteItems.length > 0 ? "" : "Gemini no devolvio items validos.");
           setStatusTone(remoteItems.length > 0 ? "info" : "warn");
         } catch (error) {
           fallbackItems.forEach(pushCandidate);
-          setStatusNote(error instanceof Error ? `${error.message} Se uso el banco local.` : "Fallo de Gemini. Se uso el banco local.");
+          setStatusNote(error instanceof Error ? `${error.message} Banco local.` : "Banco local.");
           setStatusTone("warn");
         }
 
@@ -2019,6 +2019,7 @@ function MorfoWorkspace({
   const evaluation = currentItem ? evaluations[currentItem.id] : null;
   const recheck = currentItem ? rechecks[currentItem.id] : null;
   const answer = currentItem ? answers[currentItem.id] : null;
+  const acceptedLexemeLabels = currentItem ? acceptedLexemesForItem(currentItem) : [];
 
   return (
     <section className={cx("workspace", !active && "hidden-workspace")}>
@@ -2052,7 +2053,7 @@ function MorfoWorkspace({
             </div>
 
             <div className="field-block">
-              <FieldLabel label="Foco manual" hint="Selecciona tipos de palabra para forzar el lote." />
+              <FieldLabel label="Tipos" />
               <MultiToggleList options={MORFO_WORD_TYPES} selected={settings.focusWordTypes} onToggle={toggleFocusWordType} />
             </div>
 
@@ -2081,7 +2082,7 @@ function MorfoWorkspace({
               </div>
             </div>
 
-            <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div>
+            {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
             <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
               {isGenerating ? "Preparando lote..." : queue.length > 0 ? "Siguiente palabra" : "Generar lote"}
@@ -2106,11 +2107,6 @@ function MorfoWorkspace({
             ) : (
               <>
                 <h3 className="prompt-text">{currentItem.word}</h3>
-                <div className="meta-strip">
-                  <span>Modo: {currentItem.mode}</span>
-                  <span>Restantes en cola: {queue.length}</span>
-                </div>
-
                 <div className="field-grid">
                   <div>
                     <FieldLabel label="Tipo de palabra" />
@@ -2130,7 +2126,7 @@ function MorfoWorkspace({
 
                 <div className="field-grid">
                   <div>
-                    <FieldLabel label="Morfemas" hint="Separados por coma." />
+                    <FieldLabel label="Morfemas" hint="Sin contar el lexema; separados por coma." />
                     <input
                       placeholder="Ej. des, ad, o, s"
                       value={guessMorphemesText}
@@ -2167,7 +2163,7 @@ function MorfoWorkspace({
                       <p>
                         Lexema:{" "}
                         <strong className={evaluation.lexemeOk ? "result-ok" : "result-bad"}>
-                          {evaluation.lexemeOk ? "correcto" : `incorrecto (aceptados: ${currentItem.acceptedLexemes.join(", ")})`}
+                          {evaluation.lexemeOk ? "correcto" : `incorrecto (aceptados: ${acceptedLexemeLabels.join(", ")})`}
                         </strong>
                       </p>
                       <p>
@@ -2197,53 +2193,44 @@ function MorfoWorkspace({
                       <p>{currentItem.explanation}</p>
                     </div>
 
-                    <details className="details-panel">
-                      <summary>Respuesta del modelo (inicial)</summary>
-                      <div className="details-content">
-                        <p>Tipo de palabra propuesto: {currentItem.wordType}</p>
-                        <p>Lexema propuesto: {currentItem.lexeme}</p>
-                        <p>Morfemas propuestos: {currentItem.morphemes.join(", ")}</p>
-                        <p>Tipos de morfema propuestos: {currentItem.morphemeTypes.join(", ")}</p>
-                        <button className="ghost-btn" disabled={isRechecking} type="button" onClick={handleRecheck}>
-                          {isRechecking ? "Revisando..." : "Recheck"}
-                        </button>
+                    <div className="button-row">
+                      <button className="ghost-btn" disabled={isRechecking} type="button" onClick={handleRecheck}>
+                        {isRechecking ? "Revisando..." : "Revisar"}
+                      </button>
+                    </div>
 
-                        {recheck ? (
-                          <div className="info-block">
-                            {recheck.success ? (
-                              <>
-                                <p className={recheck.isCorrect ? "result-ok" : "result-bad"}>
-                                  {recheck.isCorrect
-                                    ? `Confirmado por ${recheck.model}: la respuesta inicial era correcta.`
-                                    : `Recheck con ${recheck.model}: se detectaron discrepancias.`}
-                                </p>
-                                {!recheck.isCorrect ? (
-                                  <p>
-                                    Correccion sugerida: tipo={recheck.correctedWordType} | lexema={recheck.correctedLexeme}
-                                  </p>
-                                ) : null}
-                                {recheck.correctedMorphemes && recheck.correctedMorphemes.length > 0 ? (
-                                  <p>Morfemas sugeridos: {recheck.correctedMorphemes.join(", ")}</p>
-                                ) : null}
-                                {recheck.correctedMorphemeTypes && recheck.correctedMorphemeTypes.length > 0 ? (
-                                  <p>Tipos sugeridos: {recheck.correctedMorphemeTypes.join(", ")}</p>
-                                ) : null}
-                                {recheck.issues && recheck.issues.length > 0 ? (
-                                  <ul>
-                                    {recheck.issues.map((issue) => (
-                                      <li key={issue}>{issue}</li>
-                                    ))}
-                                  </ul>
-                                ) : null}
-                                {recheck.correctionNote ? <p>{recheck.correctionNote}</p> : null}
-                              </>
-                            ) : (
-                              <p className="result-bad">{recheck.error}</p>
-                            )}
-                          </div>
-                        ) : null}
+                    {recheck ? (
+                      <div className="info-block">
+                        {recheck.success ? (
+                          <>
+                            <p className={recheck.isCorrect ? "result-ok" : "result-bad"}>
+                              {recheck.isCorrect ? `OK (${recheck.model})` : `Revisar (${recheck.model})`}
+                            </p>
+                            {!recheck.isCorrect ? (
+                              <p>
+                                {recheck.correctedWordType} | {recheck.correctedLexeme}
+                              </p>
+                            ) : null}
+                            {recheck.correctedMorphemes && recheck.correctedMorphemes.length > 0 ? (
+                              <p>{recheck.correctedMorphemes.join(", ")}</p>
+                            ) : null}
+                            {recheck.correctedMorphemeTypes && recheck.correctedMorphemeTypes.length > 0 ? (
+                              <p>{recheck.correctedMorphemeTypes.join(", ")}</p>
+                            ) : null}
+                            {recheck.issues && recheck.issues.length > 0 ? (
+                              <ul>
+                                {recheck.issues.map((issue) => (
+                                  <li key={issue}>{issue}</li>
+                                ))}
+                              </ul>
+                            ) : null}
+                            {recheck.correctionNote ? <p>{recheck.correctionNote}</p> : null}
+                          </>
+                        ) : (
+                          <p className="result-bad">{recheck.error}</p>
+                        )}
                       </div>
-                    </details>
+                    ) : null}
 
                     <div className="question-box">
                       <FieldLabel label="Pregunta sobre esta palabra" hint="Opcional, con respuesta breve del modelo." />

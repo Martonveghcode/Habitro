@@ -115,6 +115,11 @@ Reglas obligatorias:
 - Genera palabras (no oraciones completas).
 - Si se solicita batch_size > 1, devuelve exactamente ese numero de items.
 - Cada item debe incluir tipo de palabra, lexema, morfemas y tipos de morfema.
+- El campo lexeme va separado: no incluyas el lexema dentro de morphemes.
+- accepted_lexemes debe incluir siempre el lexeme exacto y puede anadir infinitivo/base aceptada.
+- morphemes debe contener solo prefijos, interfijos, sufijos, vocales tematicas y morfemas flexivos; sin guiones decorativos.
+- morphemes y morpheme_types deben tener la misma longitud y el mismo orden.
+- La explicacion debe coincidir exactamente con lexeme, morphemes y morpheme_types; no menciones morfemas que no esten en el JSON.
 - Incluye una explicacion breve y clara.
 - Ajusta dificultad:
   d1: estructura transparente y analisis directo
@@ -132,6 +137,7 @@ const MORFO_RECHECK_PROMPT = `
 Eres un verificador estricto de morfologia espanola.
 Recibes una palabra y el analisis propuesto por otro modelo.
 Tu tarea es decidir si la propuesta es correcta.
+El lexema va separado: la lista morphemes no debe repetir el lexema y debe coincidir con la explicacion.
 Devuelve SOLO JSON valido.
 `;
 
@@ -400,6 +406,31 @@ function normalizeTextToken(value) {
     .replace(/[\u0300-\u036f]/g, "");
 }
 
+function cleanMorphemeToken(value) {
+  return String(value || "")
+    .trim()
+    .replace(/^[\s\-\u2010\u2011\u2012\u2013\u2014]+|[\s\-\u2010\u2011\u2012\u2013\u2014]+$/g, "");
+}
+
+function normalizePieceToken(value) {
+  return normalizeTextToken(cleanMorphemeToken(value)).replace(/\s+/g, "").replace(/[-\u2010\u2011\u2012\u2013\u2014]/g, "");
+}
+
+function uniqueNormalizedItems(items, normalize = normalizeTextToken) {
+  const seen = new Set();
+  const values = [];
+  items.forEach((item) => {
+    const trimmed = String(item || "").trim();
+    const key = normalize(trimmed);
+    if (!trimmed || !key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    values.push(trimmed);
+  });
+  return values;
+}
+
 function normalizeLabelAgainstOptions(value, options) {
   const raw = String(value || "").trim();
   const key = normalizeTextToken(raw);
@@ -461,23 +492,16 @@ function normalizeSeItem(item, difficulty, strategy, options) {
 function normalizeMorfoItem(item, difficulty, strategy) {
   const morphemesRaw = item.morphemes ?? item.morpheme_list ?? [];
   const morphemeTypesRaw = item.morpheme_types ?? item.morphemeTypes ?? [];
-  const morphemes = Array.isArray(morphemesRaw) ? morphemesRaw.map((entry) => String(entry).trim()).filter(Boolean) : [];
+  const morphemes = Array.isArray(morphemesRaw) ? morphemesRaw.map(cleanMorphemeToken).filter(Boolean) : [];
   const morphemeTypes = Array.isArray(morphemeTypesRaw)
     ? morphemeTypesRaw.map((entry) => normalizeMorphemeType(entry)).filter(Boolean)
     : [];
   const lexeme = String(item.lexeme || "").trim();
   const acceptedLexemesRaw = item.accepted_lexemes ?? item.acceptedLexemes ?? [];
-  const acceptedLexemes = Array.isArray(acceptedLexemesRaw)
-    ? acceptedLexemesRaw.map((entry) => String(entry).trim()).filter(Boolean)
-    : [];
-  if (!acceptedLexemes.length && lexeme) {
-    acceptedLexemes.push(lexeme);
-  }
-  if (morphemeTypes.length > morphemes.length) {
-    morphemeTypes.length = morphemes.length;
-  } else if (morphemes.length > morphemeTypes.length && morphemeTypes.length > 0) {
-    morphemes.length = morphemeTypes.length;
-  }
+  const acceptedLexemes = uniqueNormalizedItems(
+    [lexeme, ...(Array.isArray(acceptedLexemesRaw) ? acceptedLexemesRaw : [])],
+    normalizeTextToken,
+  );
 
   return {
     word: String(item.word || "").trim(),
@@ -626,9 +650,9 @@ function buildMorfoGenerationPrompt(payload) {
             difficulty: "1|2|3",
             word_type: "one_of_allowed_word_types",
             lexeme: "string",
-            accepted_lexemes: ["one_or_more_strings"],
-            morphemes: ["string"],
-            morpheme_types: ["one_or_more_allowed_morpheme_types"],
+            accepted_lexemes: ["must_include_lexeme"],
+            morphemes: ["non_lexeme_morpheme_strings_without_boundary_hyphens"],
+            morpheme_types: ["same_length_and_order_as_morphemes"],
             analysis_type: "string",
             explanation: "string_short",
           },
@@ -720,6 +744,9 @@ async function handleGenerateMorfo(apiKey, requestBody) {
         item.lexeme &&
         item.analysisType &&
         item.explanation &&
+        item.morphemes.length > 0 &&
+        item.morphemes.length === item.morphemeTypes.length &&
+        !item.morphemes.some((morpheme) => normalizePieceToken(morpheme) === normalizePieceToken(item.lexeme)) &&
         MORFO_WORD_TYPES.includes(item.wordType) &&
         item.morphemeTypes.every((entry) => MORFO_MORPHEME_TYPES.includes(entry)),
     );

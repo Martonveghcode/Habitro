@@ -887,7 +887,7 @@ export function fallbackSeBatch(
   difficulty: Difficulty,
   strategies: SeStrategy[],
   recentSentences: string[],
-): SeItem[] {
+): Array<SeItem | null> {
   const memory = [...recentSentences];
   return strategies.map((strategy) => {
     let pool = [...SE_SAMPLE_BANK[difficulty]];
@@ -902,6 +902,8 @@ export function fallbackSeBatch(
       const filtered = pool.filter((item) => targetValues.includes(item.seValue));
       if (filtered.length > 0) {
         pool = filtered;
+      } else {
+        return null;
       }
     }
     const novel = pool.filter((item) => isNovelSentence(item.sentence, memory, 0.75));
@@ -1013,7 +1015,7 @@ export function normalizeTextToken(value: string): string {
 }
 
 export function normalizePieceToken(value: string): string {
-  return normalizeTextToken(value).replace(/\s+/g, "");
+  return normalizeTextToken(value).replace(/\s+/g, "").replace(/[-\u2010\u2011\u2012\u2013\u2014]/g, "");
 }
 
 export function normalizeVerbalStructureLabel(value: string, options: readonly string[] = SE_VERBAL_STRUCTURES): string {
@@ -1046,11 +1048,48 @@ export function uniqueItems<T>(items: T[]): T[] {
   return Array.from(new Set(items));
 }
 
+export function uniqueNormalizedItems(items: string[], normalize = normalizeTextToken): string[] {
+  const seen = new Set<string>();
+  const values: string[] = [];
+  items.forEach((item) => {
+    const trimmed = item.trim();
+    const key = normalize(trimmed);
+    if (!trimmed || !key || seen.has(key)) {
+      return;
+    }
+    seen.add(key);
+    values.push(trimmed);
+  });
+  return values;
+}
+
+export function acceptedLexemesForItem(item: Pick<MorfoItem, "lexeme" | "acceptedLexemes">): string[] {
+  return uniqueNormalizedItems([item.lexeme, ...item.acceptedLexemes], normalizeTextToken);
+}
+
 export function parseGuessList(rawText: string): string[] {
   return rawText
     .split(",")
     .map((entry) => entry.trim())
     .filter(Boolean);
+}
+
+function normalizedMultisetEquals(left: string[], right: string[], normalize: (value: string) => string): boolean {
+  const leftCounts = new Map<string, number>();
+  const rightCounts = new Map<string, number>();
+
+  left.map(normalize).filter(Boolean).forEach((value) => {
+    leftCounts.set(value, (leftCounts.get(value) ?? 0) + 1);
+  });
+  right.map(normalize).filter(Boolean).forEach((value) => {
+    rightCounts.set(value, (rightCounts.get(value) ?? 0) + 1);
+  });
+
+  return (
+    leftCounts.size > 0 &&
+    leftCounts.size === rightCounts.size &&
+    [...leftCounts].every(([value, count]) => rightCounts.get(value) === count)
+  );
 }
 
 export function evaluateSeGuess(
@@ -1102,15 +1141,10 @@ export function evaluateMorfoGuess(
   guessMorphemesText: string,
   guessMorphemeTypes: string[],
 ): MorfoEvaluation {
-  const expectedLexemes = item.acceptedLexemes.map(normalizeTextToken).filter(Boolean);
+  const expectedLexemes = acceptedLexemesForItem(item).map(normalizeTextToken).filter(Boolean);
   const lexemeOk = expectedLexemes.includes(normalizeTextToken(guessLexeme));
   const guessedMorphemes = parseGuessList(guessMorphemesText);
-  const expectedMorphemeSet = new Set(item.morphemes.map(normalizePieceToken).filter(Boolean));
-  const guessedMorphemeSet = new Set(guessedMorphemes.map(normalizePieceToken).filter(Boolean));
-  const morphemesOk =
-    expectedMorphemeSet.size > 0 &&
-    expectedMorphemeSet.size === guessedMorphemeSet.size &&
-    [...expectedMorphemeSet].every((value) => guessedMorphemeSet.has(value));
+  const morphemesOk = normalizedMultisetEquals(item.morphemes, guessedMorphemes, normalizePieceToken);
 
   const expectedTypes = uniqueItems(item.morphemeTypes.map(normalizeMorphemeTypeLabel)).filter((value) =>
     MORFO_MORPHEME_TYPES.includes(value as (typeof MORFO_MORPHEME_TYPES)[number]),
@@ -1199,7 +1233,7 @@ export function makeMorfoAttempt(item: MorfoItem, settings: MorfoSettings, evalu
     word: item.word,
     expectedWordType: item.wordType,
     expectedLexeme: item.lexeme,
-    expectedLexemes: item.acceptedLexemes,
+    expectedLexemes: acceptedLexemesForItem(item),
     expectedMorphemes: item.morphemes,
     expectedMorphemeTypes: item.morphemeTypes,
     expectedPrimaryMorphemeType: item.morphemeTypes[0] ?? "",

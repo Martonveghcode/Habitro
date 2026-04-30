@@ -439,6 +439,54 @@ textarea:disabled {
   gap: var(--space-2);
 }
 
+.custom-value-editor {
+  margin-top: var(--space-3);
+}
+
+.custom-value-form {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: var(--space-2);
+}
+
+.custom-value-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: var(--space-2);
+  margin-top: var(--space-2);
+}
+
+.custom-value-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  min-height: 28px;
+  padding: 0 8px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  background: var(--bg-muted);
+  color: var(--fg-default);
+  font-size: 13px;
+}
+
+.custom-value-chip button {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border: 0;
+  border-radius: 50%;
+  background: transparent;
+  color: var(--fg-muted);
+  cursor: pointer;
+}
+
+.custom-value-chip button:hover {
+  background: var(--bg-default);
+  color: var(--danger-emphasis);
+}
+
 .choice-pill,
 .primary-btn,
 .ghost-btn,
