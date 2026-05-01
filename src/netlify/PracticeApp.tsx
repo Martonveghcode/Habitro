@@ -25,6 +25,7 @@ import {
   fallbackSeBatch,
   fetchRecentMorfoLabels,
   fetchRecentMorfoWords,
+  fetchRecentPeriphrasisLabels,
   fetchRecentPeriphrasisSentences,
   fetchRecentSeLabels,
   fetchRecentSeSentences,
@@ -48,6 +49,7 @@ import {
   requestMorfoGeneration,
   requestMorfoQuestion,
   requestMorfoRecheck,
+  requestPeriphrasisGeneration,
   requestSeGeneration,
   requestSeQuestion,
   requestSeRecheck,
@@ -506,6 +508,8 @@ export function NetlifyPracticeApp() {
               page={periphrasisPage}
               settings={storageState.periphrasisSettings}
               attempts={storageState.periphrasisAttempts}
+              apiKey={storageState.geminiApiKey}
+              onApiKeyChange={updateGeminiApiKey}
               onSettingsChange={updatePeriphrasisSettings}
               onAttemptsChange={updatePeriphrasisAttempts}
             />
@@ -1264,6 +1268,8 @@ function PeriphrasisWorkspace({
   page,
   settings,
   attempts,
+  apiKey,
+  onApiKeyChange,
   onSettingsChange,
   onAttemptsChange,
 }: {
@@ -1271,6 +1277,8 @@ function PeriphrasisWorkspace({
   page: PageName;
   settings: PeriphrasisSettings;
   attempts: PeriphrasisAttempt[];
+  apiKey: string;
+  onApiKeyChange: (value: string) => void;
   onSettingsChange: (settings: PeriphrasisSettings) => void;
   onAttemptsChange: (attempts: PeriphrasisAttempt[]) => void;
 }) {
@@ -1300,6 +1308,12 @@ function PeriphrasisWorkspace({
   const [resetConfirmed, setResetConfirmed] = useState(false);
   const [statusNote, setStatusNote] = useState("");
   const [profileDraft, setProfileDraft] = useState(settings.profileId);
+  const [selectedModelDraft, setSelectedModelDraft] = useState(
+    MODEL_OPTIONS.some((option) => option.value === settings.modelName) ? settings.modelName : "custom",
+  );
+  const [customModelDraft, setCustomModelDraft] = useState(
+    MODEL_OPTIONS.some((option) => option.value === settings.modelName) ? "" : settings.modelName,
+  );
   const [customTypesDraft, setCustomTypesDraft] = useState(settings.customPeriphrasisTypes.join(", "));
   const [customTypeInput, setCustomTypeInput] = useState("");
 
@@ -1315,8 +1329,15 @@ function PeriphrasisWorkspace({
 
   useEffect(() => {
     setProfileDraft(settings.profileId);
+    if (MODEL_OPTIONS.some((option) => option.value === settings.modelName)) {
+      setSelectedModelDraft(settings.modelName);
+      setCustomModelDraft("");
+    } else {
+      setSelectedModelDraft("custom");
+      setCustomModelDraft(settings.modelName);
+    }
     setCustomTypesDraft(settings.customPeriphrasisTypes.join(", "));
-  }, [settings.customPeriphrasisTypes, settings.profileId]);
+  }, [settings.customPeriphrasisTypes, settings.modelName, settings.profileId]);
 
   useEffect(() => {
     setMixBucket([]);
@@ -1341,7 +1362,7 @@ function PeriphrasisWorkspace({
     setCustomTypeInput("");
   };
 
-  const handleGenerate = () => {
+  const handleGenerate = async () => {
     setIsGenerating(true);
     try {
       let nextQueue = [...queue];
@@ -1369,10 +1390,64 @@ function PeriphrasisWorkspace({
 
         setMixBucket(workingBucket);
         const recentSentences = fetchRecentPeriphrasisSentences(attempts, settings.profileId, 14);
-        nextQueue = settings.personalized
-          ? fallbackPeriphrasisBatch(settings.difficulty, strategies, recentSentences)
-          : shuffleList(fallbackPeriphrasisBatch(settings.difficulty, strategies, recentSentences));
-        setStatusNote("");
+        const recentLabels = fetchRecentPeriphrasisLabels(attempts, settings.profileId, 10);
+        const fallbackItems = fallbackPeriphrasisBatch(settings.difficulty, strategies, recentSentences);
+        const prepared: Array<PeriphrasisItem | null> = Array.from({ length: batchSize }, () => null);
+        const seen = new Set<string>();
+        const assignCandidate = (slotIndex: number, candidate: Omit<PeriphrasisItem, "id"> | PeriphrasisItem | null) => {
+          if (!candidate || prepared[slotIndex]) {
+            return;
+          }
+          const key = candidate.sentence.trim().toLowerCase();
+          if (!key || seen.has(key)) {
+            return;
+          }
+          seen.add(key);
+          prepared[slotIndex] = "id" in candidate ? candidate : { ...candidate, id: createId("perifrasis") };
+        };
+
+        try {
+          const remoteItems = await requestPeriphrasisGeneration({
+            apiKey,
+            modelName: settings.modelName,
+            difficulty: settings.difficulty,
+            strategies,
+            profile,
+            recentSentences,
+            recentLabels,
+            allowedStructures: [...PERIPHRASIS_STRUCTURES],
+            allowedPeriphrasisTypes: availablePeriphrasisTypes,
+          });
+          strategies.forEach((_, index) => {
+            assignCandidate(index, remoteItems[index] ?? null);
+            assignCandidate(index, fallbackItems[index] ?? null);
+          });
+          const remoteValidCount = remoteItems.filter((item) => item !== null).length;
+          setStatusNote(remoteValidCount > 0 ? "" : "Gemini no devolvio items validos.");
+        } catch (error) {
+          fallbackItems.forEach((item, index) => assignCandidate(index, item));
+          setStatusNote(error instanceof Error ? `${error.message} Banco local.` : "Banco local.");
+        }
+
+        while (prepared.some((item) => item === null)) {
+          const extraRecentSentences = [
+            ...recentSentences,
+            ...prepared.filter((item): item is PeriphrasisItem => item !== null).map((item) => item.sentence),
+          ];
+          const extraFallback = fallbackPeriphrasisBatch(settings.difficulty, strategies, extraRecentSentences);
+          const beforeMissing = prepared.filter((item) => item === null).length;
+          extraFallback.forEach((item, index) => assignCandidate(index, item));
+          const afterMissing = prepared.filter((item) => item === null).length;
+          if (afterMissing === beforeMissing) {
+            break;
+          }
+        }
+
+        const finalized = prepared.filter((item): item is PeriphrasisItem => item !== null);
+        if (finalized.length < batchSize) {
+          setStatusNote("Lote incompleto.");
+        }
+        nextQueue = settings.personalized ? finalized : shuffleList(finalized);
       }
 
       const [nextItem, ...rest] = nextQueue;
@@ -1399,9 +1474,11 @@ function PeriphrasisWorkspace({
 
   const saveSettingsDraft = () => {
     const nextCustomTypes = stripBaseLabels(parseCustomList(customTypesDraft), PERIPHRASIS_TYPES);
+    const resolvedModel = selectedModelDraft === "custom" ? customModelDraft.trim() || MODEL_OPTIONS[0].value : selectedModelDraft;
     onSettingsChange({
       ...settings,
       profileId: profileDraft.trim() || "alumno",
+      modelName: resolvedModel,
       customPeriphrasisTypes: nextCustomTypes,
     });
   };
@@ -1709,7 +1786,7 @@ function PeriphrasisWorkspace({
       {page === "settings" ? (
         <div className="page-grid single-column">
           <div className="panel">
-            <h3>Perfil y tipos personalizados</h3>
+            <h3>Perfil y modelo</h3>
 
             <div className="field-grid">
               <div>
@@ -1717,22 +1794,51 @@ function PeriphrasisWorkspace({
                 <input value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} />
               </div>
               <div>
-                <FieldLabel
-                  label="Tipos de perifrasis personalizados"
-                  hint="Separados por comas. Se suman a la lista base y tambien aparecen en Practicar."
-                />
-                <input
-                  placeholder="Ej. Obligacion atenuada, enfatica"
-                  value={customTypesDraft}
-                  onChange={(event) => setCustomTypesDraft(event.target.value)}
-                />
+                <FieldLabel label="Modelo Gemini" hint="Si no hay clave valida, se usara el banco local." />
+                <select value={selectedModelDraft} onChange={(event) => setSelectedModelDraft(event.target.value)}>
+                  {MODEL_OPTIONS.map((option) => (
+                    <option key={option.value} value={option.value}>
+                      {option.label}
+                    </option>
+                  ))}
+                  <option value="custom">Personalizado (manual)</option>
+                </select>
               </div>
+            </div>
+
+            <div>
+              <FieldLabel label="Modelo personalizado" hint="Solo se usa si eliges la opcion manual." />
+              <input
+                disabled={selectedModelDraft !== "custom"}
+                placeholder="ej. gemini-2.5-flash-lite"
+                value={customModelDraft}
+                onChange={(event) => setCustomModelDraft(event.target.value)}
+              />
+            </div>
+
+            <div>
+              <FieldLabel
+                label="Tipos de perifrasis personalizados"
+                hint="Separados por comas. Se suman a la lista base y tambien aparecen en Practicar."
+              />
+              <input
+                placeholder="Ej. Obligacion atenuada, enfatica"
+                value={customTypesDraft}
+                onChange={(event) => setCustomTypesDraft(event.target.value)}
+              />
             </div>
 
             <button className="primary-btn" type="button" onClick={saveSettingsDraft}>
               Guardar ajustes
             </button>
 
+            <GeminiKeyPanel apiKey={apiKey} onApiKeyChange={onApiKeyChange} />
+
+            {settings.modelName.toLowerCase().startsWith("gemma") ? (
+              <div className="info-block">
+                <p>Gemma activa.</p>
+              </div>
+            ) : null}
           </div>
         </div>
       ) : null}

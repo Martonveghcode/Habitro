@@ -925,7 +925,8 @@ export function fallbackPeriphrasisBatch(
   strategies: PeriphrasisStrategy[],
   recentSentences: string[],
 ): PeriphrasisItem[] {
-  const memory = [...recentSentences];
+  const recentMemory = [...recentSentences];
+  const batchMemory: string[] = [];
   return strategies.map((strategy) => {
     let pool = [...PERIPHRASIS_SAMPLE_BANK[difficulty]];
     const targetStructures =
@@ -942,12 +943,16 @@ export function fallbackPeriphrasisBatch(
         pool = filtered;
       }
     }
-    const novel = pool.filter((item) => isNovelSentence(item.sentence, memory, 0.75));
+    const unusedInBatch = pool.filter((item) => isNovelSentence(item.sentence, batchMemory, 0.75));
+    const novel = unusedInBatch.filter((item) => isNovelSentence(item.sentence, recentMemory, 0.75));
     if (novel.length > 0) {
       pool = novel;
+    } else if (unusedInBatch.length > 0) {
+      pool = unusedInBatch;
     }
     const chosen = randomItem(pool);
-    memory.push(chosen.sentence);
+    recentMemory.push(chosen.sentence);
+    batchMemory.push(chosen.sentence);
     return {
       ...chosen,
       id: createId("perifrasis"),

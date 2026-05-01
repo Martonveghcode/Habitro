@@ -34,6 +34,21 @@ const SE_PERIPHRASIS_TYPES = [
   "Aspectual habitual",
 ];
 
+const PERIPHRASIS_STRUCTURES = ["Perifrasis verbal", "Locucion verbal", "Dos verbos"];
+
+const PERIPHRASIS_TYPES = [
+  "No aplica",
+  "Modal obligativa",
+  "Modal de posibilidad",
+  "Aspectual ingresiva",
+  "Aspectual incoativa",
+  "Aspectual durativa",
+  "Aspectual terminativa",
+  "Aspectual reiterativa",
+  "Aspectual resultativa",
+  "Aspectual habitual",
+];
+
 const MORFO_WORD_TYPES = ["Sustantivo", "Adjetivo", "Verbo", "Adverbio"];
 
 const MORFO_MORPHEME_TYPES = [
@@ -78,6 +93,30 @@ Reglas obligatorias:
 - NO devuelvas texto fuera de JSON.
 `;
 
+const PERIPHRASIS_SYSTEM_PROMPT = `
+Eres PROFE SINTAXIS en modo especializado en construcciones verbales.
+Debes generar frases para practicar estas tres categorias:
+- Perifrasis verbal
+- Locucion verbal
+- Dos verbos
+
+Tambien debes clasificar el tipo de perifrasis con una etiqueta exacta de allowed_periphrasis_types.
+Si la construccion NO es una perifrasis verbal, periphrasis_type debe ser exactamente "No aplica".
+
+Reglas obligatorias:
+- Si se solicita batch_size > 1, devuelve exactamente ese numero de frases.
+- Cada item del schedule corresponde a un slot concreto del lote y debes mantener el orden.
+- Respeta target_structure, target_periphrasis_type y focus_structures cuando aparezcan.
+- Evita repetir frases, verbos principales, marcos sintacticos y etiquetas recientes.
+- Incluye tipo de oracion y una explicacion breve.
+- Ajusta dificultad:
+  d1: estructura transparente y vocabulario frecuente
+  d2: estructura media con algo de ambiguedad controlada
+  d3: estructura avanzada o con mas contexto
+- NO incluyas "se" de forma artificial: esta seccion no practica valores del se.
+- NO devuelvas texto fuera de JSON.
+`;
+
 const SE_RECHECK_PROMPT = `
 Eres un verificador estricto de gramatica espanola para "valores del se".
 Recibes una frase y la respuesta propuesta por otro modelo, incluyendo el analisis de construccion verbal.
@@ -115,7 +154,9 @@ Reglas obligatorias:
 - Genera palabras (no oraciones completas).
 - Si se solicita batch_size > 1, devuelve exactamente ese numero de items.
 - Cada item debe incluir tipo de palabra, lexema, morfemas y tipos de morfema.
+- Para palabras de tipo Verbo, genera solo formas personales conjugadas; no uses infinitivos en -ar/-er/-ir, gerundios ni participios.
 - El campo lexeme va separado: no incluyas el lexema dentro de morphemes.
+- La palabra debe poder reconstruirse exactamente como prefijos + lexeme + resto de morphemes, sin cambios ortograficos ocultos.
 - accepted_lexemes debe incluir siempre el lexeme exacto y puede anadir infinitivo/base aceptada.
 - morphemes debe contener solo prefijos, interfijos, sufijos, vocales tematicas y morfemas flexivos; sin guiones decorativos.
 - morphemes y morpheme_types deben tener la misma longitud y el mismo orden.
@@ -160,6 +201,15 @@ const seStrategySchema = z.object({
   ratioHint: z.string().default(""),
 });
 
+const periphrasisStrategySchema = z.object({
+  mode: strategyModeSchema,
+  targeted: z.boolean(),
+  focusStructures: z.array(z.string()).default([]),
+  targetStructure: z.string().default(""),
+  targetPeriphrasisType: z.string().default(""),
+  ratioHint: z.string().default(""),
+});
+
 const morfoStrategySchema = z.object({
   mode: strategyModeSchema,
   targeted: z.boolean(),
@@ -192,6 +242,26 @@ const requestSchema = z.discriminatedUnion("action", [
       allowedFunctions: z.array(z.string()).min(1).default(SE_FUNCTIONS),
       allowedVerbalStructures: z.array(z.string()).min(1).default(SE_VERBAL_STRUCTURES),
       allowedPeriphrasisTypes: z.array(z.string()).min(1).default(SE_PERIPHRASIS_TYPES),
+    }),
+  }),
+  z.object({
+    action: z.literal("generate-periphrasis"),
+    modelName: z.string().trim().optional(),
+    payload: z.object({
+      difficulty: difficultySchema,
+      strategies: z.array(periphrasisStrategySchema).min(1),
+      profile: z.unknown(),
+      recentSentences: z.array(z.string()).default([]),
+      recentLabels: z
+        .array(
+          z.object({
+            structure: z.string(),
+            periphrasisType: z.string().default(""),
+          }),
+        )
+        .default([]),
+      allowedStructures: z.array(z.string()).min(1).default(PERIPHRASIS_STRUCTURES),
+      allowedPeriphrasisTypes: z.array(z.string()).min(1).default(PERIPHRASIS_TYPES),
     }),
   }),
   z.object({
@@ -489,6 +559,24 @@ function normalizeSeItem(item, difficulty, strategy, options) {
   };
 }
 
+function normalizePeriphrasisItem(item, difficulty, strategy, options) {
+  return {
+    sentence: String(item.sentence || "").trim(),
+    difficulty: Number(item.difficulty || difficulty),
+    verbalStructure: normalizeLabelAgainstOptions(
+      item.verbal_structure ?? item.verbalStructure ?? item.structure,
+      options.allowedStructures,
+    ),
+    periphrasisType: normalizeLabelAgainstOptions(
+      item.periphrasis_type ?? item.periphrasisType,
+      options.allowedPeriphrasisTypes,
+    ),
+    phraseType: String(item.phrase_type ?? item.phraseType ?? "").trim(),
+    explanation: String(item.explanation || "").trim(),
+    mode: strategy.mode,
+  };
+}
+
 function normalizeMorfoItem(item, difficulty, strategy) {
   const morphemesRaw = item.morphemes ?? item.morpheme_list ?? [];
   const morphemeTypesRaw = item.morpheme_types ?? item.morphemeTypes ?? [];
@@ -515,6 +603,32 @@ function normalizeMorfoItem(item, difficulty, strategy) {
     explanation: String(item.explanation || "").trim(),
     mode: strategy.mode,
   };
+}
+
+function isUnsupportedNonFiniteVerb(item) {
+  if (normalizeTextToken(item.wordType) !== normalizeTextToken("Verbo")) {
+    return false;
+  }
+  const word = normalizePieceToken(item.word);
+  return /(ar|er|ir|ando|iendo|yendo|ado|ido)$/.test(word);
+}
+
+function morfoItemRebuildsWord(item) {
+  const prefixes = [];
+  const suffixes = [];
+  item.morphemes.forEach((morpheme, index) => {
+    const type = normalizeMorphemeType(item.morphemeTypes[index]);
+    if (type === "Prefijo derivativo") {
+      prefixes.push(morpheme);
+    } else {
+      suffixes.push(morpheme);
+    }
+  });
+
+  return uniqueNormalizedItems([item.lexeme, ...item.acceptedLexemes], normalizePieceToken).some((candidateLexeme) => {
+    const rebuilt = `${prefixes.join("")}${candidateLexeme}${suffixes.join("")}`;
+    return normalizePieceToken(rebuilt) === normalizePieceToken(item.word);
+  });
 }
 
 function buildSeGenerationPrompt(payload) {
@@ -607,6 +721,73 @@ function buildSeGenerationPrompt(payload) {
   );
 }
 
+function buildPeriphrasisGenerationPrompt(payload) {
+  const recentStructures = payload.recentLabels.map((entry) => entry.structure).filter(Boolean);
+  const recentPeriphrasisTypes = payload.recentLabels.map((entry) => entry.periphrasisType).filter(Boolean);
+  const avoidStructures =
+    recentStructures.length >= 2 && recentStructures[0] === recentStructures[1] ? [recentStructures[0]] : [];
+  const avoidPeriphrasisTypes =
+    recentPeriphrasisTypes.length >= 2 && recentPeriphrasisTypes[0] === recentPeriphrasisTypes[1]
+      ? [recentPeriphrasisTypes[0]]
+      : [];
+
+  return JSON.stringify(
+    {
+      task: "Generar un lote de frases para practicar perifrasis verbales, locuciones verbales y dos verbos",
+      difficulty: payload.difficulty,
+      batch_size: payload.strategies.length,
+      generation_strategy: {
+        schedule: payload.strategies.map((strategy, index) => ({
+          slot: index + 1,
+          mode: strategy.mode,
+          targeted: strategy.targeted,
+          focus_structures: strategy.focusStructures,
+          target_structure: strategy.targetStructure || null,
+          target_periphrasis_type: strategy.targetPeriphrasisType || null,
+        })),
+        ratio_hint: payload.strategies[0]?.ratioHint || "sin ratio",
+      },
+      learning_profile: payload.profile,
+      allowed_structures: payload.allowedStructures,
+      allowed_periphrasis_types: payload.allowedPeriphrasisTypes,
+      anti_repetition: {
+        avoid_recent_sentences: payload.recentSentences,
+        avoid_structures_temporarily: avoidStructures,
+        avoid_periphrasis_types_temporarily: avoidPeriphrasisTypes,
+        must_be_semantically_distinct: true,
+        do_not_repeat_main_verb_or_frame: true,
+      },
+      batch_diversity_rules: {
+        different_main_verbs_per_item: true,
+        vary_subject_and_context: true,
+        avoid_only_single_word_changes: true,
+        vary_sentence_length: true,
+      },
+      constraints: {
+        must_return_exact_count: payload.strategies.length,
+        no_internal_duplicates: true,
+        respect_schedule_slot_by_slot: true,
+        non_periphrasis_items_must_use_no_aplica: true,
+        periphrasis_items_must_not_use_no_aplica: true,
+      },
+      output_schema: {
+        items: [
+          {
+            sentence: "string",
+            difficulty: "1|2|3",
+            verbal_structure: "one_of_allowed_structures",
+            periphrasis_type: "one_of_allowed_periphrasis_types",
+            phrase_type: "string",
+            explanation: "string_short",
+          },
+        ],
+      },
+    },
+    null,
+    2,
+  );
+}
+
 function buildMorfoGenerationPrompt(payload) {
   const recentWordTypes = payload.recentLabels.map((entry) => entry.wordType);
   const recentMorphemeTypes = payload.recentLabels.map((entry) => entry.morphemeType);
@@ -642,6 +823,8 @@ function buildMorfoGenerationPrompt(payload) {
       constraints: {
         must_return_exact_count: payload.strategies.length,
         no_internal_duplicates: true,
+        no_non_finite_verbs: true,
+        word_must_equal_prefixes_plus_lexeme_plus_remaining_morphemes: true,
       },
       output_schema: {
         items: [
@@ -675,6 +858,34 @@ function seItemMatchesStrategy(item, strategy, allowedValues) {
     return true;
   }
   return normalizeTextToken(item.seValue) === normalizeTextToken(expectedValue);
+}
+
+function periphrasisItemMatchesStrategy(item, strategy, options) {
+  const expectedStructure = strategy.targetStructure || "";
+  if (
+    expectedStructure &&
+    normalizeTextToken(item.verbalStructure) !==
+      normalizeTextToken(normalizeLabelAgainstOptions(expectedStructure, options.allowedStructures))
+  ) {
+    return false;
+  }
+
+  const expectedPeriphrasisType = strategy.targetPeriphrasisType || "";
+  if (
+    expectedPeriphrasisType &&
+    normalizeTextToken(item.periphrasisType) !==
+      normalizeTextToken(normalizeLabelAgainstOptions(expectedPeriphrasisType, options.allowedPeriphrasisTypes))
+  ) {
+    return false;
+  }
+
+  return true;
+}
+
+function periphrasisTypeIsCompatible(item) {
+  const isPeriphrasis = normalizeTextToken(item.verbalStructure) === normalizeTextToken("Perifrasis verbal");
+  const isNoAplica = normalizeTextToken(item.periphrasisType) === normalizeTextToken("No aplica");
+  return isPeriphrasis ? !isNoAplica : isNoAplica;
 }
 
 async function handleGenerateSe(apiKey, requestBody) {
@@ -722,6 +933,50 @@ async function handleGenerateSe(apiKey, requestBody) {
   return jsonResponse(200, { model: result.model, items });
 }
 
+async function handleGeneratePeriphrasis(apiKey, requestBody) {
+  const prompt = buildPeriphrasisGenerationPrompt(requestBody.payload);
+  const result = await requestWithFallback({
+    apiKey,
+    requestedModel: requestBody.modelName,
+    systemPrompt: PERIPHRASIS_SYSTEM_PROMPT,
+    userPrompt: prompt,
+    temperature: 0.78,
+    expectJson: true,
+  });
+
+  const parsed = extractJson(result.text);
+  const rawItems = extractCandidateItems(parsed);
+  const items = requestBody.payload.strategies.map((strategy, index) => {
+    const rawItem = rawItems[index];
+    if (!rawItem) {
+      return null;
+    }
+
+    const item = normalizePeriphrasisItem(rawItem, requestBody.payload.difficulty, strategy, {
+      allowedStructures: requestBody.payload.allowedStructures,
+      allowedPeriphrasisTypes: requestBody.payload.allowedPeriphrasisTypes,
+    });
+
+    const itemIsValid =
+      item.sentence &&
+      item.verbalStructure &&
+      item.periphrasisType &&
+      item.phraseType &&
+      item.explanation &&
+      requestBody.payload.allowedStructures.includes(item.verbalStructure) &&
+      requestBody.payload.allowedPeriphrasisTypes.includes(item.periphrasisType) &&
+      periphrasisTypeIsCompatible(item) &&
+      periphrasisItemMatchesStrategy(item, strategy, {
+        allowedStructures: requestBody.payload.allowedStructures,
+        allowedPeriphrasisTypes: requestBody.payload.allowedPeriphrasisTypes,
+      });
+
+    return itemIsValid ? item : null;
+  });
+
+  return jsonResponse(200, { model: result.model, items });
+}
+
 async function handleGenerateMorfo(apiKey, requestBody) {
   const prompt = buildMorfoGenerationPrompt(requestBody.payload);
   const result = await requestWithFallback({
@@ -747,6 +1002,8 @@ async function handleGenerateMorfo(apiKey, requestBody) {
         item.morphemes.length > 0 &&
         item.morphemes.length === item.morphemeTypes.length &&
         !item.morphemes.some((morpheme) => normalizePieceToken(morpheme) === normalizePieceToken(item.lexeme)) &&
+        !isUnsupportedNonFiniteVerb(item) &&
+        morfoItemRebuildsWord(item) &&
         MORFO_WORD_TYPES.includes(item.wordType) &&
         item.morphemeTypes.every((entry) => MORFO_MORPHEME_TYPES.includes(entry)),
     );
@@ -946,6 +1203,8 @@ export default async (request) => {
     switch (payload.action) {
       case "generate-se":
         return await handleGenerateSe(apiKey, payload);
+      case "generate-periphrasis":
+        return await handleGeneratePeriphrasis(apiKey, payload);
       case "generate-morfo":
         return await handleGenerateMorfo(apiKey, payload);
       case "recheck-se":

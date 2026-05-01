@@ -11,6 +11,8 @@ import {
 import type {
   MorfoItem,
   MorfoStrategy,
+  PeriphrasisItem,
+  PeriphrasisStrategy,
   QuestionResult,
   RecheckResultMorfo,
   RecheckResultSe,
@@ -93,6 +95,74 @@ function sanitizeSeItem(
   };
 }
 
+function sanitizePeriphrasisItem(
+  raw: Record<string, unknown>,
+  strategy: PeriphrasisStrategy,
+  options: {
+    allowedStructures: readonly string[];
+    allowedPeriphrasisTypes: readonly string[];
+  },
+): Omit<PeriphrasisItem, "id"> | null {
+  const sentence = String(raw.sentence ?? "").trim();
+  const verbalStructure = normalizeVerbalStructureLabel(
+    String(raw.verbalStructure ?? raw.verbal_structure ?? raw.structure ?? "").trim(),
+    options.allowedStructures,
+  );
+  const periphrasisType = normalizePeriphrasisTypeLabel(
+    String(raw.periphrasisType ?? raw.periphrasis_type ?? "").trim(),
+    options.allowedPeriphrasisTypes,
+  );
+  const phraseType = String(raw.phraseType ?? raw.phrase_type ?? "").trim();
+  const explanation = String(raw.explanation ?? "").trim();
+  const difficulty = Number(raw.difficulty ?? 0) as PeriphrasisItem["difficulty"];
+
+  if (!sentence || !verbalStructure || !periphrasisType || !phraseType || !explanation || !difficulty) {
+    return null;
+  }
+
+  return {
+    sentence,
+    difficulty,
+    verbalStructure,
+    periphrasisType,
+    phraseType,
+    explanation,
+    mode: strategy.mode,
+  };
+}
+
+function isUnsupportedNonFiniteVerb(word: string, wordType: string): boolean {
+  if (normalizeTextToken(wordType) !== normalizeTextToken("Verbo")) {
+    return false;
+  }
+  const normalizedWord = normalizePieceToken(word);
+  return /(ar|er|ir|ando|iendo|yendo|ado|ido)$/.test(normalizedWord);
+}
+
+function morfoItemRebuildsWord(
+  word: string,
+  lexeme: string,
+  acceptedLexemes: string[],
+  morphemes: string[],
+  morphemeTypes: string[],
+): boolean {
+  const prefixes: string[] = [];
+  const suffixes: string[] = [];
+  morphemes.forEach((morpheme, index) => {
+    const type = normalizeMorphemeTypeLabel(morphemeTypes[index] ?? "");
+    if (type === "Prefijo derivativo") {
+      prefixes.push(morpheme);
+    } else {
+      suffixes.push(morpheme);
+    }
+  });
+
+  return uniqueNormalizedItems([lexeme, ...acceptedLexemes], normalizePieceToken).some((candidateLexeme) => {
+    const rebuilt = `${prefixes.join("")}${candidateLexeme}${suffixes.join("")}`;
+    return normalizePieceToken(rebuilt) === normalizePieceToken(word);
+  });
+}
+
 function sanitizeMorfoItem(raw: Record<string, unknown>, strategy: MorfoStrategy): Omit<MorfoItem, "id"> | null {
   const word = String(raw.word ?? "").trim();
   const wordType = String(raw.wordType ?? raw.word_type ?? "").trim();
@@ -123,7 +193,9 @@ function sanitizeMorfoItem(raw: Record<string, unknown>, strategy: MorfoStrategy
     !difficulty ||
     morphemes.length === 0 ||
     morphemes.length !== morphemeTypes.length ||
-    morphemes.some((morpheme) => normalizePieceToken(morpheme) === normalizePieceToken(lexeme))
+    morphemes.some((morpheme) => normalizePieceToken(morpheme) === normalizePieceToken(lexeme)) ||
+    isUnsupportedNonFiniteVerb(word, wordType) ||
+    !morfoItemRebuildsWord(word, lexeme, acceptedLexemes, morphemes, morphemeTypes)
   ) {
     return null;
   }
@@ -185,6 +257,47 @@ export async function requestSeGeneration(input: {
         allowedVerbalStructures: input.allowedVerbalStructures,
         allowedPeriphrasisTypes: input.allowedPeriphrasisTypes,
       });
+  });
+}
+
+export async function requestPeriphrasisGeneration(input: {
+  apiKey?: string;
+  modelName: string;
+  difficulty: 1 | 2 | 3;
+  strategies: PeriphrasisStrategy[];
+  profile: unknown;
+  recentSentences: string[];
+  recentLabels: Array<{ structure: string; periphrasisType: string }>;
+  allowedStructures: string[];
+  allowedPeriphrasisTypes: string[];
+}): Promise<Array<Omit<PeriphrasisItem, "id"> | null>> {
+  const payload = await postAi<{ items?: Array<Record<string, unknown>> }>(
+    {
+      action: "generate-periphrasis",
+      modelName: input.modelName,
+      payload: {
+        difficulty: input.difficulty,
+        strategies: input.strategies,
+        profile: input.profile,
+        recentSentences: input.recentSentences,
+        recentLabels: input.recentLabels,
+        allowedStructures: input.allowedStructures,
+        allowedPeriphrasisTypes: input.allowedPeriphrasisTypes,
+      },
+    },
+    input.apiKey,
+  );
+
+  const rawItems = Array.isArray(payload.items) ? payload.items : [];
+  return input.strategies.map((strategy, index) => {
+    const item = rawItems[index];
+    if (!item || typeof item !== "object") {
+      return null;
+    }
+    return sanitizePeriphrasisItem(item, strategy, {
+      allowedStructures: input.allowedStructures,
+      allowedPeriphrasisTypes: input.allowedPeriphrasisTypes,
+    });
   });
 }
 
