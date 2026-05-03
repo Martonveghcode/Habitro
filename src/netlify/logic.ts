@@ -1043,6 +1043,24 @@ export function normalizePeriphrasisTypeLabel(
 
 export function normalizeMorphemeTypeLabel(value: string): string {
   const key = normalizeTextToken(value);
+  const aliases: Record<string, string> = {
+    prefijo: "Prefijo derivativo",
+    sufijo: "Sufijo derivativo",
+    genero: "Morfema flexivo nominal (genero)",
+    "morfema de genero": "Morfema flexivo nominal (genero)",
+    numero: "Morfema flexivo nominal (numero)",
+    "morfema de numero": "Morfema flexivo nominal (numero)",
+    "vocal tematica": "Vocal tematica",
+    vt: "Vocal tematica",
+    "morfema verbal tma": "Morfema flexivo verbal (tiempo/modo/aspecto)",
+    "tiempo/modo/aspecto": "Morfema flexivo verbal (tiempo/modo/aspecto)",
+    "persona y numero": "Morfema flexivo verbal (persona/numero)",
+    "persona/numero": "Morfema flexivo verbal (persona/numero)",
+    "morfema flexivo verbal (persona y numero)": "Morfema flexivo verbal (persona/numero)",
+  };
+  if (aliases[key]) {
+    return aliases[key];
+  }
   const mapping = new Map<string, string>(
     MORFO_MORPHEME_TYPES.map((label) => [normalizeTextToken(label), label]),
   );

@@ -486,6 +486,27 @@ function normalizePieceToken(value) {
   return normalizeTextToken(cleanMorphemeToken(value)).replace(/\s+/g, "").replace(/[-\u2010\u2011\u2012\u2013\u2014]/g, "");
 }
 
+function normalizeOrthographicPieceToken(value) {
+  return normalizePieceToken(value)
+    .replace(/qu/g, "c")
+    .replace(/gu(?=[ei])/g, "g")
+    .replace(/[cz]/g, "z")
+    .replace(/[gj]/g, "j");
+}
+
+function toStringList(value) {
+  if (Array.isArray(value)) {
+    return value.map((entry) => String(entry ?? "").trim()).filter(Boolean);
+  }
+  if (typeof value === "string") {
+    return value
+      .split(/[,\n;|]+/)
+      .map((entry) => entry.trim())
+      .filter(Boolean);
+  }
+  return [];
+}
+
 function uniqueNormalizedItems(items, normalize = normalizeTextToken) {
   const seen = new Set();
   const values = [];
@@ -580,16 +601,36 @@ function normalizePeriphrasisItem(item, difficulty, strategy, options) {
 function normalizeMorfoItem(item, difficulty, strategy) {
   const morphemesRaw = item.morphemes ?? item.morpheme_list ?? [];
   const morphemeTypesRaw = item.morpheme_types ?? item.morphemeTypes ?? [];
-  const morphemes = Array.isArray(morphemesRaw) ? morphemesRaw.map(cleanMorphemeToken).filter(Boolean) : [];
-  const morphemeTypes = Array.isArray(morphemeTypesRaw)
-    ? morphemeTypesRaw.map((entry) => normalizeMorphemeType(entry)).filter(Boolean)
-    : [];
   const lexeme = String(item.lexeme || "").trim();
   const acceptedLexemesRaw = item.accepted_lexemes ?? item.acceptedLexemes ?? [];
   const acceptedLexemes = uniqueNormalizedItems(
-    [lexeme, ...(Array.isArray(acceptedLexemesRaw) ? acceptedLexemesRaw : [])],
+    [lexeme, ...toStringList(acceptedLexemesRaw)],
     normalizeTextToken,
   );
+  const lexemeKeys = new Set(uniqueNormalizedItems([lexeme, ...acceptedLexemes], normalizePieceToken).map(normalizePieceToken));
+  const lexemeOrthoKeys = new Set(
+    uniqueNormalizedItems([lexeme, ...acceptedLexemes], normalizeOrthographicPieceToken).map(normalizeOrthographicPieceToken),
+  );
+  const morphemeTypesList = toStringList(morphemeTypesRaw);
+  const morphemePairs = toStringList(morphemesRaw)
+    .map((morpheme, index) => ({
+      morpheme: cleanMorphemeToken(morpheme),
+      morphemeType: normalizeMorphemeType(morphemeTypesList[index] ?? ""),
+    }))
+    .filter(({ morpheme, morphemeType }) => {
+      const morphemeKey = normalizePieceToken(morpheme);
+      const morphemeOrthoKey = normalizeOrthographicPieceToken(morpheme);
+      const typeKey = normalizeTextToken(morphemeType);
+      return (
+        morpheme &&
+        typeKey !== "lexema" &&
+        typeKey !== "raiz" &&
+        typeKey !== "raiz lexica" &&
+        typeKey !== "base lexica" &&
+        !lexemeKeys.has(morphemeKey) &&
+        !lexemeOrthoKeys.has(morphemeOrthoKey)
+      );
+    });
 
   return {
     word: String(item.word || "").trim(),
@@ -597,8 +638,8 @@ function normalizeMorfoItem(item, difficulty, strategy) {
     wordType: normalizeWordType(item.word_type ?? item.wordType),
     lexeme,
     acceptedLexemes,
-    morphemes,
-    morphemeTypes,
+    morphemes: morphemePairs.map((entry) => entry.morpheme),
+    morphemeTypes: morphemePairs.map((entry) => entry.morphemeType).filter(Boolean),
     analysisType: String(item.analysis_type ?? item.analysisType ?? "").trim(),
     explanation: String(item.explanation || "").trim(),
     mode: strategy.mode,
@@ -627,7 +668,10 @@ function morfoItemRebuildsWord(item) {
 
   return uniqueNormalizedItems([item.lexeme, ...item.acceptedLexemes], normalizePieceToken).some((candidateLexeme) => {
     const rebuilt = `${prefixes.join("")}${candidateLexeme}${suffixes.join("")}`;
-    return normalizePieceToken(rebuilt) === normalizePieceToken(item.word);
+    return (
+      normalizePieceToken(rebuilt) === normalizePieceToken(item.word) ||
+      normalizeOrthographicPieceToken(rebuilt) === normalizeOrthographicPieceToken(item.word)
+    );
   });
 }
 
