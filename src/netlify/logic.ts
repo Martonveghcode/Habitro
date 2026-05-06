@@ -39,6 +39,17 @@ import type {
 
 const STORAGE_KEY = "sintaxis-netlify-practice-v1";
 const DEFAULT_MODEL = MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash-lite";
+export const MIN_PRACTICE_BATCH_SIZE = 1;
+export const DEFAULT_PRACTICE_BATCH_SIZE = 5;
+export const MAX_PRACTICE_BATCH_SIZE = 10;
+
+export function coercePracticeBatchSize(value: unknown): number {
+  const numericValue = typeof value === "number" ? value : Number(value);
+  if (!Number.isFinite(numericValue)) {
+    return DEFAULT_PRACTICE_BATCH_SIZE;
+  }
+  return Math.min(MAX_PRACTICE_BATCH_SIZE, Math.max(MIN_PRACTICE_BATCH_SIZE, Math.round(numericValue)));
+}
 
 export function createId(prefix: string): string {
   if (typeof crypto !== "undefined" && typeof crypto.randomUUID === "function") {
@@ -57,6 +68,7 @@ function defaultSeSettings(): SeSettings {
     modelName: DEFAULT_MODEL,
     difficulty: 2,
     personalized: true,
+    batchSize: DEFAULT_PRACTICE_BATCH_SIZE,
     focusValues: [],
     customValues: [],
     customPeriphrasisTypes: [],
@@ -72,6 +84,7 @@ function defaultMorfoSettings(): MorfoSettings {
     modelName: DEFAULT_MODEL,
     difficulty: 2,
     personalized: true,
+    batchSize: DEFAULT_PRACTICE_BATCH_SIZE,
     focusWordTypes: [],
     targetWeight: 40,
     normalWeight: 60,
@@ -85,6 +98,7 @@ function defaultPeriphrasisSettings(): PeriphrasisSettings {
     modelName: DEFAULT_MODEL,
     difficulty: 2,
     personalized: true,
+    batchSize: DEFAULT_PRACTICE_BATCH_SIZE,
     focusStructures: [],
     customPeriphrasisTypes: [],
     targetWeight: 40,
@@ -206,6 +220,7 @@ export function loadStorageState(): StorageState {
         customPeriphrasisTypes: Array.isArray(parsedSeSettings.customPeriphrasisTypes)
           ? parsedSeSettings.customPeriphrasisTypes.filter((entry): entry is string => typeof entry === "string")
           : [],
+        batchSize: coercePracticeBatchSize(parsedSeSettings.batchSize),
       },
       periphrasisSettings: {
         ...defaultPeriphrasisSettings(),
@@ -216,6 +231,7 @@ export function loadStorageState(): StorageState {
         customPeriphrasisTypes: Array.isArray(parsedPeriphrasisSettings.customPeriphrasisTypes)
           ? parsedPeriphrasisSettings.customPeriphrasisTypes.filter((entry): entry is string => typeof entry === "string")
           : [],
+        batchSize: coercePracticeBatchSize(parsedPeriphrasisSettings.batchSize),
       },
       morfoSettings: {
         ...defaultMorfoSettings(),
@@ -223,6 +239,7 @@ export function loadStorageState(): StorageState {
         focusWordTypes: Array.isArray(parsedMorfoSettings.focusWordTypes)
           ? parsedMorfoSettings.focusWordTypes.filter((entry): entry is string => typeof entry === "string")
           : [],
+        batchSize: coercePracticeBatchSize(parsedMorfoSettings.batchSize),
       },
       seAttempts: Array.isArray(parsed.seAttempts)
         ? parsed.seAttempts.map((attempt) => sanitizeStoredSeAttempt(attempt)).filter((attempt): attempt is SeAttempt => attempt !== null)

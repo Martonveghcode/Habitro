@@ -378,6 +378,57 @@ textarea:disabled {
   line-height: 1.25;
 }
 
+.batch-size-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+}
+
+.batch-size-header .field {
+  margin-bottom: 0;
+}
+
+.batch-size-count {
+  color: var(--fg-default);
+  font-size: 13px;
+  font-weight: 600;
+  line-height: 1.5;
+}
+
+.batch-size-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  align-items: center;
+  gap: var(--space-3);
+  margin-top: var(--space-2);
+}
+
+.batch-size-control input[type="range"] {
+  min-height: 32px;
+  padding: 0;
+  border: 0;
+  background: transparent;
+  accent-color: var(--accent-emphasis);
+}
+
+.batch-size-control input[type="range"]:focus {
+  box-shadow: none;
+}
+
+.batch-size-number {
+  text-align: center;
+}
+
+.range-meta {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 2px;
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1.5;
+}
+
 .section-heading {
   margin: 0 0 var(--space-2);
   font-size: 14px;

@@ -135,6 +135,7 @@ export interface SeSettings {
   modelName: string;
   difficulty: Difficulty;
   personalized: boolean;
+  batchSize: number;
   focusValues: string[];
   customValues: string[];
   customPeriphrasisTypes: string[];
@@ -148,6 +149,7 @@ export interface PeriphrasisSettings {
   modelName: string;
   difficulty: Difficulty;
   personalized: boolean;
+  batchSize: number;
   focusStructures: string[];
   customPeriphrasisTypes: string[];
   targetWeight: number;
@@ -160,6 +162,7 @@ export interface MorfoSettings {
   modelName: string;
   difficulty: Difficulty;
   personalized: boolean;
+  batchSize: number;
   focusWordTypes: string[];
   targetWeight: number;
   normalWeight: number;

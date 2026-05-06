@@ -16,6 +16,7 @@ import {
   chooseMorfoTarget,
   choosePeriphrasisTarget,
   chooseSeTarget,
+  coercePracticeBatchSize,
   createId,
   evaluateMorfoGuess,
   evaluatePeriphrasisGuess,
@@ -33,6 +34,8 @@ import {
   makeMorfoAttempt,
   makePeriphrasisAttempt,
   makeSeAttempt,
+  MAX_PRACTICE_BATCH_SIZE,
+  MIN_PRACTICE_BATCH_SIZE,
   morfoLearningProfile,
   normalizeTextToken,
   periphrasisAccuracy,
@@ -136,6 +139,47 @@ function FieldLabel({ label, hint: _hint }: { label: string; hint?: string }) {
     <label className="field">
       <span>{label}</span>
     </label>
+  );
+}
+
+function BatchSizeControl({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  const safeValue = coercePracticeBatchSize(value);
+  const handleChange = (nextValue: string) => {
+    onChange(coercePracticeBatchSize(nextValue));
+  };
+
+  return (
+    <div className="field-block batch-size-control">
+      <div className="batch-size-header">
+        <FieldLabel label="Cantidad del lote" />
+        <span className="batch-size-count">{safeValue}</span>
+      </div>
+      <div className="batch-size-row">
+        <input
+          aria-label="Cantidad del lote"
+          max={MAX_PRACTICE_BATCH_SIZE}
+          min={MIN_PRACTICE_BATCH_SIZE}
+          step={1}
+          type="range"
+          value={safeValue}
+          onChange={(event) => handleChange(event.target.value)}
+        />
+        <input
+          aria-label="Cantidad exacta del lote"
+          className="batch-size-number"
+          max={MAX_PRACTICE_BATCH_SIZE}
+          min={MIN_PRACTICE_BATCH_SIZE}
+          step={1}
+          type="number"
+          value={safeValue}
+          onChange={(event) => handleChange(event.target.value)}
+        />
+      </div>
+      <div className="range-meta">
+        <span>{MIN_PRACTICE_BATCH_SIZE}</span>
+        <span>Max. {MAX_PRACTICE_BATCH_SIZE}</span>
+      </div>
+    </div>
   );
 }
 
@@ -649,8 +693,7 @@ function SeWorkspace({
           : settings.personalized
             ? []
             : orderSeCoverageValues(availableSeValues, recentLabels);
-        const baseBatchSize = settings.personalized ? 3 : 10;
-        const batchSize = Math.max(baseBatchSize, coverageValues.length);
+        const batchSize = coercePracticeBatchSize(settings.batchSize);
         let workingBucket = [...mixBucket];
         const strategies: SeStrategy[] = [];
 
@@ -906,6 +949,11 @@ function SeWorkspace({
                 <span>Personalizado</span>
               </label>
             </div>
+
+            <BatchSizeControl
+              value={settings.batchSize}
+              onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+            />
 
             <div className="field-block">
               <FieldLabel label="Valores" />
@@ -1367,7 +1415,7 @@ function PeriphrasisWorkspace({
     try {
       let nextQueue = [...queue];
       if (nextQueue.length === 0) {
-        const batchSize = settings.personalized ? 3 : 10;
+        const batchSize = coercePracticeBatchSize(settings.batchSize);
         let workingBucket = [...mixBucket];
         const strategies: PeriphrasisStrategy[] = [];
 
@@ -1515,6 +1563,11 @@ function PeriphrasisWorkspace({
                 <span>Personalizado</span>
               </label>
             </div>
+
+            <BatchSizeControl
+              value={settings.batchSize}
+              onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+            />
 
             <div className="field-block">
               <FieldLabel label="Estructuras" />
@@ -1941,7 +1994,7 @@ function MorfoWorkspace({
     try {
       let nextQueue = [...queue];
       if (nextQueue.length === 0) {
-        const batchSize = settings.personalized ? 3 : 10;
+        const batchSize = coercePracticeBatchSize(settings.batchSize);
         let workingBucket = [...mixBucket];
         const strategies: MorfoStrategy[] = [];
 
@@ -2157,6 +2210,11 @@ function MorfoWorkspace({
                 <span>Personalizado</span>
               </label>
             </div>
+
+            <BatchSizeControl
+              value={settings.batchSize}
+              onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+            />
 
             <div className="field-block">
               <FieldLabel label="Tipos" />
