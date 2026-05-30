@@ -91,7 +91,7 @@ import type {
 } from "./types";
 
 type SectionName = "se" | "perifrasis" | "morfologia";
-type PageName = "practice" | "history" | "settings";
+type PageName = "practice" | "history" | "settings" | "storage";
 
 interface SectionMeta {
   navLabel: string;
@@ -114,6 +114,9 @@ const PAGE_META: Record<PageName, PageMeta> = {
   },
   settings: {
     label: "Ajustes",
+  },
+  storage: {
+    label: "Bancos",
   },
 };
 
@@ -411,14 +414,18 @@ function SourceToggle({
 
 function ManualBankPanel({
   count,
+  defaultOpen = false,
   onClear,
   onImportText,
   placeholder,
+  title,
 }: {
   count: number;
+  defaultOpen?: boolean;
   onClear: () => void;
   onImportText: (rawText: string) => ImportResult;
   placeholder: string;
+  title: string;
 }) {
   const [draft, setDraft] = useState("");
   const [message, setMessage] = useState("");
@@ -436,9 +443,9 @@ function ManualBankPanel({
   };
 
   return (
-    <details className="details-panel manual-bank-panel">
+    <details className="details-panel manual-bank-panel" open={defaultOpen}>
       <summary>
-        <span>Banco manual</span>
+        <span>{title}</span>
         <span>{count} guardados</span>
       </summary>
       <div className="details-content">
@@ -489,6 +496,119 @@ function ManualBankPanel({
         {message ? <div className={cx("inline-banner", tone === "warn" && "warn")}>{message}</div> : null}
       </div>
     </details>
+  );
+}
+
+function QuestionBankStoragePage({
+  seSettings,
+  periphrasisSettings,
+  morfoSettings,
+  seQuestionBank,
+  periphrasisQuestionBank,
+  morfoQuestionBank,
+  onSeQuestionBankChange,
+  onPeriphrasisQuestionBankChange,
+  onMorfoQuestionBankChange,
+}: {
+  seSettings: SeSettings;
+  periphrasisSettings: PeriphrasisSettings;
+  morfoSettings: MorfoSettings;
+  seQuestionBank: StoredSeItem[];
+  periphrasisQuestionBank: StoredPeriphrasisItem[];
+  morfoQuestionBank: StoredMorfoItem[];
+  onSeQuestionBankChange: (items: StoredSeItem[]) => void;
+  onPeriphrasisQuestionBankChange: (items: StoredPeriphrasisItem[]) => void;
+  onMorfoQuestionBankChange: (items: StoredMorfoItem[]) => void;
+}) {
+  const availableSeValues = useMemo(() => mergeLabelGroups(SE_VALUES, seSettings.customValues), [seSettings.customValues]);
+  const availablePeriphrasisTypes = useMemo(
+    () => mergeLabelGroups(PERIPHRASIS_TYPES, periphrasisSettings.customPeriphrasisTypes),
+    [periphrasisSettings.customPeriphrasisTypes],
+  );
+
+  const importSeQuestionBank = (rawText: string): ImportResult => {
+    const records = parseQuestionBankRecords(rawText);
+    const validItems = records
+      .map((record) =>
+        sanitizeUploadedSeItem(record, seSettings.difficulty, {
+          allowedValues: availableSeValues,
+          allowedFunctions: [...SE_FUNCTIONS],
+          allowedVerbalStructures: [...SE_VERBAL_STRUCTURES],
+          allowedPeriphrasisTypes: [...SE_PERIPHRASIS_TYPES],
+        }),
+      )
+      .filter((item): item is StoredSeItem => item !== null);
+    const nextBank = mergeQuestionBank(seQuestionBank, validItems, (item) => normalizeTextToken(item.sentence));
+    onSeQuestionBankChange(nextBank);
+    return {
+      saved: validItems.length,
+      rejected: records.length - validItems.length,
+      total: records.length,
+    };
+  };
+
+  const importPeriphrasisQuestionBank = (rawText: string): ImportResult => {
+    const records = parseQuestionBankRecords(rawText);
+    const validItems = records
+      .map((record) =>
+        sanitizeUploadedPeriphrasisItem(record, periphrasisSettings.difficulty, {
+          allowedStructures: [...PERIPHRASIS_STRUCTURES],
+          allowedPeriphrasisTypes: availablePeriphrasisTypes,
+        }),
+      )
+      .filter((item): item is StoredPeriphrasisItem => item !== null);
+    const nextBank = mergeQuestionBank(periphrasisQuestionBank, validItems, (item) => normalizeTextToken(item.sentence));
+    onPeriphrasisQuestionBankChange(nextBank);
+    return {
+      saved: validItems.length,
+      rejected: records.length - validItems.length,
+      total: records.length,
+    };
+  };
+
+  const importMorfoQuestionBank = (rawText: string): ImportResult => {
+    const records = parseQuestionBankRecords(rawText);
+    const validItems = records
+      .map((record) => sanitizeUploadedMorfoItem(record, morfoSettings.difficulty))
+      .filter((item): item is StoredMorfoItem => item !== null);
+    const nextBank = mergeQuestionBank(morfoQuestionBank, validItems, (item) => normalizeTextToken(item.word));
+    onMorfoQuestionBankChange(nextBank);
+    return {
+      saved: validItems.length,
+      rejected: records.length - validItems.length,
+      total: records.length,
+    };
+  };
+
+  return (
+    <section className="workspace bank-storage-page">
+      <div className="bank-grid">
+        <ManualBankPanel
+          count={seQuestionBank.length}
+          defaultOpen
+          placeholder={SE_IMPORT_PLACEHOLDER}
+          title="Valores del se"
+          onClear={() => onSeQuestionBankChange([])}
+          onImportText={importSeQuestionBank}
+        />
+        <ManualBankPanel
+          count={periphrasisQuestionBank.length}
+          defaultOpen
+          placeholder={PERIPHRASIS_IMPORT_PLACEHOLDER}
+          title="Perifrasis"
+          onClear={() => onPeriphrasisQuestionBankChange([])}
+          onImportText={importPeriphrasisQuestionBank}
+        />
+        <ManualBankPanel
+          count={morfoQuestionBank.length}
+          defaultOpen
+          placeholder={MORFO_IMPORT_PLACEHOLDER}
+          title="Morfologia"
+          onClear={() => onMorfoQuestionBankChange([])}
+          onImportText={importMorfoQuestionBank}
+        />
+      </div>
+    </section>
   );
 }
 
@@ -638,6 +758,7 @@ export function NetlifyPracticeApp() {
   const currentPage =
     activeSection === "se" ? sePage : activeSection === "perifrasis" ? periphrasisPage : morfoPage;
   const activeSectionMeta = SECTION_META[activeSection];
+  const pageTitle = currentPage === "storage" ? "Bancos" : activeSectionMeta.title;
 
   const setPageForSection = (section: SectionName, page: PageName) => {
     if (section === "se") {
@@ -686,9 +807,9 @@ export function NetlifyPracticeApp() {
 
       <div className="app-frame">
         <section className="workspace-shell">
-          <section className={cx("hero-banner", activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
+          <section className={cx("hero-banner", currentPage !== "storage" && activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
             <div className="hero-banner__copy">
-              <h1>{activeSectionMeta.title}</h1>
+              <h1>{pageTitle}</h1>
               <div className="cta-links">
                 {(Object.entries(PAGE_META) as Array<[PageName, PageMeta]>).map(([pageKey, pageMeta]) => (
                   <PageAction
@@ -703,42 +824,55 @@ export function NetlifyPracticeApp() {
           </section>
 
           <main className="main-stage">
-            <SeWorkspace
-              active={activeSection === "se"}
-              page={sePage}
-              settings={storageState.seSettings}
-              attempts={storageState.seAttempts}
-              questionBank={storageState.seQuestionBank}
-              apiKey={storageState.geminiApiKey}
-              onApiKeyChange={updateGeminiApiKey}
-              onSettingsChange={updateSeSettings}
-              onAttemptsChange={updateSeAttempts}
-              onQuestionBankChange={updateSeQuestionBank}
-            />
-            <PeriphrasisWorkspace
-              active={activeSection === "perifrasis"}
-              page={periphrasisPage}
-              settings={storageState.periphrasisSettings}
-              attempts={storageState.periphrasisAttempts}
-              questionBank={storageState.periphrasisQuestionBank}
-              apiKey={storageState.geminiApiKey}
-              onApiKeyChange={updateGeminiApiKey}
-              onSettingsChange={updatePeriphrasisSettings}
-              onAttemptsChange={updatePeriphrasisAttempts}
-              onQuestionBankChange={updatePeriphrasisQuestionBank}
-            />
-            <MorfoWorkspace
-              active={activeSection === "morfologia"}
-              page={morfoPage}
-              settings={storageState.morfoSettings}
-              attempts={storageState.morfoAttempts}
-              questionBank={storageState.morfoQuestionBank}
-              apiKey={storageState.geminiApiKey}
-              onApiKeyChange={updateGeminiApiKey}
-              onSettingsChange={updateMorfoSettings}
-              onAttemptsChange={updateMorfoAttempts}
-              onQuestionBankChange={updateMorfoQuestionBank}
-            />
+            {currentPage === "storage" ? (
+              <QuestionBankStoragePage
+                morfoQuestionBank={storageState.morfoQuestionBank}
+                morfoSettings={storageState.morfoSettings}
+                periphrasisQuestionBank={storageState.periphrasisQuestionBank}
+                periphrasisSettings={storageState.periphrasisSettings}
+                seQuestionBank={storageState.seQuestionBank}
+                seSettings={storageState.seSettings}
+                onMorfoQuestionBankChange={updateMorfoQuestionBank}
+                onPeriphrasisQuestionBankChange={updatePeriphrasisQuestionBank}
+                onSeQuestionBankChange={updateSeQuestionBank}
+              />
+            ) : (
+              <>
+                <SeWorkspace
+                  active={activeSection === "se"}
+                  page={sePage}
+                  settings={storageState.seSettings}
+                  attempts={storageState.seAttempts}
+                  questionBank={storageState.seQuestionBank}
+                  apiKey={storageState.geminiApiKey}
+                  onApiKeyChange={updateGeminiApiKey}
+                  onSettingsChange={updateSeSettings}
+                  onAttemptsChange={updateSeAttempts}
+                />
+                <PeriphrasisWorkspace
+                  active={activeSection === "perifrasis"}
+                  page={periphrasisPage}
+                  settings={storageState.periphrasisSettings}
+                  attempts={storageState.periphrasisAttempts}
+                  questionBank={storageState.periphrasisQuestionBank}
+                  apiKey={storageState.geminiApiKey}
+                  onApiKeyChange={updateGeminiApiKey}
+                  onSettingsChange={updatePeriphrasisSettings}
+                  onAttemptsChange={updatePeriphrasisAttempts}
+                />
+                <MorfoWorkspace
+                  active={activeSection === "morfologia"}
+                  page={morfoPage}
+                  settings={storageState.morfoSettings}
+                  attempts={storageState.morfoAttempts}
+                  questionBank={storageState.morfoQuestionBank}
+                  apiKey={storageState.geminiApiKey}
+                  onApiKeyChange={updateGeminiApiKey}
+                  onSettingsChange={updateMorfoSettings}
+                  onAttemptsChange={updateMorfoAttempts}
+                />
+              </>
+            )}
           </main>
         </section>
       </div>
@@ -756,7 +890,6 @@ function SeWorkspace({
   onApiKeyChange,
   onSettingsChange,
   onAttemptsChange,
-  onQuestionBankChange,
 }: {
   active: boolean;
   page: PageName;
@@ -767,7 +900,6 @@ function SeWorkspace({
   onApiKeyChange: (value: string) => void;
   onSettingsChange: (settings: SeSettings) => void;
   onAttemptsChange: (attempts: SeAttempt[]) => void;
-  onQuestionBankChange: (items: StoredSeItem[]) => void;
 }) {
   const profile = useMemo(() => seLearningProfile(attempts, settings.profileId), [attempts, settings.profileId]);
   const profileAttempts = useMemo(
@@ -860,27 +992,6 @@ function SeWorkspace({
   const updateItemSource = (itemSource: ItemSource) => {
     onSettingsChange({ ...settings, itemSource });
     setQueue([]);
-  };
-
-  const importSeQuestionBank = (rawText: string): ImportResult => {
-    const records = parseQuestionBankRecords(rawText);
-    const validItems = records
-      .map((record) =>
-        sanitizeUploadedSeItem(record, settings.difficulty, {
-          allowedValues: availableSeValues,
-          allowedFunctions: [...SE_FUNCTIONS],
-          allowedVerbalStructures: [...SE_VERBAL_STRUCTURES],
-          allowedPeriphrasisTypes: [...SE_PERIPHRASIS_TYPES],
-        }),
-      )
-      .filter((item): item is StoredSeItem => item !== null);
-    const nextBank = mergeQuestionBank(questionBank, validItems, (item) => normalizeTextToken(item.sentence));
-    onQuestionBankChange(nextBank);
-    return {
-      saved: validItems.length,
-      rejected: records.length - validItems.length,
-      total: records.length,
-    };
   };
 
   const handleGenerate = async () => {
@@ -1166,13 +1277,6 @@ function SeWorkspace({
             />
 
             <SourceToggle source={settings.itemSource} manualCount={questionBank.length} onChange={updateItemSource} />
-
-            <ManualBankPanel
-              count={questionBank.length}
-              placeholder={SE_IMPORT_PLACEHOLDER}
-              onClear={() => onQuestionBankChange([])}
-              onImportText={importSeQuestionBank}
-            />
 
             <div className="field-block">
               <FieldLabel label="Valores" />
@@ -1540,7 +1644,6 @@ function PeriphrasisWorkspace({
   onApiKeyChange,
   onSettingsChange,
   onAttemptsChange,
-  onQuestionBankChange,
 }: {
   active: boolean;
   page: PageName;
@@ -1551,7 +1654,6 @@ function PeriphrasisWorkspace({
   onApiKeyChange: (value: string) => void;
   onSettingsChange: (settings: PeriphrasisSettings) => void;
   onAttemptsChange: (attempts: PeriphrasisAttempt[]) => void;
-  onQuestionBankChange: (items: StoredPeriphrasisItem[]) => void;
 }) {
   const profile = useMemo(() => periphrasisLearningProfile(attempts, settings.profileId), [attempts, settings.profileId]);
   const profileAttempts = useMemo(
@@ -1636,25 +1738,6 @@ function PeriphrasisWorkspace({
   const updateItemSource = (itemSource: ItemSource) => {
     onSettingsChange({ ...settings, itemSource });
     setQueue([]);
-  };
-
-  const importPeriphrasisQuestionBank = (rawText: string): ImportResult => {
-    const records = parseQuestionBankRecords(rawText);
-    const validItems = records
-      .map((record) =>
-        sanitizeUploadedPeriphrasisItem(record, settings.difficulty, {
-          allowedStructures: [...PERIPHRASIS_STRUCTURES],
-          allowedPeriphrasisTypes: availablePeriphrasisTypes,
-        }),
-      )
-      .filter((item): item is StoredPeriphrasisItem => item !== null);
-    const nextBank = mergeQuestionBank(questionBank, validItems, (item) => normalizeTextToken(item.sentence));
-    onQuestionBankChange(nextBank);
-    return {
-      saved: validItems.length,
-      rejected: records.length - validItems.length,
-      total: records.length,
-    };
   };
 
   const handleGenerate = async () => {
@@ -1824,13 +1907,6 @@ function PeriphrasisWorkspace({
             />
 
             <SourceToggle source={settings.itemSource} manualCount={questionBank.length} onChange={updateItemSource} />
-
-            <ManualBankPanel
-              count={questionBank.length}
-              placeholder={PERIPHRASIS_IMPORT_PLACEHOLDER}
-              onClear={() => onQuestionBankChange([])}
-              onImportText={importPeriphrasisQuestionBank}
-            />
 
             <div className="field-block">
               <FieldLabel label="Estructuras" />
@@ -2172,7 +2248,6 @@ function MorfoWorkspace({
   onApiKeyChange,
   onSettingsChange,
   onAttemptsChange,
-  onQuestionBankChange,
 }: {
   active: boolean;
   page: PageName;
@@ -2183,7 +2258,6 @@ function MorfoWorkspace({
   onApiKeyChange: (value: string) => void;
   onSettingsChange: (settings: MorfoSettings) => void;
   onAttemptsChange: (attempts: MorfoAttempt[]) => void;
-  onQuestionBankChange: (items: StoredMorfoItem[]) => void;
 }) {
   const profile = useMemo(() => morfoLearningProfile(attempts, settings.profileId), [attempts, settings.profileId]);
   const profileAttempts = useMemo(
@@ -2259,20 +2333,6 @@ function MorfoWorkspace({
   const updateItemSource = (itemSource: ItemSource) => {
     onSettingsChange({ ...settings, itemSource });
     setQueue([]);
-  };
-
-  const importMorfoQuestionBank = (rawText: string): ImportResult => {
-    const records = parseQuestionBankRecords(rawText);
-    const validItems = records
-      .map((record) => sanitizeUploadedMorfoItem(record, settings.difficulty))
-      .filter((item): item is StoredMorfoItem => item !== null);
-    const nextBank = mergeQuestionBank(questionBank, validItems, (item) => normalizeTextToken(item.word));
-    onQuestionBankChange(nextBank);
-    return {
-      saved: validItems.length,
-      rejected: records.length - validItems.length,
-      total: records.length,
-    };
   };
 
   const handleGenerate = async () => {
@@ -2515,13 +2575,6 @@ function MorfoWorkspace({
             />
 
             <SourceToggle source={settings.itemSource} manualCount={questionBank.length} onChange={updateItemSource} />
-
-            <ManualBankPanel
-              count={questionBank.length}
-              placeholder={MORFO_IMPORT_PLACEHOLDER}
-              onClear={() => onQuestionBankChange([])}
-              onImportText={importMorfoQuestionBank}
-            />
 
             <div className="field-block">
               <FieldLabel label="Tipos" />

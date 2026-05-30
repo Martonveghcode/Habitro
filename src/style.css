@@ -153,7 +153,6 @@ textarea:disabled {
   top: 0;
   z-index: 1000;
   background: var(--bg-muted);
-  border-bottom: 1px solid var(--border-default);
 }
 
 .globalnav__inner {
@@ -229,8 +228,8 @@ textarea:disabled {
 }
 
 .workspace-shell {
-  border: 1px solid var(--border-default);
-  border-radius: var(--radius-lg);
+  border: 0;
+  border-radius: 0;
   background: var(--bg-default);
   overflow: hidden;
 }
@@ -239,7 +238,6 @@ textarea:disabled {
   display: block;
   padding: var(--space-5);
   border: 0;
-  border-bottom: 1px solid var(--border-default);
   border-radius: 0;
   background: transparent;
 }
@@ -345,7 +343,6 @@ textarea:disabled {
   position: sticky;
   top: 72px;
   padding-right: var(--space-5);
-  border-right: 1px solid var(--border-default);
 }
 
 .practice-panel {
@@ -667,10 +664,9 @@ textarea:disabled {
 .info-block,
 .question-box {
   border: 0;
-  border-top: 1px solid var(--border-muted);
   border-radius: 0;
   background: transparent;
-  padding: var(--space-4) 0 0;
+  padding: var(--space-2) 0 0;
 }
 
 .result-panel p,
@@ -698,9 +694,9 @@ textarea:disabled {
 }
 
 .details-panel {
-  border: 1px solid var(--border-default);
+  border: 0;
   border-radius: var(--radius-md);
-  background: var(--bg-default);
+  background: var(--bg-muted);
   overflow: hidden;
 }
 
@@ -715,7 +711,6 @@ textarea:disabled {
   font-size: 14px;
   font-weight: 600;
   background: var(--bg-muted);
-  border-bottom: 1px solid var(--border-default);
 }
 
 .details-panel summary::-webkit-details-marker {
@@ -726,10 +721,34 @@ textarea:disabled {
   padding: var(--space-4);
 }
 
+.bank-grid {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: var(--space-4);
+  align-items: start;
+}
+
+.bank-storage-page .details-panel,
+.bank-storage-page .field-block {
+  margin-top: 0;
+}
+
+.bank-storage-page .details-panel {
+  background: var(--bg-muted);
+}
+
+.bank-storage-page .details-content {
+  padding-top: var(--space-3);
+}
+
+.manual-bank-panel textarea {
+  min-height: 180px;
+}
+
 .table-shell {
   overflow: auto;
   margin-top: var(--space-3);
-  border: 1px solid var(--border-default);
+  border: 0;
   border-radius: var(--radius-md);
   background: var(--bg-default);
 }
@@ -809,8 +828,7 @@ tbody tr:last-child td {
 
 .danger-zone {
   margin-top: var(--space-5);
-  padding-top: var(--space-4);
-  border-top: 1px solid var(--border-default);
+  padding-top: 0;
   display: flex;
   flex-direction: column;
   gap: var(--space-3);
@@ -831,12 +849,15 @@ code {
     grid-template-columns: 1fr;
   }
 
+  .bank-grid {
+    grid-template-columns: 1fr;
+  }
+
   .control-panel {
     position: static;
     padding-right: 0;
     border-right: 0;
     padding-bottom: var(--space-5);
-    border-bottom: 1px solid var(--border-default);
   }
 
   .practice-panel {

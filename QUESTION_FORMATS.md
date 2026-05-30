@@ -86,6 +86,14 @@ Allowed `periphrasis_type`:
 
 ## Perifrasis
 
+Important: this section is for the exercise category "construcciones verbales". It must include a mixed bank of:
+
+- true verbal periphrases
+- verbal locutions
+- cases with two independent verbs
+
+Do not generate only true verbal periphrases unless explicitly asked.
+
 Required item shape:
 
 ```json
@@ -107,6 +115,26 @@ Allowed `verbal_structure`:
 ["Perifrasis verbal", "Locucion verbal", "Dos verbos"]
 ```
 
+Target distribution when generating a balanced batch:
+
+```json
+{
+  "Perifrasis verbal": "40%",
+  "Locucion verbal": "30%",
+  "Dos verbos": "30%"
+}
+```
+
+For exactly 20 items, use exactly:
+
+```json
+{
+  "Perifrasis verbal": 8,
+  "Locucion verbal": 6,
+  "Dos verbos": 6
+}
+```
+
 Allowed `periphrasis_type`:
 
 ```json
@@ -125,6 +153,58 @@ Allowed `periphrasis_type`:
 ```
 
 Rule: if `verbal_structure` is `"Perifrasis verbal"`, `periphrasis_type` must not be `"No aplica"`. If `verbal_structure` is `"Locucion verbal"` or `"Dos verbos"`, `periphrasis_type` must be exactly `"No aplica"`.
+
+Copy-paste prompt for 20 difficulty-2 items:
+
+```text
+Generate exactly 20 high-quality items for the Spanish "perifrasis" exercise category at difficulty 2.
+Important: "perifrasis exercise category" means a mixed drill about verbal constructions, not 20 true periphrases.
+
+Return only strict JSON:
+{ "items": [ ... ] }
+
+Required distribution:
+- 8 items with "verbal_structure": "Perifrasis verbal"
+- 6 items with "verbal_structure": "Locucion verbal"
+- 6 items with "verbal_structure": "Dos verbos"
+
+For "Perifrasis verbal", choose a real periphrasis type from the allowed list and do not use "No aplica".
+For "Locucion verbal" and "Dos verbos", set "periphrasis_type" exactly to "No aplica".
+
+Every item must have:
+- "sentence"
+- "difficulty": 2
+- "verbal_structure"
+- "periphrasis_type"
+- "phrase_type"
+- "explanation"
+
+Allowed verbal_structure values:
+["Perifrasis verbal", "Locucion verbal", "Dos verbos"]
+
+Allowed periphrasis_type values:
+[
+  "No aplica",
+  "Modal obligativa",
+  "Modal de posibilidad",
+  "Aspectual ingresiva",
+  "Aspectual incoativa",
+  "Aspectual durativa",
+  "Aspectual terminativa",
+  "Aspectual reiterativa",
+  "Aspectual resultativa",
+  "Aspectual habitual"
+]
+
+Quality rules:
+- Use natural Spanish sentences.
+- Avoid duplicated verbs, sentence frames, and near-duplicates.
+- Make difficulty 2: medium length, clear but not trivial.
+- Include both infinitive, gerund, and participle periphrasis patterns where appropriate.
+- Include locutions that are genuinely lexicalized, not true periphrases.
+- Include "Dos verbos" cases where the two verbs are independent predicates, coordinated, juxtaposed, or in a subordinate construction.
+- No Markdown, no prose, no comments, no trailing commas.
+```
 
 ## Morfologia
 
