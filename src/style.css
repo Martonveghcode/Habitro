@@ -614,6 +614,18 @@ textarea:disabled {
   margin-top: var(--space-3);
 }
 
+.file-upload-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.file-upload-btn input {
+  position: absolute;
+  inset: 0;
+  opacity: 0;
+  cursor: pointer;
+}
+
 .inline-banner {
   margin-top: var(--space-4);
   border: 0;

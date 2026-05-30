@@ -14,6 +14,7 @@ import {
 } from "./data";
 import type {
   Difficulty,
+  ItemSource,
   MorfoAttempt,
   MorfoEvaluation,
   MorfoItem,
@@ -34,6 +35,9 @@ import type {
   SeSettings,
   SeStrategy,
   StorageState,
+  StoredMorfoItem,
+  StoredPeriphrasisItem,
+  StoredSeItem,
   SummaryRow,
 } from "./types";
 
@@ -66,6 +70,7 @@ function defaultSeSettings(): SeSettings {
   return {
     profileId: "alumno",
     modelName: DEFAULT_MODEL,
+    itemSource: "ai",
     difficulty: 2,
     personalized: true,
     batchSize: DEFAULT_PRACTICE_BATCH_SIZE,
@@ -82,6 +87,7 @@ function defaultMorfoSettings(): MorfoSettings {
   return {
     profileId: "alumno",
     modelName: DEFAULT_MODEL,
+    itemSource: "ai",
     difficulty: 2,
     personalized: true,
     batchSize: DEFAULT_PRACTICE_BATCH_SIZE,
@@ -96,6 +102,7 @@ function defaultPeriphrasisSettings(): PeriphrasisSettings {
   return {
     profileId: "alumno",
     modelName: DEFAULT_MODEL,
+    itemSource: "ai",
     difficulty: 2,
     personalized: true,
     batchSize: DEFAULT_PRACTICE_BATCH_SIZE,
@@ -104,6 +111,110 @@ function defaultPeriphrasisSettings(): PeriphrasisSettings {
     targetWeight: 40,
     normalWeight: 60,
     hideHistory: false,
+  };
+}
+
+function sanitizeItemSource(value: unknown): ItemSource {
+  return value === "manual" ? "manual" : "ai";
+}
+
+function sanitizeDifficulty(value: unknown, fallback: Difficulty = 2): Difficulty {
+  return value === 1 || value === 2 || value === 3 ? value : fallback;
+}
+
+function sanitizeStringList(value: unknown): string[] {
+  return Array.isArray(value) ? value.map((entry) => String(entry ?? "").trim()).filter(Boolean) : [];
+}
+
+function sanitizeStoredSeItem(item: unknown): StoredSeItem | null {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  const raw = item as Partial<StoredSeItem>;
+  const sentence = typeof raw.sentence === "string" ? raw.sentence.trim() : "";
+  const seValue = typeof raw.seValue === "string" ? raw.seValue.trim() : "";
+  const seFunction = typeof raw.seFunction === "string" ? raw.seFunction.trim() : "";
+  const verbalStructure = typeof raw.verbalStructure === "string" ? raw.verbalStructure.trim() : "";
+  const periphrasisType = typeof raw.periphrasisType === "string" ? raw.periphrasisType.trim() : "";
+  const phraseType = typeof raw.phraseType === "string" ? raw.phraseType.trim() : "";
+  const explanation = typeof raw.explanation === "string" ? raw.explanation.trim() : "";
+
+  if (!sentence || !seValue || !seFunction || !verbalStructure || !periphrasisType || !phraseType || !explanation) {
+    return null;
+  }
+
+  return {
+    sentence,
+    difficulty: sanitizeDifficulty(raw.difficulty),
+    seValue,
+    seFunction,
+    acceptedFunctions: sanitizeStringList(raw.acceptedFunctions).length > 0
+      ? sanitizeStringList(raw.acceptedFunctions)
+      : [seFunction],
+    verbalStructure,
+    periphrasisType,
+    phraseType,
+    explanation,
+  };
+}
+
+function sanitizeStoredPeriphrasisItem(item: unknown): StoredPeriphrasisItem | null {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  const raw = item as Partial<StoredPeriphrasisItem>;
+  const sentence = typeof raw.sentence === "string" ? raw.sentence.trim() : "";
+  const verbalStructure = typeof raw.verbalStructure === "string" ? raw.verbalStructure.trim() : "";
+  const periphrasisType = typeof raw.periphrasisType === "string" ? raw.periphrasisType.trim() : "";
+  const phraseType = typeof raw.phraseType === "string" ? raw.phraseType.trim() : "";
+  const explanation = typeof raw.explanation === "string" ? raw.explanation.trim() : "";
+
+  if (!sentence || !verbalStructure || !periphrasisType || !phraseType || !explanation) {
+    return null;
+  }
+
+  return {
+    sentence,
+    difficulty: sanitizeDifficulty(raw.difficulty),
+    verbalStructure,
+    periphrasisType,
+    phraseType,
+    explanation,
+  };
+}
+
+function sanitizeStoredMorfoItem(item: unknown): StoredMorfoItem | null {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  const raw = item as Partial<StoredMorfoItem>;
+  const word = typeof raw.word === "string" ? raw.word.trim() : "";
+  const wordType = typeof raw.wordType === "string" ? raw.wordType.trim() : "";
+  const lexeme = typeof raw.lexeme === "string" ? raw.lexeme.trim() : "";
+  const morphemes = sanitizeStringList(raw.morphemes);
+  const morphemeTypes = sanitizeStringList(raw.morphemeTypes);
+  const analysisType = typeof raw.analysisType === "string" ? raw.analysisType.trim() : "";
+  const explanation = typeof raw.explanation === "string" ? raw.explanation.trim() : "";
+
+  if (!word || !wordType || !lexeme || morphemes.length === 0 || morphemes.length !== morphemeTypes.length || !analysisType || !explanation) {
+    return null;
+  }
+
+  return {
+    word,
+    difficulty: sanitizeDifficulty(raw.difficulty),
+    wordType,
+    lexeme,
+    acceptedLexemes: sanitizeStringList(raw.acceptedLexemes).length > 0
+      ? sanitizeStringList(raw.acceptedLexemes)
+      : [lexeme],
+    morphemes,
+    morphemeTypes,
+    analysisType,
+    explanation,
   };
 }
 
@@ -184,6 +295,9 @@ export function createDefaultStorageState(): StorageState {
     seSettings: defaultSeSettings(),
     periphrasisSettings: defaultPeriphrasisSettings(),
     morfoSettings: defaultMorfoSettings(),
+    seQuestionBank: [],
+    periphrasisQuestionBank: [],
+    morfoQuestionBank: [],
     seAttempts: [],
     periphrasisAttempts: [],
     morfoAttempts: [],
@@ -211,6 +325,7 @@ export function loadStorageState(): StorageState {
       seSettings: {
         ...defaultSeSettings(),
         ...parsedSeSettings,
+        itemSource: sanitizeItemSource(parsedSeSettings.itemSource),
         focusValues: Array.isArray(parsedSeSettings.focusValues)
           ? parsedSeSettings.focusValues.filter((entry): entry is string => typeof entry === "string")
           : [],
@@ -225,6 +340,7 @@ export function loadStorageState(): StorageState {
       periphrasisSettings: {
         ...defaultPeriphrasisSettings(),
         ...parsedPeriphrasisSettings,
+        itemSource: sanitizeItemSource(parsedPeriphrasisSettings.itemSource),
         focusStructures: Array.isArray(parsedPeriphrasisSettings.focusStructures)
           ? parsedPeriphrasisSettings.focusStructures.filter((entry): entry is string => typeof entry === "string")
           : [],
@@ -236,11 +352,27 @@ export function loadStorageState(): StorageState {
       morfoSettings: {
         ...defaultMorfoSettings(),
         ...parsedMorfoSettings,
+        itemSource: sanitizeItemSource(parsedMorfoSettings.itemSource),
         focusWordTypes: Array.isArray(parsedMorfoSettings.focusWordTypes)
           ? parsedMorfoSettings.focusWordTypes.filter((entry): entry is string => typeof entry === "string")
           : [],
         batchSize: coercePracticeBatchSize(parsedMorfoSettings.batchSize),
       },
+      seQuestionBank: Array.isArray(parsed.seQuestionBank)
+        ? parsed.seQuestionBank
+            .map((item) => sanitizeStoredSeItem(item))
+            .filter((item): item is StoredSeItem => item !== null)
+        : [],
+      periphrasisQuestionBank: Array.isArray(parsed.periphrasisQuestionBank)
+        ? parsed.periphrasisQuestionBank
+            .map((item) => sanitizeStoredPeriphrasisItem(item))
+            .filter((item): item is StoredPeriphrasisItem => item !== null)
+        : [],
+      morfoQuestionBank: Array.isArray(parsed.morfoQuestionBank)
+        ? parsed.morfoQuestionBank
+            .map((item) => sanitizeStoredMorfoItem(item))
+            .filter((item): item is StoredMorfoItem => item !== null)
+        : [],
       seAttempts: Array.isArray(parsed.seAttempts)
         ? parsed.seAttempts.map((attempt) => sanitizeStoredSeAttempt(attempt)).filter((attempt): attempt is SeAttempt => attempt !== null)
         : [],
@@ -1009,6 +1141,174 @@ export function fallbackMorfoBatch(
     return {
       ...chosen,
       id: createId("morfo"),
+      mode: strategy.mode,
+    };
+  });
+}
+
+function preferDifficulty<T extends { difficulty: Difficulty }>(items: T[], difficulty: Difficulty): T[] {
+  const exact = items.filter((item) => item.difficulty === difficulty);
+  return exact.length > 0 ? exact : items;
+}
+
+function chooseManualSentenceItem<T extends { sentence: string }>(
+  pool: T[],
+  recentMemory: string[],
+  batchMemory: string[],
+): T | null {
+  if (pool.length === 0) {
+    return null;
+  }
+
+  const unusedInBatch = pool.filter((item) => isNovelSentence(item.sentence, batchMemory, 0.75));
+  const novel = unusedInBatch.filter((item) => isNovelSentence(item.sentence, recentMemory, 0.75));
+  const candidates = novel.length > 0 ? novel : unusedInBatch.length > 0 ? unusedInBatch : pool;
+  return randomItem(candidates);
+}
+
+function chooseManualWordItem<T extends { word: string }>(pool: T[], recentMemory: string[], batchMemory: string[]): T | null {
+  if (pool.length === 0) {
+    return null;
+  }
+
+  const unusedInBatch = pool.filter((item) => isNovelWord(item.word, batchMemory));
+  const novel = unusedInBatch.filter((item) => isNovelWord(item.word, recentMemory));
+  const candidates = novel.length > 0 ? novel : unusedInBatch.length > 0 ? unusedInBatch : pool;
+  return randomItem(candidates);
+}
+
+export function manualSeBatch(
+  difficulty: Difficulty,
+  strategies: SeStrategy[],
+  recentSentences: string[],
+  questionBank: StoredSeItem[],
+): Array<SeItem | null> {
+  const recentMemory = [...recentSentences];
+  const batchMemory: string[] = [];
+  const basePool = preferDifficulty(questionBank, difficulty);
+
+  return strategies.map((strategy) => {
+    let pool = [...basePool];
+    const targetValues = strategy.requiredValue
+      ? [strategy.requiredValue]
+      : strategy.focusValues.length > 0
+        ? strategy.focusValues
+        : strategy.targetValue
+          ? [strategy.targetValue]
+          : [];
+    if (targetValues.length > 0) {
+      const filtered = pool.filter((item) =>
+        targetValues.some((value) => normalizeTextToken(value) === normalizeTextToken(item.seValue)),
+      );
+      if (filtered.length > 0) {
+        pool = filtered;
+      }
+    }
+
+    const chosen = chooseManualSentenceItem(pool, recentMemory, batchMemory);
+    if (!chosen) {
+      return null;
+    }
+
+    recentMemory.push(chosen.sentence);
+    batchMemory.push(chosen.sentence);
+    return {
+      ...chosen,
+      id: createId("se_manual"),
+      mode: strategy.mode,
+    };
+  });
+}
+
+export function manualPeriphrasisBatch(
+  difficulty: Difficulty,
+  strategies: PeriphrasisStrategy[],
+  recentSentences: string[],
+  questionBank: StoredPeriphrasisItem[],
+): Array<PeriphrasisItem | null> {
+  const recentMemory = [...recentSentences];
+  const batchMemory: string[] = [];
+  const basePool = preferDifficulty(questionBank, difficulty);
+
+  return strategies.map((strategy) => {
+    let pool = [...basePool];
+    const targetStructures =
+      strategy.focusStructures.length > 0 ? strategy.focusStructures : strategy.targetStructure ? [strategy.targetStructure] : [];
+    if (targetStructures.length > 0) {
+      const filtered = pool.filter((item) =>
+        targetStructures.some((structure) => normalizeTextToken(structure) === normalizeTextToken(item.verbalStructure)),
+      );
+      if (filtered.length > 0) {
+        pool = filtered;
+      }
+    }
+    if (strategy.targetPeriphrasisType) {
+      const filtered = pool.filter(
+        (item) => normalizeTextToken(item.periphrasisType) === normalizeTextToken(strategy.targetPeriphrasisType),
+      );
+      if (filtered.length > 0) {
+        pool = filtered;
+      }
+    }
+
+    const chosen = chooseManualSentenceItem(pool, recentMemory, batchMemory);
+    if (!chosen) {
+      return null;
+    }
+
+    recentMemory.push(chosen.sentence);
+    batchMemory.push(chosen.sentence);
+    return {
+      ...chosen,
+      id: createId("perifrasis_manual"),
+      mode: strategy.mode,
+    };
+  });
+}
+
+export function manualMorfoBatch(
+  difficulty: Difficulty,
+  strategies: MorfoStrategy[],
+  recentWords: string[],
+  questionBank: StoredMorfoItem[],
+): Array<MorfoItem | null> {
+  const recentMemory = [...recentWords];
+  const batchMemory: string[] = [];
+  const basePool = preferDifficulty(questionBank, difficulty);
+
+  return strategies.map((strategy) => {
+    let pool = [...basePool];
+    const targetWordTypes =
+      strategy.focusWordTypes.length > 0 ? strategy.focusWordTypes : strategy.targetWordType ? [strategy.targetWordType] : [];
+    if (targetWordTypes.length > 0) {
+      const filtered = pool.filter((item) =>
+        targetWordTypes.some((wordType) => normalizeTextToken(wordType) === normalizeTextToken(item.wordType)),
+      );
+      if (filtered.length > 0) {
+        pool = filtered;
+      }
+    }
+    if (strategy.targetMorphemeType) {
+      const filtered = pool.filter((item) =>
+        item.morphemeTypes.some(
+          (morphemeType) => normalizeTextToken(morphemeType) === normalizeTextToken(strategy.targetMorphemeType),
+        ),
+      );
+      if (filtered.length > 0) {
+        pool = filtered;
+      }
+    }
+
+    const chosen = chooseManualWordItem(pool, recentMemory, batchMemory);
+    if (!chosen) {
+      return null;
+    }
+
+    recentMemory.push(chosen.word);
+    batchMemory.push(chosen.word);
+    return {
+      ...chosen,
+      id: createId("morfo_manual"),
       mode: strategy.mode,
     };
   });

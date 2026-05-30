@@ -1,6 +1,7 @@
 export type Difficulty = 1 | 2 | 3;
 
 export type Mode = "normal" | "personalizado_mixto" | "personalizado_objetivo" | "foco_usuario";
+export type ItemSource = "ai" | "manual";
 
 export interface ModelOption {
   label: string;
@@ -61,6 +62,10 @@ export interface MorfoItem {
   explanation: string;
   mode: Mode;
 }
+
+export type StoredSeItem = Omit<SeItem, "id" | "mode">;
+export type StoredPeriphrasisItem = Omit<PeriphrasisItem, "id" | "mode">;
+export type StoredMorfoItem = Omit<MorfoItem, "id" | "mode">;
 
 export interface SeAttempt {
   id: string;
@@ -133,6 +138,7 @@ export interface MorfoAttempt {
 export interface SeSettings {
   profileId: string;
   modelName: string;
+  itemSource: ItemSource;
   difficulty: Difficulty;
   personalized: boolean;
   batchSize: number;
@@ -147,6 +153,7 @@ export interface SeSettings {
 export interface PeriphrasisSettings {
   profileId: string;
   modelName: string;
+  itemSource: ItemSource;
   difficulty: Difficulty;
   personalized: boolean;
   batchSize: number;
@@ -160,6 +167,7 @@ export interface PeriphrasisSettings {
 export interface MorfoSettings {
   profileId: string;
   modelName: string;
+  itemSource: ItemSource;
   difficulty: Difficulty;
   personalized: boolean;
   batchSize: number;
@@ -175,6 +183,9 @@ export interface StorageState {
   seSettings: SeSettings;
   periphrasisSettings: PeriphrasisSettings;
   morfoSettings: MorfoSettings;
+  seQuestionBank: StoredSeItem[];
+  periphrasisQuestionBank: StoredPeriphrasisItem[];
+  morfoQuestionBank: StoredMorfoItem[];
   seAttempts: SeAttempt[];
   periphrasisAttempts: PeriphrasisAttempt[];
   morfoAttempts: MorfoAttempt[];

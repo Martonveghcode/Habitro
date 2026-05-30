@@ -34,6 +34,9 @@ import {
   makeMorfoAttempt,
   makePeriphrasisAttempt,
   makeSeAttempt,
+  manualMorfoBatch,
+  manualPeriphrasisBatch,
+  manualSeBatch,
   MAX_PRACTICE_BATCH_SIZE,
   MIN_PRACTICE_BATCH_SIZE,
   morfoLearningProfile,
@@ -53,6 +56,9 @@ import {
   requestMorfoQuestion,
   requestMorfoRecheck,
   requestPeriphrasisGeneration,
+  sanitizeUploadedMorfoItem,
+  sanitizeUploadedPeriphrasisItem,
+  sanitizeUploadedSeItem,
   requestSeGeneration,
   requestSeQuestion,
   requestSeRecheck,
@@ -63,6 +69,7 @@ import type {
   MorfoItem,
   MorfoSettings,
   MorfoStrategy,
+  ItemSource,
   PeriphrasisAttempt,
   PeriphrasisEvaluation,
   PeriphrasisItem,
@@ -77,6 +84,9 @@ import type {
   SeSettings,
   SeStrategy,
   StorageState,
+  StoredMorfoItem,
+  StoredPeriphrasisItem,
+  StoredSeItem,
   SummaryRow,
 } from "./types";
 
@@ -122,6 +132,10 @@ const SECTION_META: Record<SectionName, SectionMeta> = {
     theme: "dark",
   },
 };
+
+const SE_IMPORT_PLACEHOLDER = `{"items":[{"sentence":"Se venden pisos en este barrio.","difficulty":2,"se_value":"Pasiva refleja","se_function":"Marca de pasiva","accepted_functions":["Marca de pasiva","Sin funcion sintactica propia"],"verbal_structure":"Verbo simple","periphrasis_type":"No aplica","phrase_type":"Oracion simple pasiva refleja","explanation":"El verbo concuerda con el sujeto paciente 'pisos'."}]}`;
+const PERIPHRASIS_IMPORT_PLACEHOLDER = `{"items":[{"sentence":"Debes entregar el informe antes del viernes.","difficulty":2,"verbal_structure":"Perifrasis verbal","periphrasis_type":"Modal obligativa","phrase_type":"Oracion simple predicativa","explanation":"'Deber + infinitivo' expresa obligacion."}]}`;
+const MORFO_IMPORT_PLACEHOLDER = `{"items":[{"word":"desordenados","difficulty":2,"word_type":"Adjetivo","lexeme":"orden","accepted_lexemes":["orden"],"morphemes":["des","ad","o","s"],"morpheme_types":["Prefijo derivativo","Sufijo derivativo","Morfema flexivo nominal (genero)","Morfema flexivo nominal (numero)"],"analysis_type":"Adjetivo con derivacion y flexion","explanation":"Prefijo des- + lexema orden + sufijo -ad- + flexivos -o y -s."}]}`;
 
 function cx(...tokens: Array<string | false | null | undefined>): string {
   return tokens.filter(Boolean).join(" ");
@@ -338,6 +352,146 @@ function stripBaseLabels(customLabels: readonly string[], baseLabels: readonly s
   return customLabels.filter((label) => !hasLabel(baseLabels, label));
 }
 
+interface ImportResult {
+  saved: number;
+  rejected: number;
+  total: number;
+}
+
+function parseQuestionBankRecords(rawText: string): Array<Record<string, unknown>> {
+  const parsed = JSON.parse(rawText) as unknown;
+  const candidates =
+    Array.isArray(parsed)
+      ? parsed
+      : parsed && typeof parsed === "object" && Array.isArray((parsed as { items?: unknown }).items)
+        ? (parsed as { items: unknown[] }).items
+        : parsed && typeof parsed === "object"
+          ? [parsed]
+          : [];
+
+  return candidates.filter((item): item is Record<string, unknown> => Boolean(item) && typeof item === "object" && !Array.isArray(item));
+}
+
+function mergeQuestionBank<T>(existing: readonly T[], incoming: readonly T[], keyForItem: (item: T) => string): T[] {
+  const byKey = new Map<string, T>();
+  existing.forEach((item) => {
+    const key = keyForItem(item);
+    if (key) {
+      byKey.set(key, item);
+    }
+  });
+  incoming.forEach((item) => {
+    const key = keyForItem(item);
+    if (key) {
+      byKey.set(key, item);
+    }
+  });
+  return [...byKey.values()];
+}
+
+function SourceToggle({
+  source,
+  manualCount,
+  onChange,
+}: {
+  source: ItemSource;
+  manualCount: number;
+  onChange: (source: ItemSource) => void;
+}) {
+  return (
+    <div className="field-block">
+      <FieldLabel label="Fuente" />
+      <div className="chip-cloud">
+        <ChoicePill active={source === "ai"} label="Gemini/local" onClick={() => onChange("ai")} />
+        <ChoicePill active={source === "manual"} label={`Manual (${manualCount})`} onClick={() => onChange("manual")} />
+      </div>
+    </div>
+  );
+}
+
+function ManualBankPanel({
+  count,
+  onClear,
+  onImportText,
+  placeholder,
+}: {
+  count: number;
+  onClear: () => void;
+  onImportText: (rawText: string) => ImportResult;
+  placeholder: string;
+}) {
+  const [draft, setDraft] = useState("");
+  const [message, setMessage] = useState("");
+  const [tone, setTone] = useState<"info" | "warn">("info");
+
+  const importText = (rawText: string) => {
+    try {
+      const result = onImportText(rawText);
+      setMessage(`Guardados ${result.saved} validos. Ignorados ${result.rejected} de ${result.total}.`);
+      setTone(result.saved > 0 ? "info" : "warn");
+    } catch (error) {
+      setMessage(error instanceof Error ? error.message : "JSON no valido.");
+      setTone("warn");
+    }
+  };
+
+  return (
+    <details className="details-panel manual-bank-panel">
+      <summary>
+        <span>Banco manual</span>
+        <span>{count} guardados</span>
+      </summary>
+      <div className="details-content">
+        <div className="field-block">
+          <FieldLabel label="Importar JSON" />
+          <textarea
+            className="mono-input"
+            placeholder={placeholder}
+            spellCheck={false}
+            value={draft}
+            onChange={(event) => setDraft(event.target.value)}
+          />
+        </div>
+        <div className="button-row">
+          <button className="ghost-btn" disabled={!draft.trim()} type="button" onClick={() => importText(draft)}>
+            Importar pegado
+          </button>
+          <label className="ghost-btn file-upload-btn">
+            Subir JSON
+            <input
+              accept="application/json,.json"
+              type="file"
+              onChange={async (event) => {
+                const file = event.currentTarget.files?.[0];
+                if (!file) {
+                  return;
+                }
+                const text = await file.text();
+                setDraft(text);
+                importText(text);
+                event.currentTarget.value = "";
+              }}
+            />
+          </label>
+          <button
+            className="danger-btn"
+            disabled={count === 0}
+            type="button"
+            onClick={() => {
+              onClear();
+              setMessage("Banco vaciado.");
+              setTone("info");
+            }}
+          >
+            Vaciar banco
+          </button>
+        </div>
+        {message ? <div className={cx("inline-banner", tone === "warn" && "warn")}>{message}</div> : null}
+      </div>
+    </details>
+  );
+}
+
 function GeminiKeyPanel({
   apiKey,
   onApiKeyChange,
@@ -465,6 +619,18 @@ export function NetlifyPracticeApp() {
     setStorageState((current) => ({ ...current, periphrasisAttempts: next }));
   };
 
+  const updateSeQuestionBank = (next: StoredSeItem[]) => {
+    setStorageState((current) => ({ ...current, seQuestionBank: next }));
+  };
+
+  const updatePeriphrasisQuestionBank = (next: StoredPeriphrasisItem[]) => {
+    setStorageState((current) => ({ ...current, periphrasisQuestionBank: next }));
+  };
+
+  const updateMorfoQuestionBank = (next: StoredMorfoItem[]) => {
+    setStorageState((current) => ({ ...current, morfoQuestionBank: next }));
+  };
+
   const updateGeminiApiKey = (next: string) => {
     setStorageState((current) => ({ ...current, geminiApiKey: next }));
   };
@@ -542,30 +708,36 @@ export function NetlifyPracticeApp() {
               page={sePage}
               settings={storageState.seSettings}
               attempts={storageState.seAttempts}
+              questionBank={storageState.seQuestionBank}
               apiKey={storageState.geminiApiKey}
               onApiKeyChange={updateGeminiApiKey}
               onSettingsChange={updateSeSettings}
               onAttemptsChange={updateSeAttempts}
+              onQuestionBankChange={updateSeQuestionBank}
             />
             <PeriphrasisWorkspace
               active={activeSection === "perifrasis"}
               page={periphrasisPage}
               settings={storageState.periphrasisSettings}
               attempts={storageState.periphrasisAttempts}
+              questionBank={storageState.periphrasisQuestionBank}
               apiKey={storageState.geminiApiKey}
               onApiKeyChange={updateGeminiApiKey}
               onSettingsChange={updatePeriphrasisSettings}
               onAttemptsChange={updatePeriphrasisAttempts}
+              onQuestionBankChange={updatePeriphrasisQuestionBank}
             />
             <MorfoWorkspace
               active={activeSection === "morfologia"}
               page={morfoPage}
               settings={storageState.morfoSettings}
               attempts={storageState.morfoAttempts}
+              questionBank={storageState.morfoQuestionBank}
               apiKey={storageState.geminiApiKey}
               onApiKeyChange={updateGeminiApiKey}
               onSettingsChange={updateMorfoSettings}
               onAttemptsChange={updateMorfoAttempts}
+              onQuestionBankChange={updateMorfoQuestionBank}
             />
           </main>
         </section>
@@ -579,19 +751,23 @@ function SeWorkspace({
   page,
   settings,
   attempts,
+  questionBank,
   apiKey,
   onApiKeyChange,
   onSettingsChange,
   onAttemptsChange,
+  onQuestionBankChange,
 }: {
   active: boolean;
   page: PageName;
   settings: SeSettings;
   attempts: SeAttempt[];
+  questionBank: StoredSeItem[];
   apiKey: string;
   onApiKeyChange: (value: string) => void;
   onSettingsChange: (settings: SeSettings) => void;
   onAttemptsChange: (attempts: SeAttempt[]) => void;
+  onQuestionBankChange: (items: StoredSeItem[]) => void;
 }) {
   const profile = useMemo(() => seLearningProfile(attempts, settings.profileId), [attempts, settings.profileId]);
   const profileAttempts = useMemo(
@@ -681,6 +857,32 @@ function SeWorkspace({
     setQueue([]);
   };
 
+  const updateItemSource = (itemSource: ItemSource) => {
+    onSettingsChange({ ...settings, itemSource });
+    setQueue([]);
+  };
+
+  const importSeQuestionBank = (rawText: string): ImportResult => {
+    const records = parseQuestionBankRecords(rawText);
+    const validItems = records
+      .map((record) =>
+        sanitizeUploadedSeItem(record, settings.difficulty, {
+          allowedValues: availableSeValues,
+          allowedFunctions: [...SE_FUNCTIONS],
+          allowedVerbalStructures: [...SE_VERBAL_STRUCTURES],
+          allowedPeriphrasisTypes: [...SE_PERIPHRASIS_TYPES],
+        }),
+      )
+      .filter((item): item is StoredSeItem => item !== null);
+    const nextBank = mergeQuestionBank(questionBank, validItems, (item) => normalizeTextToken(item.sentence));
+    onQuestionBankChange(nextBank);
+    return {
+      saved: validItems.length,
+      rejected: records.length - validItems.length,
+      total: records.length,
+    };
+  };
+
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
@@ -746,46 +948,54 @@ function SeWorkspace({
           prepared[slotIndex] = "id" in candidate ? candidate : { ...candidate, id: createId("se") };
         };
 
-        try {
-          const remoteItems = await requestSeGeneration({
-            apiKey,
-            modelName: settings.modelName,
-            difficulty: settings.difficulty,
-            strategies,
-            profile,
-            recentSentences,
-            recentLabels,
-            allowedValues: availableSeValues,
-            allowedFunctions: [...SE_FUNCTIONS],
-            allowedVerbalStructures: [...SE_VERBAL_STRUCTURES],
-            allowedPeriphrasisTypes: [...SE_PERIPHRASIS_TYPES],
-          });
-          strategies.forEach((_, index) => {
-            assignCandidate(index, remoteItems[index] ?? null);
-            assignCandidate(index, fallbackItems[index] ?? null);
-          });
-          const remoteValidCount = remoteItems.filter((item) => item !== null).length;
-          setStatusNote(remoteValidCount > 0 ? "" : "Gemini no devolvio valores validos.");
-          setStatusTone(remoteValidCount > 0 ? "info" : "warn");
-        } catch (error) {
-          fallbackItems.forEach((item, index) => assignCandidate(index, item));
-          setStatusNote(
-            customValuePlanned
-              ? "Los valores personalizados necesitan Gemini."
-              : error instanceof Error
-                ? `${error.message} Banco local.`
-                : "Banco local.",
-          );
-          setStatusTone("warn");
-        }
+        if (settings.itemSource === "manual") {
+          const manualItems = manualSeBatch(settings.difficulty, strategies, recentSentences, questionBank);
+          manualItems.forEach((item, index) => assignCandidate(index, item));
+          const manualValidCount = manualItems.filter((item) => item !== null).length;
+          setStatusNote(manualValidCount > 0 ? "" : "Banco manual sin items validos para esta seccion.");
+          setStatusTone(manualValidCount > 0 ? "info" : "warn");
+        } else {
+          try {
+            const remoteItems = await requestSeGeneration({
+              apiKey,
+              modelName: settings.modelName,
+              difficulty: settings.difficulty,
+              strategies,
+              profile,
+              recentSentences,
+              recentLabels,
+              allowedValues: availableSeValues,
+              allowedFunctions: [...SE_FUNCTIONS],
+              allowedVerbalStructures: [...SE_VERBAL_STRUCTURES],
+              allowedPeriphrasisTypes: [...SE_PERIPHRASIS_TYPES],
+            });
+            strategies.forEach((_, index) => {
+              assignCandidate(index, remoteItems[index] ?? null);
+              assignCandidate(index, fallbackItems[index] ?? null);
+            });
+            const remoteValidCount = remoteItems.filter((item) => item !== null).length;
+            setStatusNote(remoteValidCount > 0 ? "" : "Gemini no devolvio valores validos.");
+            setStatusTone(remoteValidCount > 0 ? "info" : "warn");
+          } catch (error) {
+            fallbackItems.forEach((item, index) => assignCandidate(index, item));
+            setStatusNote(
+              customValuePlanned
+                ? "Los valores personalizados necesitan Gemini."
+                : error instanceof Error
+                  ? `${error.message} Banco local.`
+                  : "Banco local.",
+            );
+            setStatusTone("warn");
+          }
 
-        while (prepared.some((item) => item === null)) {
-          const extraFallback = fallbackSeBatch(settings.difficulty, strategies, recentSentences);
-          const beforeMissing = prepared.filter((item) => item === null).length;
-          extraFallback.forEach((item, index) => assignCandidate(index, item));
-          const afterMissing = prepared.filter((item) => item === null).length;
-          if (afterMissing === beforeMissing) {
-            break;
+          while (prepared.some((item) => item === null)) {
+            const extraFallback = fallbackSeBatch(settings.difficulty, strategies, recentSentences);
+            const beforeMissing = prepared.filter((item) => item === null).length;
+            extraFallback.forEach((item, index) => assignCandidate(index, item));
+            const afterMissing = prepared.filter((item) => item === null).length;
+            if (afterMissing === beforeMissing) {
+              break;
+            }
           }
         }
 
@@ -953,6 +1163,15 @@ function SeWorkspace({
             <BatchSizeControl
               value={settings.batchSize}
               onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+            />
+
+            <SourceToggle source={settings.itemSource} manualCount={questionBank.length} onChange={updateItemSource} />
+
+            <ManualBankPanel
+              count={questionBank.length}
+              placeholder={SE_IMPORT_PLACEHOLDER}
+              onClear={() => onQuestionBankChange([])}
+              onImportText={importSeQuestionBank}
             />
 
             <div className="field-block">
@@ -1316,19 +1535,23 @@ function PeriphrasisWorkspace({
   page,
   settings,
   attempts,
+  questionBank,
   apiKey,
   onApiKeyChange,
   onSettingsChange,
   onAttemptsChange,
+  onQuestionBankChange,
 }: {
   active: boolean;
   page: PageName;
   settings: PeriphrasisSettings;
   attempts: PeriphrasisAttempt[];
+  questionBank: StoredPeriphrasisItem[];
   apiKey: string;
   onApiKeyChange: (value: string) => void;
   onSettingsChange: (settings: PeriphrasisSettings) => void;
   onAttemptsChange: (attempts: PeriphrasisAttempt[]) => void;
+  onQuestionBankChange: (items: StoredPeriphrasisItem[]) => void;
 }) {
   const profile = useMemo(() => periphrasisLearningProfile(attempts, settings.profileId), [attempts, settings.profileId]);
   const profileAttempts = useMemo(
@@ -1410,6 +1633,30 @@ function PeriphrasisWorkspace({
     setCustomTypeInput("");
   };
 
+  const updateItemSource = (itemSource: ItemSource) => {
+    onSettingsChange({ ...settings, itemSource });
+    setQueue([]);
+  };
+
+  const importPeriphrasisQuestionBank = (rawText: string): ImportResult => {
+    const records = parseQuestionBankRecords(rawText);
+    const validItems = records
+      .map((record) =>
+        sanitizeUploadedPeriphrasisItem(record, settings.difficulty, {
+          allowedStructures: [...PERIPHRASIS_STRUCTURES],
+          allowedPeriphrasisTypes: availablePeriphrasisTypes,
+        }),
+      )
+      .filter((item): item is StoredPeriphrasisItem => item !== null);
+    const nextBank = mergeQuestionBank(questionBank, validItems, (item) => normalizeTextToken(item.sentence));
+    onQuestionBankChange(nextBank);
+    return {
+      saved: validItems.length,
+      rejected: records.length - validItems.length,
+      total: records.length,
+    };
+  };
+
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
@@ -1454,40 +1701,47 @@ function PeriphrasisWorkspace({
           prepared[slotIndex] = "id" in candidate ? candidate : { ...candidate, id: createId("perifrasis") };
         };
 
-        try {
-          const remoteItems = await requestPeriphrasisGeneration({
-            apiKey,
-            modelName: settings.modelName,
-            difficulty: settings.difficulty,
-            strategies,
-            profile,
-            recentSentences,
-            recentLabels,
-            allowedStructures: [...PERIPHRASIS_STRUCTURES],
-            allowedPeriphrasisTypes: availablePeriphrasisTypes,
-          });
-          strategies.forEach((_, index) => {
-            assignCandidate(index, remoteItems[index] ?? null);
-            assignCandidate(index, fallbackItems[index] ?? null);
-          });
-          const remoteValidCount = remoteItems.filter((item) => item !== null).length;
-          setStatusNote(remoteValidCount > 0 ? "" : "Gemini no devolvio items validos.");
-        } catch (error) {
-          fallbackItems.forEach((item, index) => assignCandidate(index, item));
-          setStatusNote(error instanceof Error ? `${error.message} Banco local.` : "Banco local.");
-        }
+        if (settings.itemSource === "manual") {
+          const manualItems = manualPeriphrasisBatch(settings.difficulty, strategies, recentSentences, questionBank);
+          manualItems.forEach((item, index) => assignCandidate(index, item));
+          const manualValidCount = manualItems.filter((item) => item !== null).length;
+          setStatusNote(manualValidCount > 0 ? "" : "Banco manual sin items validos para esta seccion.");
+        } else {
+          try {
+            const remoteItems = await requestPeriphrasisGeneration({
+              apiKey,
+              modelName: settings.modelName,
+              difficulty: settings.difficulty,
+              strategies,
+              profile,
+              recentSentences,
+              recentLabels,
+              allowedStructures: [...PERIPHRASIS_STRUCTURES],
+              allowedPeriphrasisTypes: availablePeriphrasisTypes,
+            });
+            strategies.forEach((_, index) => {
+              assignCandidate(index, remoteItems[index] ?? null);
+              assignCandidate(index, fallbackItems[index] ?? null);
+            });
+            const remoteValidCount = remoteItems.filter((item) => item !== null).length;
+            setStatusNote(remoteValidCount > 0 ? "" : "Gemini no devolvio items validos.");
+          } catch (error) {
+            fallbackItems.forEach((item, index) => assignCandidate(index, item));
+            setStatusNote(error instanceof Error ? `${error.message} Banco local.` : "Banco local.");
+          }
 
-        while (prepared.some((item) => item === null)) {
-          const extraRecentSentences = [
-            ...recentSentences,
-            ...prepared.filter((item): item is PeriphrasisItem => item !== null).map((item) => item.sentence),
-          ];
-          const extraFallback = fallbackPeriphrasisBatch(settings.difficulty, strategies, extraRecentSentences);
-          const beforeMissing = prepared.filter((item) => item === null).length;
-          extraFallback.forEach((item, index) => assignCandidate(index, item));
-          const afterMissing = prepared.filter((item) => item === null).length;
-          if (afterMissing === beforeMissing) {
-            break;
+          while (prepared.some((item) => item === null)) {
+            const extraRecentSentences = [
+              ...recentSentences,
+              ...prepared.filter((item): item is PeriphrasisItem => item !== null).map((item) => item.sentence),
+            ];
+            const extraFallback = fallbackPeriphrasisBatch(settings.difficulty, strategies, extraRecentSentences);
+            const beforeMissing = prepared.filter((item) => item === null).length;
+            extraFallback.forEach((item, index) => assignCandidate(index, item));
+            const afterMissing = prepared.filter((item) => item === null).length;
+            if (afterMissing === beforeMissing) {
+              break;
+            }
           }
         }
 
@@ -1567,6 +1821,15 @@ function PeriphrasisWorkspace({
             <BatchSizeControl
               value={settings.batchSize}
               onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+            />
+
+            <SourceToggle source={settings.itemSource} manualCount={questionBank.length} onChange={updateItemSource} />
+
+            <ManualBankPanel
+              count={questionBank.length}
+              placeholder={PERIPHRASIS_IMPORT_PLACEHOLDER}
+              onClear={() => onQuestionBankChange([])}
+              onImportText={importPeriphrasisQuestionBank}
             />
 
             <div className="field-block">
@@ -1904,19 +2167,23 @@ function MorfoWorkspace({
   page,
   settings,
   attempts,
+  questionBank,
   apiKey,
   onApiKeyChange,
   onSettingsChange,
   onAttemptsChange,
+  onQuestionBankChange,
 }: {
   active: boolean;
   page: PageName;
   settings: MorfoSettings;
   attempts: MorfoAttempt[];
+  questionBank: StoredMorfoItem[];
   apiKey: string;
   onApiKeyChange: (value: string) => void;
   onSettingsChange: (settings: MorfoSettings) => void;
   onAttemptsChange: (attempts: MorfoAttempt[]) => void;
+  onQuestionBankChange: (items: StoredMorfoItem[]) => void;
 }) {
   const profile = useMemo(() => morfoLearningProfile(attempts, settings.profileId), [attempts, settings.profileId]);
   const profileAttempts = useMemo(
@@ -1989,6 +2256,25 @@ function MorfoWorkspace({
     onSettingsChange({ ...settings, focusWordTypes: nextFocusWordTypes });
   };
 
+  const updateItemSource = (itemSource: ItemSource) => {
+    onSettingsChange({ ...settings, itemSource });
+    setQueue([]);
+  };
+
+  const importMorfoQuestionBank = (rawText: string): ImportResult => {
+    const records = parseQuestionBankRecords(rawText);
+    const validItems = records
+      .map((record) => sanitizeUploadedMorfoItem(record, settings.difficulty))
+      .filter((item): item is StoredMorfoItem => item !== null);
+    const nextBank = mergeQuestionBank(questionBank, validItems, (item) => normalizeTextToken(item.word));
+    onQuestionBankChange(nextBank);
+    return {
+      saved: validItems.length,
+      rejected: records.length - validItems.length,
+      total: records.length,
+    };
+  };
+
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
@@ -2031,32 +2317,44 @@ function MorfoWorkspace({
           prepared.push("id" in candidate ? candidate : { ...candidate, id: createId("morfo") });
         };
 
-        try {
-          const remoteItems = await requestMorfoGeneration({
-            apiKey,
-            modelName: settings.modelName,
-            difficulty: settings.difficulty,
-            strategies,
-            profile,
-            recentWords,
-            recentLabels,
+        if (settings.itemSource === "manual") {
+          const manualItems = manualMorfoBatch(settings.difficulty, strategies, recentWords, questionBank);
+          manualItems.forEach((item) => {
+            if (item) {
+              pushCandidate(item);
+            }
           });
-          remoteItems.forEach(pushCandidate);
-          fallbackItems.forEach(pushCandidate);
-          setStatusNote(remoteItems.length > 0 ? "" : "Gemini no devolvio items validos.");
-          setStatusTone(remoteItems.length > 0 ? "info" : "warn");
-        } catch (error) {
-          fallbackItems.forEach(pushCandidate);
-          setStatusNote(error instanceof Error ? `${error.message} Banco local.` : "Banco local.");
-          setStatusTone("warn");
-        }
+          const manualValidCount = manualItems.filter((item) => item !== null).length;
+          setStatusNote(manualValidCount > 0 ? "" : "Banco manual sin items validos para esta seccion.");
+          setStatusTone(manualValidCount > 0 ? "info" : "warn");
+        } else {
+          try {
+            const remoteItems = await requestMorfoGeneration({
+              apiKey,
+              modelName: settings.modelName,
+              difficulty: settings.difficulty,
+              strategies,
+              profile,
+              recentWords,
+              recentLabels,
+            });
+            remoteItems.forEach(pushCandidate);
+            fallbackItems.forEach(pushCandidate);
+            setStatusNote(remoteItems.length > 0 ? "" : "Gemini no devolvio items validos.");
+            setStatusTone(remoteItems.length > 0 ? "info" : "warn");
+          } catch (error) {
+            fallbackItems.forEach(pushCandidate);
+            setStatusNote(error instanceof Error ? `${error.message} Banco local.` : "Banco local.");
+            setStatusTone("warn");
+          }
 
-        while (prepared.length < batchSize) {
-          const extraFallback = fallbackMorfoBatch(settings.difficulty, strategies, recentWords);
-          const beforeLength = prepared.length;
-          extraFallback.forEach(pushCandidate);
-          if (prepared.length === beforeLength) {
-            break;
+          while (prepared.length < batchSize) {
+            const extraFallback = fallbackMorfoBatch(settings.difficulty, strategies, recentWords);
+            const beforeLength = prepared.length;
+            extraFallback.forEach(pushCandidate);
+            if (prepared.length === beforeLength) {
+              break;
+            }
           }
         }
 
@@ -2214,6 +2512,15 @@ function MorfoWorkspace({
             <BatchSizeControl
               value={settings.batchSize}
               onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+            />
+
+            <SourceToggle source={settings.itemSource} manualCount={questionBank.length} onChange={updateItemSource} />
+
+            <ManualBankPanel
+              count={questionBank.length}
+              placeholder={MORFO_IMPORT_PLACEHOLDER}
+              onClear={() => onQuestionBankChange([])}
+              onImportText={importMorfoQuestionBank}
             />
 
             <div className="field-block">

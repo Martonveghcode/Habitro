@@ -9,6 +9,7 @@ import {
   normalizeVerbalStructureLabel,
 } from "./logic";
 import type {
+  Difficulty,
   MorfoItem,
   MorfoStrategy,
   PeriphrasisItem,
@@ -253,6 +254,114 @@ function sanitizeMorfoItem(raw: Record<string, unknown>, strategy: MorfoStrategy
     explanation,
     mode: strategy.mode,
   };
+}
+
+function uploadedPayload(raw: Record<string, unknown>, fallbackDifficulty: Difficulty): Record<string, unknown> {
+  return raw.difficulty == null ? { ...raw, difficulty: fallbackDifficulty } : raw;
+}
+
+function seAcceptedFunctionsAreAllowed(item: Omit<SeItem, "id">, allowedFunctions: readonly string[]): boolean {
+  return item.acceptedFunctions.every((entry) => allowedFunctions.includes(normalizeFunctionLabel(entry)));
+}
+
+function periphrasisTypeMatchesStructure(item: Pick<PeriphrasisItem, "verbalStructure" | "periphrasisType">): boolean {
+  const isPeriphrasis = normalizeTextToken(item.verbalStructure) === normalizeTextToken("Perifrasis verbal");
+  const isNoAplica = normalizeTextToken(item.periphrasisType) === normalizeTextToken("No aplica");
+  return isPeriphrasis ? !isNoAplica : isNoAplica;
+}
+
+export function sanitizeUploadedSeItem(
+  raw: Record<string, unknown>,
+  fallbackDifficulty: Difficulty,
+  options: {
+    allowedValues: readonly string[];
+    allowedFunctions: readonly string[];
+    allowedVerbalStructures: readonly string[];
+    allowedPeriphrasisTypes: readonly string[];
+  },
+): Omit<SeItem, "id" | "mode"> | null {
+  const item = sanitizeSeItem(
+    uploadedPayload(raw, fallbackDifficulty),
+    {
+      mode: "normal",
+      targeted: false,
+      focusValues: [],
+      requiredValue: "",
+      targetValue: "",
+      targetFunction: "",
+      ratioHint: "",
+    },
+    options,
+  );
+
+  if (
+    !item ||
+    !options.allowedValues.includes(item.seValue) ||
+    !options.allowedFunctions.includes(item.seFunction) ||
+    !options.allowedVerbalStructures.includes(item.verbalStructure) ||
+    !options.allowedPeriphrasisTypes.includes(item.periphrasisType) ||
+    !seAcceptedFunctionsAreAllowed(item, options.allowedFunctions)
+  ) {
+    return null;
+  }
+
+  const { mode: _mode, ...stored } = item;
+  return stored;
+}
+
+export function sanitizeUploadedPeriphrasisItem(
+  raw: Record<string, unknown>,
+  fallbackDifficulty: Difficulty,
+  options: {
+    allowedStructures: readonly string[];
+    allowedPeriphrasisTypes: readonly string[];
+  },
+): Omit<PeriphrasisItem, "id" | "mode"> | null {
+  const item = sanitizePeriphrasisItem(
+    uploadedPayload(raw, fallbackDifficulty),
+    {
+      mode: "normal",
+      targeted: false,
+      focusStructures: [],
+      targetStructure: "",
+      targetPeriphrasisType: "",
+      ratioHint: "",
+    },
+    options,
+  );
+
+  if (
+    !item ||
+    !options.allowedStructures.includes(item.verbalStructure) ||
+    !options.allowedPeriphrasisTypes.includes(item.periphrasisType) ||
+    !periphrasisTypeMatchesStructure(item)
+  ) {
+    return null;
+  }
+
+  const { mode: _mode, ...stored } = item;
+  return stored;
+}
+
+export function sanitizeUploadedMorfoItem(
+  raw: Record<string, unknown>,
+  fallbackDifficulty: Difficulty,
+): Omit<MorfoItem, "id" | "mode"> | null {
+  const item = sanitizeMorfoItem(uploadedPayload(raw, fallbackDifficulty), {
+    mode: "normal",
+    targeted: false,
+    focusWordTypes: [],
+    targetWordType: "",
+    targetMorphemeType: "",
+    ratioHint: "",
+  });
+
+  if (!item) {
+    return null;
+  }
+
+  const { mode: _mode, ...stored } = item;
+  return stored;
 }
 
 export async function requestSeGeneration(input: {
