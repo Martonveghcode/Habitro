@@ -37,7 +37,7 @@ export function AuthGate({ children }: AuthGateProps) {
   if (!user) {
     return (
       <div className="centered-shell">
-        <h1 className="title">Sintaxis WebApp</h1>
+        <h1 className="title">Habitro</h1>
         <p className="muted">No hay sesion activa. Para MVP puedes entrar con sesion anonima.</p>
         <button className="primary-btn" type="button" onClick={handleAnonymousSignIn}>
           Continuar

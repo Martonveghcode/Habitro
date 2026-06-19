@@ -63,9 +63,26 @@ export interface MorfoItem {
   mode: Mode;
 }
 
+export interface SintaxisItem {
+  id: string;
+  phrase: string;
+  difficulty: Difficulty;
+  correction: string;
+  mode: Mode;
+}
+
+export interface DerivativeItem {
+  id: string;
+  functionText: string;
+  derivative: string;
+  mode: Mode;
+}
+
 export type StoredSeItem = Omit<SeItem, "id" | "mode">;
 export type StoredPeriphrasisItem = Omit<PeriphrasisItem, "id" | "mode">;
 export type StoredMorfoItem = Omit<MorfoItem, "id" | "mode">;
+export type StoredSintaxisItem = Omit<SintaxisItem, "id" | "mode">;
+export type StoredDerivativeItem = Omit<DerivativeItem, "id" | "mode">;
 
 export interface SeAttempt {
   id: string;
@@ -135,6 +152,26 @@ export interface MorfoAttempt {
   mode: Mode;
 }
 
+export interface SintaxisAttempt {
+  id: string;
+  profileId: string;
+  createdAt: string;
+  difficulty: Difficulty;
+  phrase: string;
+  userAnswer: string;
+  correction: string;
+  mode: Mode;
+}
+
+export interface DerivativeAttempt {
+  id: string;
+  profileId: string;
+  createdAt: string;
+  functionText: string;
+  derivative: string;
+  mode: Mode;
+}
+
 export interface SeSettings {
   profileId: string;
   modelName: string;
@@ -177,18 +214,41 @@ export interface MorfoSettings {
   hideHistory: boolean;
 }
 
+export interface SintaxisSettings {
+  profileId: string;
+  itemSource: ItemSource;
+  difficulty: Difficulty;
+  batchSize: number;
+  randomizeOrder: boolean;
+  hideHistory: boolean;
+}
+
+export interface DerivativeSettings {
+  profileId: string;
+  itemSource: ItemSource;
+  batchSize: number;
+  randomizeOrder: boolean;
+  hideHistory: boolean;
+}
+
 export interface StorageState {
   version: 1;
   geminiApiKey: string;
   seSettings: SeSettings;
   periphrasisSettings: PeriphrasisSettings;
   morfoSettings: MorfoSettings;
+  sintaxisSettings: SintaxisSettings;
+  derivativeSettings: DerivativeSettings;
   seQuestionBank: StoredSeItem[];
   periphrasisQuestionBank: StoredPeriphrasisItem[];
   morfoQuestionBank: StoredMorfoItem[];
+  sintaxisQuestionBank: StoredSintaxisItem[];
+  derivativeQuestionBank: StoredDerivativeItem[];
   seAttempts: SeAttempt[];
   periphrasisAttempts: PeriphrasisAttempt[];
   morfoAttempts: MorfoAttempt[];
+  sintaxisAttempts: SintaxisAttempt[];
+  derivativeAttempts: DerivativeAttempt[];
 }
 
 export interface SeProfile {

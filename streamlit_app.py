@@ -1697,7 +1697,7 @@ def render_settings_page() -> None:
 
 
 def main() -> None:
-    st.set_page_config(page_title="Sintaxis WebApp", page_icon="se", layout="wide")
+    st.set_page_config(page_title="Habitro", page_icon="se", layout="wide")
     st.markdown(CSS, unsafe_allow_html=True)
 
     init_db()

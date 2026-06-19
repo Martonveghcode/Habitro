@@ -9,6 +9,7 @@ import {
   normalizeVerbalStructureLabel,
 } from "./logic";
 import type {
+  DerivativeItem,
   Difficulty,
   MorfoItem,
   MorfoStrategy,
@@ -19,6 +20,7 @@ import type {
   RecheckResultSe,
   SeItem,
   SeStrategy,
+  SintaxisItem,
 } from "./types";
 
 async function postAi<T>(body: unknown, apiKey?: string): Promise<T> {
@@ -362,6 +364,49 @@ export function sanitizeUploadedMorfoItem(
 
   const { mode: _mode, ...stored } = item;
   return stored;
+}
+
+export function sanitizeUploadedSintaxisItem(
+  raw: Record<string, unknown>,
+  fallbackDifficulty: Difficulty,
+): Omit<SintaxisItem, "id" | "mode"> | null {
+  const payload = uploadedPayload(raw, fallbackDifficulty);
+  const phrase = String(payload.phrase ?? payload.sentence ?? payload.frase ?? "").trim();
+  const correction = String(
+    payload.correction ?? payload.correctionMarkdown ?? payload.correction_markdown ?? payload.correccion ?? "",
+  ).trim();
+  const difficulty = Number(payload.difficulty ?? 0) as Difficulty;
+
+  if (!phrase || !correction || (difficulty !== 1 && difficulty !== 2 && difficulty !== 3)) {
+    return null;
+  }
+
+  return {
+    phrase,
+    difficulty,
+    correction,
+  };
+}
+
+export function sanitizeUploadedDerivativeItem(raw: Record<string, unknown>): Omit<DerivativeItem, "id" | "mode"> | null {
+  const functionText = String(
+    raw.functionText ??
+      raw.function ??
+      raw.function_to_deriv ??
+      raw.functionToDeriv ??
+      raw.funcion ??
+      "",
+  ).trim();
+  const derivative = String(raw.derivative ?? raw.answer ?? raw.derivada ?? "").trim();
+
+  if (!functionText || !derivative) {
+    return null;
+  }
+
+  return {
+    functionText,
+    derivative,
+  };
 }
 
 export async function requestSeGeneration(input: {

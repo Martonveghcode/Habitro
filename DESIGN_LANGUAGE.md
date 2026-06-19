@@ -1,4 +1,4 @@
-# Sintaxis WebApp Design Language
+# Habitro Design Language
 
 ## 1. Direction
 

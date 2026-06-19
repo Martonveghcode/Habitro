@@ -14,6 +14,9 @@ import {
 } from "./data";
 import type {
   Difficulty,
+  DerivativeAttempt,
+  DerivativeItem,
+  DerivativeSettings,
   ItemSource,
   MorfoAttempt,
   MorfoEvaluation,
@@ -34,10 +37,15 @@ import type {
   SeProfile,
   SeSettings,
   SeStrategy,
+  SintaxisAttempt,
+  SintaxisItem,
+  SintaxisSettings,
   StorageState,
+  StoredDerivativeItem,
   StoredMorfoItem,
   StoredPeriphrasisItem,
   StoredSeItem,
+  StoredSintaxisItem,
   SummaryRow,
 } from "./types";
 
@@ -110,6 +118,27 @@ function defaultPeriphrasisSettings(): PeriphrasisSettings {
     customPeriphrasisTypes: [],
     targetWeight: 40,
     normalWeight: 60,
+    hideHistory: false,
+  };
+}
+
+function defaultSintaxisSettings(): SintaxisSettings {
+  return {
+    profileId: "alumno",
+    itemSource: "manual",
+    difficulty: 2,
+    batchSize: DEFAULT_PRACTICE_BATCH_SIZE,
+    randomizeOrder: true,
+    hideHistory: false,
+  };
+}
+
+function defaultDerivativeSettings(): DerivativeSettings {
+  return {
+    profileId: "alumno",
+    itemSource: "manual",
+    batchSize: DEFAULT_PRACTICE_BATCH_SIZE,
+    randomizeOrder: true,
     hideHistory: false,
   };
 }
@@ -218,6 +247,62 @@ function sanitizeStoredMorfoItem(item: unknown): StoredMorfoItem | null {
   };
 }
 
+function sanitizeStoredSintaxisItem(item: unknown): StoredSintaxisItem | null {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  const raw = item as Record<string, unknown>;
+  const phrase = String(raw.phrase ?? raw.sentence ?? raw.frase ?? "").trim();
+  const correction = String(
+    raw.correction ?? raw.correctionMarkdown ?? raw.correction_markdown ?? raw.correccion ?? "",
+  ).trim();
+
+  if (!phrase || !correction) {
+    return null;
+  }
+
+  return {
+    phrase,
+    difficulty: sanitizeDifficulty(raw.difficulty),
+    correction,
+  };
+}
+
+function derivativeFunctionFromRecord(raw: Record<string, unknown>): string {
+  return String(
+    raw.functionText ??
+      raw.function ??
+      raw.function_to_deriv ??
+      raw.functionToDeriv ??
+      raw.funcion ??
+      "",
+  ).trim();
+}
+
+function derivativeAnswerFromRecord(raw: Record<string, unknown>): string {
+  return String(raw.derivative ?? raw.answer ?? raw.derivada ?? "").trim();
+}
+
+function sanitizeStoredDerivativeItem(item: unknown): StoredDerivativeItem | null {
+  if (!item || typeof item !== "object") {
+    return null;
+  }
+
+  const raw = item as Record<string, unknown>;
+  const functionText = derivativeFunctionFromRecord(raw);
+  const derivative = derivativeAnswerFromRecord(raw);
+
+  if (!functionText || !derivative) {
+    return null;
+  }
+
+  return {
+    functionText,
+    derivative,
+  };
+}
+
 function sanitizeStoredSeAttempt(attempt: unknown): SeAttempt | null {
   if (!attempt || typeof attempt !== "object") {
     return null;
@@ -288,6 +373,61 @@ function sanitizeStoredPeriphrasisAttempt(attempt: unknown): PeriphrasisAttempt 
   };
 }
 
+function sanitizeStoredSintaxisAttempt(attempt: unknown): SintaxisAttempt | null {
+  if (!attempt || typeof attempt !== "object") {
+    return null;
+  }
+
+  const raw = attempt as Partial<SintaxisAttempt>;
+  const id = typeof raw.id === "string" && raw.id.trim() ? raw.id : createId("sintaxis_attempt");
+  const profileId = typeof raw.profileId === "string" && raw.profileId.trim() ? raw.profileId : "alumno";
+  const createdAt = typeof raw.createdAt === "string" && raw.createdAt.trim() ? raw.createdAt : nowIso();
+  const phrase = typeof raw.phrase === "string" ? raw.phrase.trim() : "";
+  const userAnswer = typeof raw.userAnswer === "string" ? raw.userAnswer : "";
+  const correction = typeof raw.correction === "string" ? raw.correction.trim() : "";
+
+  if (!phrase || !correction) {
+    return null;
+  }
+
+  return {
+    id,
+    profileId,
+    createdAt,
+    difficulty: sanitizeDifficulty(raw.difficulty),
+    phrase,
+    userAnswer,
+    correction,
+    mode: raw.mode ?? "normal",
+  };
+}
+
+function sanitizeStoredDerivativeAttempt(attempt: unknown): DerivativeAttempt | null {
+  if (!attempt || typeof attempt !== "object") {
+    return null;
+  }
+
+  const raw = attempt as Partial<DerivativeAttempt> & Record<string, unknown>;
+  const id = typeof raw.id === "string" && raw.id.trim() ? raw.id : createId("derivative_attempt");
+  const profileId = typeof raw.profileId === "string" && raw.profileId.trim() ? raw.profileId : "alumno";
+  const createdAt = typeof raw.createdAt === "string" && raw.createdAt.trim() ? raw.createdAt : nowIso();
+  const functionText = typeof raw.functionText === "string" ? raw.functionText.trim() : derivativeFunctionFromRecord(raw);
+  const derivative = typeof raw.derivative === "string" ? raw.derivative.trim() : derivativeAnswerFromRecord(raw);
+
+  if (!functionText || !derivative) {
+    return null;
+  }
+
+  return {
+    id,
+    profileId,
+    createdAt,
+    functionText,
+    derivative,
+    mode: raw.mode ?? "normal",
+  };
+}
+
 export function createDefaultStorageState(): StorageState {
   return {
     version: 1,
@@ -295,12 +435,18 @@ export function createDefaultStorageState(): StorageState {
     seSettings: defaultSeSettings(),
     periphrasisSettings: defaultPeriphrasisSettings(),
     morfoSettings: defaultMorfoSettings(),
+    sintaxisSettings: defaultSintaxisSettings(),
+    derivativeSettings: defaultDerivativeSettings(),
     seQuestionBank: [],
     periphrasisQuestionBank: [],
     morfoQuestionBank: [],
+    sintaxisQuestionBank: [],
+    derivativeQuestionBank: [],
     seAttempts: [],
     periphrasisAttempts: [],
     morfoAttempts: [],
+    sintaxisAttempts: [],
+    derivativeAttempts: [],
   };
 }
 
@@ -319,6 +465,8 @@ export function loadStorageState(): StorageState {
     const parsedSeSettings = (parsed.seSettings ?? {}) as Partial<SeSettings>;
     const parsedPeriphrasisSettings = (parsed.periphrasisSettings ?? {}) as Partial<PeriphrasisSettings>;
     const parsedMorfoSettings = (parsed.morfoSettings ?? {}) as Partial<MorfoSettings>;
+    const parsedSintaxisSettings = (parsed.sintaxisSettings ?? {}) as Partial<SintaxisSettings>;
+    const parsedDerivativeSettings = (parsed.derivativeSettings ?? {}) as Partial<DerivativeSettings>;
     return {
       version: 1,
       geminiApiKey: typeof parsed.geminiApiKey === "string" ? parsed.geminiApiKey : "",
@@ -358,6 +506,25 @@ export function loadStorageState(): StorageState {
           : [],
         batchSize: coercePracticeBatchSize(parsedMorfoSettings.batchSize),
       },
+      sintaxisSettings: {
+        ...defaultSintaxisSettings(),
+        ...parsedSintaxisSettings,
+        itemSource: "manual",
+        batchSize: coercePracticeBatchSize(parsedSintaxisSettings.batchSize),
+        difficulty: sanitizeDifficulty(parsedSintaxisSettings.difficulty),
+        randomizeOrder: typeof parsedSintaxisSettings.randomizeOrder === "boolean"
+          ? parsedSintaxisSettings.randomizeOrder
+          : true,
+      },
+      derivativeSettings: {
+        ...defaultDerivativeSettings(),
+        ...parsedDerivativeSettings,
+        itemSource: "manual",
+        batchSize: coercePracticeBatchSize(parsedDerivativeSettings.batchSize),
+        randomizeOrder: typeof parsedDerivativeSettings.randomizeOrder === "boolean"
+          ? parsedDerivativeSettings.randomizeOrder
+          : true,
+      },
       seQuestionBank: Array.isArray(parsed.seQuestionBank)
         ? parsed.seQuestionBank
             .map((item) => sanitizeStoredSeItem(item))
@@ -373,6 +540,16 @@ export function loadStorageState(): StorageState {
             .map((item) => sanitizeStoredMorfoItem(item))
             .filter((item): item is StoredMorfoItem => item !== null)
         : [],
+      sintaxisQuestionBank: Array.isArray(parsed.sintaxisQuestionBank)
+        ? parsed.sintaxisQuestionBank
+            .map((item) => sanitizeStoredSintaxisItem(item))
+            .filter((item): item is StoredSintaxisItem => item !== null)
+        : [],
+      derivativeQuestionBank: Array.isArray(parsed.derivativeQuestionBank)
+        ? parsed.derivativeQuestionBank
+            .map((item) => sanitizeStoredDerivativeItem(item))
+            .filter((item): item is StoredDerivativeItem => item !== null)
+        : [],
       seAttempts: Array.isArray(parsed.seAttempts)
         ? parsed.seAttempts.map((attempt) => sanitizeStoredSeAttempt(attempt)).filter((attempt): attempt is SeAttempt => attempt !== null)
         : [],
@@ -382,6 +559,16 @@ export function loadStorageState(): StorageState {
             .filter((attempt): attempt is PeriphrasisAttempt => attempt !== null)
         : [],
       morfoAttempts: Array.isArray(parsed.morfoAttempts) ? parsed.morfoAttempts : [],
+      sintaxisAttempts: Array.isArray(parsed.sintaxisAttempts)
+        ? parsed.sintaxisAttempts
+            .map((attempt) => sanitizeStoredSintaxisAttempt(attempt))
+            .filter((attempt): attempt is SintaxisAttempt => attempt !== null)
+        : [],
+      derivativeAttempts: Array.isArray(parsed.derivativeAttempts)
+        ? parsed.derivativeAttempts
+            .map((attempt) => sanitizeStoredDerivativeAttempt(attempt))
+            .filter((attempt): attempt is DerivativeAttempt => attempt !== null)
+        : [],
     };
   } catch {
     return createDefaultStorageState();
@@ -1028,6 +1215,40 @@ export function fetchRecentMorfoLabels(
     }));
 }
 
+export function fetchRecentSintaxisPhrases(attempts: SintaxisAttempt[], profileId: string, limit = 12): string[] {
+  const seen = new Set<string>();
+  const results: string[] = [];
+  attempts
+    .filter((attempt) => attempt.profileId === profileId)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .forEach((attempt) => {
+      const key = attempt.phrase.trim().toLowerCase();
+      if (!key || seen.has(key) || results.length >= limit) {
+        return;
+      }
+      seen.add(key);
+      results.push(attempt.phrase);
+    });
+  return results;
+}
+
+export function fetchRecentDerivativeFunctions(attempts: DerivativeAttempt[], profileId: string, limit = 12): string[] {
+  const seen = new Set<string>();
+  const results: string[] = [];
+  attempts
+    .filter((attempt) => attempt.profileId === profileId)
+    .sort((left, right) => right.createdAt.localeCompare(left.createdAt))
+    .forEach((attempt) => {
+      const key = normalizeTextToken(attempt.functionText);
+      if (!key || seen.has(key) || results.length >= limit) {
+        return;
+      }
+      seen.add(key);
+      results.push(attempt.functionText);
+    });
+  return results;
+}
+
 function randomItem<T>(items: T[]): T {
   return items[Math.floor(Math.random() * items.length)]!;
 }
@@ -1146,11 +1367,6 @@ export function fallbackMorfoBatch(
   });
 }
 
-function preferDifficulty<T extends { difficulty: Difficulty }>(items: T[], difficulty: Difficulty): T[] {
-  const exact = items.filter((item) => item.difficulty === difficulty);
-  return exact.length > 0 ? exact : items;
-}
-
 function chooseManualSentenceItem<T extends { sentence: string }>(
   pool: T[],
   recentMemory: string[],
@@ -1162,6 +1378,36 @@ function chooseManualSentenceItem<T extends { sentence: string }>(
 
   const unusedInBatch = pool.filter((item) => isNovelSentence(item.sentence, batchMemory, 0.75));
   const novel = unusedInBatch.filter((item) => isNovelSentence(item.sentence, recentMemory, 0.75));
+  const candidates = novel.length > 0 ? novel : unusedInBatch.length > 0 ? unusedInBatch : pool;
+  return randomItem(candidates);
+}
+
+function chooseManualPhraseItem<T extends { phrase: string }>(
+  pool: T[],
+  recentMemory: string[],
+  batchMemory: string[],
+): T | null {
+  if (pool.length === 0) {
+    return null;
+  }
+
+  const unusedInBatch = pool.filter((item) => isNovelSentence(item.phrase, batchMemory, 0.75));
+  const novel = unusedInBatch.filter((item) => isNovelSentence(item.phrase, recentMemory, 0.75));
+  const candidates = novel.length > 0 ? novel : unusedInBatch.length > 0 ? unusedInBatch : pool;
+  return randomItem(candidates);
+}
+
+function chooseManualDerivativeItem<T extends { functionText: string }>(
+  pool: T[],
+  recentMemory: string[],
+  batchMemory: string[],
+): T | null {
+  if (pool.length === 0) {
+    return null;
+  }
+
+  const unusedInBatch = pool.filter((item) => isNovelWord(item.functionText, batchMemory));
+  const novel = unusedInBatch.filter((item) => isNovelWord(item.functionText, recentMemory));
   const candidates = novel.length > 0 ? novel : unusedInBatch.length > 0 ? unusedInBatch : pool;
   return randomItem(candidates);
 }
@@ -1178,14 +1424,13 @@ function chooseManualWordItem<T extends { word: string }>(pool: T[], recentMemor
 }
 
 export function manualSeBatch(
-  difficulty: Difficulty,
   strategies: SeStrategy[],
   recentSentences: string[],
   questionBank: StoredSeItem[],
 ): Array<SeItem | null> {
   const recentMemory = [...recentSentences];
   const batchMemory: string[] = [];
-  const basePool = preferDifficulty(questionBank, difficulty);
+  const basePool = questionBank;
 
   return strategies.map((strategy) => {
     let pool = [...basePool];
@@ -1221,14 +1466,13 @@ export function manualSeBatch(
 }
 
 export function manualPeriphrasisBatch(
-  difficulty: Difficulty,
   strategies: PeriphrasisStrategy[],
   recentSentences: string[],
   questionBank: StoredPeriphrasisItem[],
 ): Array<PeriphrasisItem | null> {
   const recentMemory = [...recentSentences];
   const batchMemory: string[] = [];
-  const basePool = preferDifficulty(questionBank, difficulty);
+  const basePool = questionBank;
 
   return strategies.map((strategy) => {
     let pool = [...basePool];
@@ -1267,14 +1511,13 @@ export function manualPeriphrasisBatch(
 }
 
 export function manualMorfoBatch(
-  difficulty: Difficulty,
   strategies: MorfoStrategy[],
   recentWords: string[],
   questionBank: StoredMorfoItem[],
 ): Array<MorfoItem | null> {
   const recentMemory = [...recentWords];
   const batchMemory: string[] = [];
-  const basePool = preferDifficulty(questionBank, difficulty);
+  const basePool = questionBank;
 
   return strategies.map((strategy) => {
     let pool = [...basePool];
@@ -1310,6 +1553,66 @@ export function manualMorfoBatch(
       ...chosen,
       id: createId("morfo_manual"),
       mode: strategy.mode,
+    };
+  });
+}
+
+export function manualSintaxisBatch(
+  batchSize: number,
+  recentPhrases: string[],
+  questionBank: StoredSintaxisItem[],
+  randomizeOrder: boolean,
+): Array<SintaxisItem | null> {
+  const recentMemory = [...recentPhrases];
+  const batchMemory: string[] = [];
+  const basePool = questionBank;
+
+  return Array.from({ length: coercePracticeBatchSize(batchSize) }, () => {
+    const chosen = randomizeOrder
+      ? chooseManualPhraseItem(basePool, recentMemory, batchMemory)
+      : basePool.find((item) => isNovelSentence(item.phrase, batchMemory, 0.75) && isNovelSentence(item.phrase, recentMemory, 0.75)) ??
+        basePool.find((item) => isNovelSentence(item.phrase, batchMemory, 0.75)) ??
+        null;
+    if (!chosen) {
+      return null;
+    }
+
+    recentMemory.push(chosen.phrase);
+    batchMemory.push(chosen.phrase);
+    return {
+      ...chosen,
+      id: createId("sintaxis_manual"),
+      mode: "normal",
+    };
+  });
+}
+
+export function manualDerivativeBatch(
+  batchSize: number,
+  recentFunctions: string[],
+  questionBank: StoredDerivativeItem[],
+  randomizeOrder: boolean,
+): Array<DerivativeItem | null> {
+  const recentMemory = [...recentFunctions];
+  const batchMemory: string[] = [];
+  const basePool = questionBank;
+
+  return Array.from({ length: coercePracticeBatchSize(batchSize) }, () => {
+    const chosen = randomizeOrder
+      ? chooseManualDerivativeItem(basePool, recentMemory, batchMemory)
+      : basePool.find((item) => isNovelWord(item.functionText, batchMemory) && isNovelWord(item.functionText, recentMemory)) ??
+        basePool.find((item) => isNovelWord(item.functionText, batchMemory)) ??
+        null;
+    if (!chosen) {
+      return null;
+    }
+
+    recentMemory.push(chosen.functionText);
+    batchMemory.push(chosen.functionText);
+    return {
+      ...chosen,
+      id: createId("derivative_manual"),
+      mode: "normal",
     };
   });
 }
@@ -1592,6 +1895,34 @@ export function makeMorfoAttempt(item: MorfoItem, settings: MorfoSettings, evalu
   };
 }
 
+export function makeSintaxisAttempt(
+  item: SintaxisItem,
+  settings: SintaxisSettings,
+  userAnswer: string,
+): SintaxisAttempt {
+  return {
+    id: item.id,
+    profileId: settings.profileId.trim() || "alumno",
+    createdAt: nowIso(),
+    difficulty: item.difficulty,
+    phrase: item.phrase,
+    userAnswer: userAnswer.trim(),
+    correction: item.correction,
+    mode: item.mode,
+  };
+}
+
+export function makeDerivativeAttempt(item: DerivativeItem, settings: DerivativeSettings): DerivativeAttempt {
+  return {
+    id: item.id,
+    profileId: settings.profileId.trim() || "alumno",
+    createdAt: nowIso(),
+    functionText: item.functionText,
+    derivative: item.derivative,
+    mode: item.mode,
+  };
+}
+
 export function seAccuracy(attempts: SeAttempt[]): number {
   if (attempts.length === 0) {
     return 0;
@@ -1617,5 +1948,13 @@ export function resetPeriphrasisAttempts(attempts: PeriphrasisAttempt[], profile
 }
 
 export function resetMorfoAttempts(attempts: MorfoAttempt[], profileId: string): MorfoAttempt[] {
+  return attempts.filter((attempt) => attempt.profileId !== profileId);
+}
+
+export function resetSintaxisAttempts(attempts: SintaxisAttempt[], profileId: string): SintaxisAttempt[] {
+  return attempts.filter((attempt) => attempt.profileId !== profileId);
+}
+
+export function resetDerivativeAttempts(attempts: DerivativeAttempt[], profileId: string): DerivativeAttempt[] {
   return attempts.filter((attempt) => attempt.profileId !== profileId);
 }

@@ -88,17 +88,6 @@ export function ControlsPanel({ onGenerateSentence }: ControlsPanelProps) {
           </select>
         </label>
 
-        <label className="field">
-          <span>Dificultad</span>
-          <select
-            value={settings.difficulty}
-            onChange={(event) => setSetting("difficulty", Number(event.target.value) as 1 | 2 | 3)}
-          >
-            <option value={1}>1 - Basico</option>
-            <option value={2}>2 - Intermedio</option>
-            <option value={3}>3 - Avanzado</option>
-          </select>
-        </label>
       </div>
 
       <div className="field">

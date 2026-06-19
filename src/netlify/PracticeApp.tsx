@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
+import katex from "katex";
+import "katex/dist/katex.min.css";
+import ReactMarkdown from "react-markdown";
 
 import {
   MODEL_OPTIONS,
@@ -21,22 +24,23 @@ import {
   evaluateMorfoGuess,
   evaluatePeriphrasisGuess,
   evaluateSeGuess,
-  fallbackMorfoBatch,
-  fallbackPeriphrasisBatch,
-  fallbackSeBatch,
-  fetchRecentMorfoLabels,
+  fetchRecentDerivativeFunctions,
   fetchRecentMorfoWords,
-  fetchRecentPeriphrasisLabels,
   fetchRecentPeriphrasisSentences,
   fetchRecentSeLabels,
   fetchRecentSeSentences,
+  fetchRecentSintaxisPhrases,
   loadStorageState,
+  makeDerivativeAttempt,
   makeMorfoAttempt,
   makePeriphrasisAttempt,
   makeSeAttempt,
+  makeSintaxisAttempt,
   manualMorfoBatch,
+  manualDerivativeBatch,
   manualPeriphrasisBatch,
   manualSeBatch,
+  manualSintaxisBatch,
   MAX_PRACTICE_BATCH_SIZE,
   MIN_PRACTICE_BATCH_SIZE,
   morfoLearningProfile,
@@ -44,32 +48,35 @@ import {
   periphrasisAccuracy,
   periphrasisLearningProfile,
   popMixTargeted,
+  resetDerivativeAttempts,
   resetMorfoAttempts,
   resetPeriphrasisAttempts,
   resetSeAttempts,
+  resetSintaxisAttempts,
   saveStorageState,
   seAccuracy,
   seLearningProfile,
 } from "./logic";
 import {
-  requestMorfoGeneration,
+  sanitizeUploadedDerivativeItem,
   requestMorfoQuestion,
   requestMorfoRecheck,
-  requestPeriphrasisGeneration,
   sanitizeUploadedMorfoItem,
   sanitizeUploadedPeriphrasisItem,
   sanitizeUploadedSeItem,
-  requestSeGeneration,
+  sanitizeUploadedSintaxisItem,
   requestSeQuestion,
   requestSeRecheck,
 } from "./api";
 import type {
+  DerivativeAttempt,
+  DerivativeItem,
+  DerivativeSettings,
   MorfoAttempt,
   MorfoEvaluation,
   MorfoItem,
   MorfoSettings,
   MorfoStrategy,
-  ItemSource,
   PeriphrasisAttempt,
   PeriphrasisEvaluation,
   PeriphrasisItem,
@@ -83,14 +90,19 @@ import type {
   SeItem,
   SeSettings,
   SeStrategy,
+  SintaxisAttempt,
+  SintaxisItem,
+  SintaxisSettings,
   StorageState,
+  StoredDerivativeItem,
   StoredMorfoItem,
   StoredPeriphrasisItem,
   StoredSeItem,
+  StoredSintaxisItem,
   SummaryRow,
 } from "./types";
 
-type SectionName = "se" | "perifrasis" | "morfologia";
+type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative";
 type PageName = "practice" | "history" | "settings" | "storage";
 
 interface SectionMeta {
@@ -103,7 +115,7 @@ interface PageMeta {
   label: string;
 }
 
-const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia"];
+const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative"];
 
 const PAGE_META: Record<PageName, PageMeta> = {
   practice: {
@@ -134,14 +146,67 @@ const SECTION_META: Record<SectionName, SectionMeta> = {
     title: "Morfologia",
     theme: "dark",
   },
+  sintaxis: {
+    navLabel: "Sintaxis",
+    title: "Sintaxis",
+  },
+  derivative: {
+    navLabel: "Derivative",
+    title: "Derivative",
+  },
 };
 
 const SE_IMPORT_PLACEHOLDER = `{"items":[{"sentence":"Se venden pisos en este barrio.","difficulty":2,"se_value":"Pasiva refleja","se_function":"Marca de pasiva","accepted_functions":["Marca de pasiva","Sin funcion sintactica propia"],"verbal_structure":"Verbo simple","periphrasis_type":"No aplica","phrase_type":"Oracion simple pasiva refleja","explanation":"El verbo concuerda con el sujeto paciente 'pisos'."}]}`;
 const PERIPHRASIS_IMPORT_PLACEHOLDER = `{"items":[{"sentence":"Debes entregar el informe antes del viernes.","difficulty":2,"verbal_structure":"Perifrasis verbal","periphrasis_type":"Modal obligativa","phrase_type":"Oracion simple predicativa","explanation":"'Deber + infinitivo' expresa obligacion."}]}`;
 const MORFO_IMPORT_PLACEHOLDER = `{"items":[{"word":"desordenados","difficulty":2,"word_type":"Adjetivo","lexeme":"orden","accepted_lexemes":["orden"],"morphemes":["des","ad","o","s"],"morpheme_types":["Prefijo derivativo","Sufijo derivativo","Morfema flexivo nominal (genero)","Morfema flexivo nominal (numero)"],"analysis_type":"Adjetivo con derivacion y flexion","explanation":"Prefijo des- + lexema orden + sufijo -ad- + flexivos -o y -s."}]}`;
+const SINTAXIS_IMPORT_PLACEHOLDER = `{"items":[{"phrase":"Aunque llovia, salimos temprano.","difficulty":2,"correction":"**Analisis:** oracion compuesta por subordinacion adverbial concesiva.\\n\\n- **Subordinada:** \\"Aunque llovia\\"\\n- **Principal:** \\"salimos temprano\\"\\n- **CC de tiempo:** \\"temprano\\""}]}`;
+const DERIVATIVE_IMPORT_PLACEHOLDER = `{"items":[{"function":"f(x)=x^3-5x^2+2x","derivative":"f'(x)=3x^2-10x+2"}]}`;
 
 function cx(...tokens: Array<string | false | null | undefined>): string {
   return tokens.filter(Boolean).join(" ");
+}
+
+function normalizeLatexInput(value: string): string {
+  const cleaned = value.trim();
+  if (cleaned.startsWith("$$") && cleaned.endsWith("$$")) {
+    return cleaned.slice(2, -2).trim();
+  }
+  if (cleaned.startsWith("\\[") && cleaned.endsWith("\\]")) {
+    return cleaned.slice(2, -2).trim();
+  }
+  if (cleaned.startsWith("\\(") && cleaned.endsWith("\\)")) {
+    return cleaned.slice(2, -2).trim();
+  }
+  if (cleaned.startsWith("$") && cleaned.endsWith("$")) {
+    return cleaned.slice(1, -1).trim();
+  }
+  return cleaned;
+}
+
+function MathDisplay({ value, className }: { value: string; className?: string }) {
+  const rendered = useMemo(() => {
+    try {
+      return {
+        html: katex.renderToString(normalizeLatexInput(value), {
+          displayMode: true,
+          throwOnError: false,
+          strict: false,
+        }),
+        fallback: "",
+      };
+    } catch {
+      return {
+        html: "",
+        fallback: value,
+      };
+    }
+  }, [value]);
+
+  if (rendered.fallback) {
+    return <pre className={cx("math-display math-display--fallback", className)}>{rendered.fallback}</pre>;
+  }
+
+  return <div className={cx("math-display", className)} dangerouslySetInnerHTML={{ __html: rendered.html }} />;
 }
 
 function ratioLabel(targetWeight: number, normalWeight: number): string {
@@ -197,22 +262,6 @@ function BatchSizeControl({ value, onChange }: { value: number; onChange: (value
         <span>Max. {MAX_PRACTICE_BATCH_SIZE}</span>
       </div>
     </div>
-  );
-}
-
-function ChoicePill({
-  active,
-  label,
-  onClick,
-}: {
-  active: boolean;
-  label: string;
-  onClick: () => void;
-}) {
-  return (
-    <button aria-pressed={active} className={cx("choice-pill", active && "active")} type="button" onClick={onClick}>
-      {label}
-    </button>
   );
 }
 
@@ -392,26 +441,6 @@ function mergeQuestionBank<T>(existing: readonly T[], incoming: readonly T[], ke
   return [...byKey.values()];
 }
 
-function SourceToggle({
-  source,
-  manualCount,
-  onChange,
-}: {
-  source: ItemSource;
-  manualCount: number;
-  onChange: (source: ItemSource) => void;
-}) {
-  return (
-    <div className="field-block">
-      <FieldLabel label="Fuente" />
-      <div className="chip-cloud">
-        <ChoicePill active={source === "ai"} label="Gemini/local" onClick={() => onChange("ai")} />
-        <ChoicePill active={source === "manual"} label={`Manual (${manualCount})`} onClick={() => onChange("manual")} />
-      </div>
-    </div>
-  );
-}
-
 function ManualBankPanel({
   count,
   defaultOpen = false,
@@ -503,22 +532,32 @@ function QuestionBankStoragePage({
   seSettings,
   periphrasisSettings,
   morfoSettings,
+  sintaxisSettings,
   seQuestionBank,
   periphrasisQuestionBank,
   morfoQuestionBank,
+  sintaxisQuestionBank,
+  derivativeQuestionBank,
   onSeQuestionBankChange,
   onPeriphrasisQuestionBankChange,
   onMorfoQuestionBankChange,
+  onSintaxisQuestionBankChange,
+  onDerivativeQuestionBankChange,
 }: {
   seSettings: SeSettings;
   periphrasisSettings: PeriphrasisSettings;
   morfoSettings: MorfoSettings;
+  sintaxisSettings: SintaxisSettings;
   seQuestionBank: StoredSeItem[];
   periphrasisQuestionBank: StoredPeriphrasisItem[];
   morfoQuestionBank: StoredMorfoItem[];
+  sintaxisQuestionBank: StoredSintaxisItem[];
+  derivativeQuestionBank: StoredDerivativeItem[];
   onSeQuestionBankChange: (items: StoredSeItem[]) => void;
   onPeriphrasisQuestionBankChange: (items: StoredPeriphrasisItem[]) => void;
   onMorfoQuestionBankChange: (items: StoredMorfoItem[]) => void;
+  onSintaxisQuestionBankChange: (items: StoredSintaxisItem[]) => void;
+  onDerivativeQuestionBankChange: (items: StoredDerivativeItem[]) => void;
 }) {
   const availableSeValues = useMemo(() => mergeLabelGroups(SE_VALUES, seSettings.customValues), [seSettings.customValues]);
   const availablePeriphrasisTypes = useMemo(
@@ -580,6 +619,34 @@ function QuestionBankStoragePage({
     };
   };
 
+  const importSintaxisQuestionBank = (rawText: string): ImportResult => {
+    const records = parseQuestionBankRecords(rawText);
+    const validItems = records
+      .map((record) => sanitizeUploadedSintaxisItem(record, sintaxisSettings.difficulty))
+      .filter((item): item is StoredSintaxisItem => item !== null);
+    const nextBank = mergeQuestionBank(sintaxisQuestionBank, validItems, (item) => normalizeTextToken(item.phrase));
+    onSintaxisQuestionBankChange(nextBank);
+    return {
+      saved: validItems.length,
+      rejected: records.length - validItems.length,
+      total: records.length,
+    };
+  };
+
+  const importDerivativeQuestionBank = (rawText: string): ImportResult => {
+    const records = parseQuestionBankRecords(rawText);
+    const validItems = records
+      .map((record) => sanitizeUploadedDerivativeItem(record))
+      .filter((item): item is StoredDerivativeItem => item !== null);
+    const nextBank = mergeQuestionBank(derivativeQuestionBank, validItems, (item) => normalizeTextToken(item.functionText));
+    onDerivativeQuestionBankChange(nextBank);
+    return {
+      saved: validItems.length,
+      rejected: records.length - validItems.length,
+      total: records.length,
+    };
+  };
+
   return (
     <section className="workspace bank-storage-page">
       <div className="bank-grid">
@@ -606,6 +673,22 @@ function QuestionBankStoragePage({
           title="Morfologia"
           onClear={() => onMorfoQuestionBankChange([])}
           onImportText={importMorfoQuestionBank}
+        />
+        <ManualBankPanel
+          count={sintaxisQuestionBank.length}
+          defaultOpen
+          placeholder={SINTAXIS_IMPORT_PLACEHOLDER}
+          title="Sintaxis"
+          onClear={() => onSintaxisQuestionBankChange([])}
+          onImportText={importSintaxisQuestionBank}
+        />
+        <ManualBankPanel
+          count={derivativeQuestionBank.length}
+          defaultOpen
+          placeholder={DERIVATIVE_IMPORT_PLACEHOLDER}
+          title="Derivative"
+          onClear={() => onDerivativeQuestionBankChange([])}
+          onImportText={importDerivativeQuestionBank}
         />
       </div>
     </section>
@@ -696,20 +779,14 @@ function buildRequiredSeStrategy(value: string, mode: SeStrategy["mode"], ratioH
   };
 }
 
-function seStrategyValues(strategy: SeStrategy): string[] {
-  return uniqueLabels([
-    strategy.requiredValue,
-    strategy.targetValue,
-    ...strategy.focusValues,
-  ]);
-}
-
 export function NetlifyPracticeApp() {
   const [storageState, setStorageState] = useState<StorageState>(() => loadStorageState());
   const [activeSection, setActiveSection] = useState<SectionName>("se");
   const [sePage, setSePage] = useState<PageName>("practice");
   const [periphrasisPage, setPeriphrasisPage] = useState<PageName>("practice");
   const [morfoPage, setMorfoPage] = useState<PageName>("practice");
+  const [sintaxisPage, setSintaxisPage] = useState<PageName>("practice");
+  const [derivativePage, setDerivativePage] = useState<PageName>("practice");
 
   useEffect(() => {
     saveStorageState(storageState);
@@ -727,6 +804,14 @@ export function NetlifyPracticeApp() {
     setStorageState((current) => ({ ...current, periphrasisSettings: next }));
   };
 
+  const updateSintaxisSettings = (next: SintaxisSettings) => {
+    setStorageState((current) => ({ ...current, sintaxisSettings: next }));
+  };
+
+  const updateDerivativeSettings = (next: DerivativeSettings) => {
+    setStorageState((current) => ({ ...current, derivativeSettings: next }));
+  };
+
   const updateSeAttempts = (next: SeAttempt[]) => {
     setStorageState((current) => ({ ...current, seAttempts: next }));
   };
@@ -737,6 +822,14 @@ export function NetlifyPracticeApp() {
 
   const updatePeriphrasisAttempts = (next: PeriphrasisAttempt[]) => {
     setStorageState((current) => ({ ...current, periphrasisAttempts: next }));
+  };
+
+  const updateSintaxisAttempts = (next: SintaxisAttempt[]) => {
+    setStorageState((current) => ({ ...current, sintaxisAttempts: next }));
+  };
+
+  const updateDerivativeAttempts = (next: DerivativeAttempt[]) => {
+    setStorageState((current) => ({ ...current, derivativeAttempts: next }));
   };
 
   const updateSeQuestionBank = (next: StoredSeItem[]) => {
@@ -751,12 +844,28 @@ export function NetlifyPracticeApp() {
     setStorageState((current) => ({ ...current, morfoQuestionBank: next }));
   };
 
+  const updateSintaxisQuestionBank = (next: StoredSintaxisItem[]) => {
+    setStorageState((current) => ({ ...current, sintaxisQuestionBank: next }));
+  };
+
+  const updateDerivativeQuestionBank = (next: StoredDerivativeItem[]) => {
+    setStorageState((current) => ({ ...current, derivativeQuestionBank: next }));
+  };
+
   const updateGeminiApiKey = (next: string) => {
     setStorageState((current) => ({ ...current, geminiApiKey: next }));
   };
 
   const currentPage =
-    activeSection === "se" ? sePage : activeSection === "perifrasis" ? periphrasisPage : morfoPage;
+    activeSection === "se"
+      ? sePage
+      : activeSection === "perifrasis"
+        ? periphrasisPage
+        : activeSection === "morfologia"
+          ? morfoPage
+          : activeSection === "sintaxis"
+            ? sintaxisPage
+            : derivativePage;
   const activeSectionMeta = SECTION_META[activeSection];
   const pageTitle = currentPage === "storage" ? "Bancos" : activeSectionMeta.title;
 
@@ -769,7 +878,15 @@ export function NetlifyPracticeApp() {
       setPeriphrasisPage(page);
       return;
     }
-    setMorfoPage(page);
+    if (section === "morfologia") {
+      setMorfoPage(page);
+      return;
+    }
+    if (section === "sintaxis") {
+      setSintaxisPage(page);
+      return;
+    }
+    setDerivativePage(page);
   };
 
   return (
@@ -784,8 +901,7 @@ export function NetlifyPracticeApp() {
               setSePage("practice");
             }}
           >
-            <span className="globalnav__glyph">S</span>
-            <span>Sintaxis WebApp</span>
+            <span>Habitro</span>
           </button>
 
           <nav className="globalnav__menu" aria-label="Secciones">
@@ -826,15 +942,20 @@ export function NetlifyPracticeApp() {
           <main className="main-stage">
             {currentPage === "storage" ? (
               <QuestionBankStoragePage
+                derivativeQuestionBank={storageState.derivativeQuestionBank}
                 morfoQuestionBank={storageState.morfoQuestionBank}
                 morfoSettings={storageState.morfoSettings}
                 periphrasisQuestionBank={storageState.periphrasisQuestionBank}
                 periphrasisSettings={storageState.periphrasisSettings}
                 seQuestionBank={storageState.seQuestionBank}
                 seSettings={storageState.seSettings}
+                sintaxisQuestionBank={storageState.sintaxisQuestionBank}
+                sintaxisSettings={storageState.sintaxisSettings}
+                onDerivativeQuestionBankChange={updateDerivativeQuestionBank}
                 onMorfoQuestionBankChange={updateMorfoQuestionBank}
                 onPeriphrasisQuestionBankChange={updatePeriphrasisQuestionBank}
                 onSeQuestionBankChange={updateSeQuestionBank}
+                onSintaxisQuestionBankChange={updateSintaxisQuestionBank}
               />
             ) : (
               <>
@@ -870,6 +991,24 @@ export function NetlifyPracticeApp() {
                   onApiKeyChange={updateGeminiApiKey}
                   onSettingsChange={updateMorfoSettings}
                   onAttemptsChange={updateMorfoAttempts}
+                />
+                <SintaxisWorkspace
+                  active={activeSection === "sintaxis"}
+                  page={sintaxisPage}
+                  settings={storageState.sintaxisSettings}
+                  attempts={storageState.sintaxisAttempts}
+                  questionBank={storageState.sintaxisQuestionBank}
+                  onSettingsChange={updateSintaxisSettings}
+                  onAttemptsChange={updateSintaxisAttempts}
+                />
+                <DerivativeWorkspace
+                  active={activeSection === "derivative"}
+                  page={derivativePage}
+                  settings={storageState.derivativeSettings}
+                  attempts={storageState.derivativeAttempts}
+                  questionBank={storageState.derivativeQuestionBank}
+                  onSettingsChange={updateDerivativeSettings}
+                  onAttemptsChange={updateDerivativeAttempts}
                 />
               </>
             )}
@@ -989,11 +1128,6 @@ function SeWorkspace({
     setQueue([]);
   };
 
-  const updateItemSource = (itemSource: ItemSource) => {
-    onSettingsChange({ ...settings, itemSource });
-    setQueue([]);
-  };
-
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
@@ -1041,10 +1175,6 @@ function SeWorkspace({
 
         setMixBucket(workingBucket);
 
-        const customValuePlanned = strategies.some((strategy) =>
-          seStrategyValues(strategy).some((value) => value && !hasLabel(SE_VALUES, value)),
-        );
-        const fallbackItems = fallbackSeBatch(settings.difficulty, strategies, recentSentences);
         const prepared: Array<SeItem | null> = Array.from({ length: batchSize }, () => null);
         const seen = new Set<string>();
         const assignCandidate = (slotIndex: number, candidate: Omit<SeItem, "id"> | SeItem | null) => {
@@ -1059,61 +1189,19 @@ function SeWorkspace({
           prepared[slotIndex] = "id" in candidate ? candidate : { ...candidate, id: createId("se") };
         };
 
-        if (settings.itemSource === "manual") {
-          const manualItems = manualSeBatch(settings.difficulty, strategies, recentSentences, questionBank);
-          manualItems.forEach((item, index) => assignCandidate(index, item));
-          const manualValidCount = manualItems.filter((item) => item !== null).length;
-          setStatusNote(manualValidCount > 0 ? "" : "Banco manual sin items validos para esta seccion.");
-          setStatusTone(manualValidCount > 0 ? "info" : "warn");
-        } else {
-          try {
-            const remoteItems = await requestSeGeneration({
-              apiKey,
-              modelName: settings.modelName,
-              difficulty: settings.difficulty,
-              strategies,
-              profile,
-              recentSentences,
-              recentLabels,
-              allowedValues: availableSeValues,
-              allowedFunctions: [...SE_FUNCTIONS],
-              allowedVerbalStructures: [...SE_VERBAL_STRUCTURES],
-              allowedPeriphrasisTypes: [...SE_PERIPHRASIS_TYPES],
-            });
-            strategies.forEach((_, index) => {
-              assignCandidate(index, remoteItems[index] ?? null);
-              assignCandidate(index, fallbackItems[index] ?? null);
-            });
-            const remoteValidCount = remoteItems.filter((item) => item !== null).length;
-            setStatusNote(remoteValidCount > 0 ? "" : "Gemini no devolvio valores validos.");
-            setStatusTone(remoteValidCount > 0 ? "info" : "warn");
-          } catch (error) {
-            fallbackItems.forEach((item, index) => assignCandidate(index, item));
-            setStatusNote(
-              customValuePlanned
-                ? "Los valores personalizados necesitan Gemini."
-                : error instanceof Error
-                  ? `${error.message} Banco local.`
-                  : "Banco local.",
-            );
-            setStatusTone("warn");
-          }
-
-          while (prepared.some((item) => item === null)) {
-            const extraFallback = fallbackSeBatch(settings.difficulty, strategies, recentSentences);
-            const beforeMissing = prepared.filter((item) => item === null).length;
-            extraFallback.forEach((item, index) => assignCandidate(index, item));
-            const afterMissing = prepared.filter((item) => item === null).length;
-            if (afterMissing === beforeMissing) {
-              break;
-            }
-          }
-        }
+        const manualItems = manualSeBatch(strategies, recentSentences, questionBank);
+        manualItems.forEach((item, index) => assignCandidate(index, item));
 
         const finalized = prepared.filter((item): item is SeItem => item !== null);
-        if (finalized.length < batchSize) {
-          setStatusNote(customValuePlanned ? "Los valores personalizados necesitan Gemini." : "Lote incompleto.");
+        if (finalized.length === 0) {
+          setStatusNote("Banco manual sin items validos para esta seccion.");
           setStatusTone("warn");
+        } else if (finalized.length < batchSize) {
+          setStatusNote("Lote incompleto.");
+          setStatusTone("warn");
+        } else {
+          setStatusNote("");
+          setStatusTone("info");
         }
 
         nextQueue = settings.personalized ? finalized : shuffleList(finalized);
@@ -1246,20 +1334,6 @@ function SeWorkspace({
         <div className="page-grid">
           <div className="panel control-panel">
             <div className="field-block">
-              <FieldLabel label="Dificultad" hint="Se mantiene por seccion." />
-              <div className="chip-cloud">
-                {[1, 2, 3].map((difficulty) => (
-                  <ChoicePill
-                    key={difficulty}
-                    active={settings.difficulty === difficulty}
-                    label={`D${difficulty}`}
-                    onClick={() => onSettingsChange({ ...settings, difficulty: difficulty as 1 | 2 | 3 })}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="field-block">
               <FieldLabel label="Modo" hint="Usa refuerzo de debilidades cuando hay historial." />
               <label className="checkbox-line">
                 <input
@@ -1275,8 +1349,6 @@ function SeWorkspace({
               value={settings.batchSize}
               onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
             />
-
-            <SourceToggle source={settings.itemSource} manualCount={questionBank.length} onChange={updateItemSource} />
 
             <div className="field-block">
               <FieldLabel label="Valores" />
@@ -1735,11 +1807,6 @@ function PeriphrasisWorkspace({
     setCustomTypeInput("");
   };
 
-  const updateItemSource = (itemSource: ItemSource) => {
-    onSettingsChange({ ...settings, itemSource });
-    setQueue([]);
-  };
-
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
@@ -1768,8 +1835,6 @@ function PeriphrasisWorkspace({
 
         setMixBucket(workingBucket);
         const recentSentences = fetchRecentPeriphrasisSentences(attempts, settings.profileId, 14);
-        const recentLabels = fetchRecentPeriphrasisLabels(attempts, settings.profileId, 10);
-        const fallbackItems = fallbackPeriphrasisBatch(settings.difficulty, strategies, recentSentences);
         const prepared: Array<PeriphrasisItem | null> = Array.from({ length: batchSize }, () => null);
         const seen = new Set<string>();
         const assignCandidate = (slotIndex: number, candidate: Omit<PeriphrasisItem, "id"> | PeriphrasisItem | null) => {
@@ -1784,53 +1849,16 @@ function PeriphrasisWorkspace({
           prepared[slotIndex] = "id" in candidate ? candidate : { ...candidate, id: createId("perifrasis") };
         };
 
-        if (settings.itemSource === "manual") {
-          const manualItems = manualPeriphrasisBatch(settings.difficulty, strategies, recentSentences, questionBank);
-          manualItems.forEach((item, index) => assignCandidate(index, item));
-          const manualValidCount = manualItems.filter((item) => item !== null).length;
-          setStatusNote(manualValidCount > 0 ? "" : "Banco manual sin items validos para esta seccion.");
-        } else {
-          try {
-            const remoteItems = await requestPeriphrasisGeneration({
-              apiKey,
-              modelName: settings.modelName,
-              difficulty: settings.difficulty,
-              strategies,
-              profile,
-              recentSentences,
-              recentLabels,
-              allowedStructures: [...PERIPHRASIS_STRUCTURES],
-              allowedPeriphrasisTypes: availablePeriphrasisTypes,
-            });
-            strategies.forEach((_, index) => {
-              assignCandidate(index, remoteItems[index] ?? null);
-              assignCandidate(index, fallbackItems[index] ?? null);
-            });
-            const remoteValidCount = remoteItems.filter((item) => item !== null).length;
-            setStatusNote(remoteValidCount > 0 ? "" : "Gemini no devolvio items validos.");
-          } catch (error) {
-            fallbackItems.forEach((item, index) => assignCandidate(index, item));
-            setStatusNote(error instanceof Error ? `${error.message} Banco local.` : "Banco local.");
-          }
-
-          while (prepared.some((item) => item === null)) {
-            const extraRecentSentences = [
-              ...recentSentences,
-              ...prepared.filter((item): item is PeriphrasisItem => item !== null).map((item) => item.sentence),
-            ];
-            const extraFallback = fallbackPeriphrasisBatch(settings.difficulty, strategies, extraRecentSentences);
-            const beforeMissing = prepared.filter((item) => item === null).length;
-            extraFallback.forEach((item, index) => assignCandidate(index, item));
-            const afterMissing = prepared.filter((item) => item === null).length;
-            if (afterMissing === beforeMissing) {
-              break;
-            }
-          }
-        }
+        const manualItems = manualPeriphrasisBatch(strategies, recentSentences, questionBank);
+        manualItems.forEach((item, index) => assignCandidate(index, item));
 
         const finalized = prepared.filter((item): item is PeriphrasisItem => item !== null);
-        if (finalized.length < batchSize) {
+        if (finalized.length === 0) {
+          setStatusNote("Banco manual sin items validos para esta seccion.");
+        } else if (finalized.length < batchSize) {
           setStatusNote("Lote incompleto.");
+        } else {
+          setStatusNote("");
         }
         nextQueue = settings.personalized ? finalized : shuffleList(finalized);
       }
@@ -1876,20 +1904,6 @@ function PeriphrasisWorkspace({
         <div className="page-grid">
           <div className="panel control-panel">
             <div className="field-block">
-              <FieldLabel label="Dificultad" hint="Se mantiene por seccion." />
-              <div className="chip-cloud">
-                {[1, 2, 3].map((difficulty) => (
-                  <ChoicePill
-                    key={difficulty}
-                    active={settings.difficulty === difficulty}
-                    label={`D${difficulty}`}
-                    onClick={() => onSettingsChange({ ...settings, difficulty: difficulty as 1 | 2 | 3 })}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="field-block">
               <FieldLabel label="Modo" hint="Usa refuerzo de debilidades cuando hay historial." />
               <label className="checkbox-line">
                 <input
@@ -1905,8 +1919,6 @@ function PeriphrasisWorkspace({
               value={settings.batchSize}
               onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
             />
-
-            <SourceToggle source={settings.itemSource} manualCount={questionBank.length} onChange={updateItemSource} />
 
             <div className="field-block">
               <FieldLabel label="Estructuras" />
@@ -2330,11 +2342,6 @@ function MorfoWorkspace({
     onSettingsChange({ ...settings, focusWordTypes: nextFocusWordTypes });
   };
 
-  const updateItemSource = (itemSource: ItemSource) => {
-    onSettingsChange({ ...settings, itemSource });
-    setQueue([]);
-  };
-
   const handleGenerate = async () => {
     setIsGenerating(true);
     try {
@@ -2364,8 +2371,6 @@ function MorfoWorkspace({
         setMixBucket(workingBucket);
 
         const recentWords = fetchRecentMorfoWords(attempts, settings.profileId, 14);
-        const recentLabels = fetchRecentMorfoLabels(attempts, settings.profileId, 10);
-        const fallbackItems = fallbackMorfoBatch(settings.difficulty, strategies, recentWords);
         const prepared: MorfoItem[] = [];
         const seen = new Set<string>();
         const pushCandidate = (candidate: Omit<MorfoItem, "id"> | MorfoItem) => {
@@ -2377,45 +2382,21 @@ function MorfoWorkspace({
           prepared.push("id" in candidate ? candidate : { ...candidate, id: createId("morfo") });
         };
 
-        if (settings.itemSource === "manual") {
-          const manualItems = manualMorfoBatch(settings.difficulty, strategies, recentWords, questionBank);
-          manualItems.forEach((item) => {
-            if (item) {
-              pushCandidate(item);
-            }
-          });
-          const manualValidCount = manualItems.filter((item) => item !== null).length;
-          setStatusNote(manualValidCount > 0 ? "" : "Banco manual sin items validos para esta seccion.");
-          setStatusTone(manualValidCount > 0 ? "info" : "warn");
+        const manualItems = manualMorfoBatch(strategies, recentWords, questionBank);
+        manualItems.forEach((item) => {
+          if (item) {
+            pushCandidate(item);
+          }
+        });
+        if (prepared.length === 0) {
+          setStatusNote("Banco manual sin items validos para esta seccion.");
+          setStatusTone("warn");
+        } else if (prepared.length < batchSize) {
+          setStatusNote("Lote incompleto.");
+          setStatusTone("warn");
         } else {
-          try {
-            const remoteItems = await requestMorfoGeneration({
-              apiKey,
-              modelName: settings.modelName,
-              difficulty: settings.difficulty,
-              strategies,
-              profile,
-              recentWords,
-              recentLabels,
-            });
-            remoteItems.forEach(pushCandidate);
-            fallbackItems.forEach(pushCandidate);
-            setStatusNote(remoteItems.length > 0 ? "" : "Gemini no devolvio items validos.");
-            setStatusTone(remoteItems.length > 0 ? "info" : "warn");
-          } catch (error) {
-            fallbackItems.forEach(pushCandidate);
-            setStatusNote(error instanceof Error ? `${error.message} Banco local.` : "Banco local.");
-            setStatusTone("warn");
-          }
-
-          while (prepared.length < batchSize) {
-            const extraFallback = fallbackMorfoBatch(settings.difficulty, strategies, recentWords);
-            const beforeLength = prepared.length;
-            extraFallback.forEach(pushCandidate);
-            if (prepared.length === beforeLength) {
-              break;
-            }
-          }
+          setStatusNote("");
+          setStatusTone("info");
         }
 
         nextQueue = settings.personalized ? prepared : shuffleList(prepared);
@@ -2544,20 +2525,6 @@ function MorfoWorkspace({
         <div className="page-grid">
           <div className="panel control-panel">
             <div className="field-block">
-              <FieldLabel label="Dificultad" hint="Se mantiene por seccion." />
-              <div className="chip-cloud">
-                {[1, 2, 3].map((difficulty) => (
-                  <ChoicePill
-                    key={difficulty}
-                    active={settings.difficulty === difficulty}
-                    label={`D${difficulty}`}
-                    onClick={() => onSettingsChange({ ...settings, difficulty: difficulty as 1 | 2 | 3 })}
-                  />
-                ))}
-              </div>
-            </div>
-
-            <div className="field-block">
               <FieldLabel label="Modo" hint="Usa refuerzo de debilidades cuando hay historial." />
               <label className="checkbox-line">
                 <input
@@ -2573,8 +2540,6 @@ function MorfoWorkspace({
               value={settings.batchSize}
               onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
             />
-
-            <SourceToggle source={settings.itemSource} manualCount={questionBank.length} onChange={updateItemSource} />
 
             <div className="field-block">
               <FieldLabel label="Tipos" />
@@ -2938,6 +2903,505 @@ function MorfoWorkspace({
                 <p>Gemma activa.</p>
               </div>
             ) : null}
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function SintaxisWorkspace({
+  active,
+  page,
+  settings,
+  attempts,
+  questionBank,
+  onSettingsChange,
+  onAttemptsChange,
+}: {
+  active: boolean;
+  page: PageName;
+  settings: SintaxisSettings;
+  attempts: SintaxisAttempt[];
+  questionBank: StoredSintaxisItem[];
+  onSettingsChange: (settings: SintaxisSettings) => void;
+  onAttemptsChange: (attempts: SintaxisAttempt[]) => void;
+}) {
+  const profileAttempts = useMemo(
+    () => attempts.filter((attempt) => attempt.profileId === settings.profileId),
+    [attempts, settings.profileId],
+  );
+  const [currentItem, setCurrentItem] = useState<SintaxisItem | null>(null);
+  const [queue, setQueue] = useState<SintaxisItem[]>([]);
+  const [checkedItemId, setCheckedItemId] = useState<string | null>(null);
+  const [correctionVisible, setCorrectionVisible] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [resetConfirmed, setResetConfirmed] = useState(false);
+  const [statusNote, setStatusNote] = useState("");
+  const [statusTone, setStatusTone] = useState<"info" | "warn">("info");
+  const [profileDraft, setProfileDraft] = useState(settings.profileId);
+
+  useEffect(() => {
+    setCorrectionVisible(false);
+  }, [currentItem?.id]);
+
+  useEffect(() => {
+    setProfileDraft(settings.profileId);
+  }, [settings.profileId]);
+
+  const handleGenerate = () => {
+    setIsGenerating(true);
+    try {
+      let nextQueue = [...queue];
+      if (nextQueue.length === 0) {
+        const batchSize = coercePracticeBatchSize(settings.batchSize);
+        const recentPhrases = fetchRecentSintaxisPhrases(attempts, settings.profileId, 14);
+        const manualItems = manualSintaxisBatch(
+          batchSize,
+          recentPhrases,
+          questionBank,
+          settings.randomizeOrder,
+        );
+        const finalized = manualItems.filter((item): item is SintaxisItem => item !== null);
+
+        if (finalized.length === 0) {
+          setStatusNote("Banco manual sin items validos para esta seccion.");
+          setStatusTone("warn");
+        } else if (finalized.length < batchSize) {
+          setStatusNote("Lote incompleto.");
+          setStatusTone("warn");
+        } else {
+          setStatusNote("");
+          setStatusTone("info");
+        }
+
+        nextQueue = settings.randomizeOrder ? shuffleList(finalized) : finalized;
+      }
+
+      const [nextItem, ...rest] = nextQueue;
+      setCurrentItem(nextItem ?? null);
+      setQueue(rest);
+      setCheckedItemId(null);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleRevealCorrection = () => {
+    if (!currentItem) {
+      return;
+    }
+    setCorrectionVisible(true);
+
+    if (checkedItemId !== currentItem.id) {
+      onAttemptsChange([...attempts, makeSintaxisAttempt(currentItem, settings, "")]);
+      setCheckedItemId(currentItem.id);
+    }
+  };
+
+  const saveSettingsDraft = () => {
+    onSettingsChange({
+      ...settings,
+      profileId: profileDraft.trim() || "alumno",
+      itemSource: "manual",
+    });
+  };
+
+  return (
+    <section className={cx("workspace", !active && "hidden-workspace")}>
+      {page === "practice" ? (
+        <div className="page-grid">
+          <div className="panel control-panel">
+            <BatchSizeControl
+              value={settings.batchSize}
+              onChange={(batchSize) => {
+                onSettingsChange({ ...settings, batchSize, itemSource: "manual" });
+                setQueue([]);
+              }}
+            />
+
+            <div className="field-block">
+              <label className="checkbox-line">
+                <input
+                  checked={settings.randomizeOrder}
+                  onChange={(event) => {
+                    onSettingsChange({ ...settings, randomizeOrder: event.target.checked, itemSource: "manual" });
+                    setQueue([]);
+                  }}
+                  type="checkbox"
+                />
+                <span>Orden aleatorio</span>
+              </label>
+              <div className="button-row">
+                <button
+                  className="ghost-btn"
+                  disabled={queue.length < 2}
+                  type="button"
+                  onClick={() => setQueue((current) => shuffleList(current))}
+                >
+                  Barajar pendientes
+                </button>
+              </div>
+            </div>
+
+            {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
+
+            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
+              {isGenerating ? "Preparando lote..." : queue.length > 0 ? "Siguiente frase" : "Generar lote"}
+            </button>
+          </div>
+
+          <div className="panel practice-panel">
+            {!currentItem ? (
+              <div className="empty-state">
+                <h3>Genera una frase para empezar.</h3>
+              </div>
+            ) : (
+              <div className="sintaxis-practice-column">
+                <h3 className="prompt-text sintaxis-prompt-text">{currentItem.phrase}</h3>
+
+                <button className="primary-btn sintaxis-correction-btn" type="button" onClick={handleRevealCorrection}>
+                  Mostrar correccion
+                </button>
+
+                {correctionVisible ? (
+                  <div className="info-block markdown-correction sintaxis-correction-box">
+                    <ReactMarkdown>{currentItem.correction}</ReactMarkdown>
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {page === "history" ? (
+        <div className="page-grid single-column">
+          <div className="panel">
+            <div className="row-between">
+              <div>
+                <h3>Historial local por perfil</h3>
+              </div>
+              <label className="checkbox-line">
+                <input
+                  checked={settings.hideHistory}
+                  onChange={(event) => onSettingsChange({ ...settings, hideHistory: event.target.checked, itemSource: "manual" })}
+                  type="checkbox"
+                />
+                <span>Ocultar historial</span>
+              </label>
+            </div>
+
+            {settings.hideHistory ? (
+              <p>Historial oculto para esta seccion.</p>
+            ) : (
+              <>
+                <div className="row-between">
+                  <p>Intentos totales: {profileAttempts.length}</p>
+                </div>
+
+                <div className="stack-lg">
+                  <div>
+                    <h4 className="section-heading">Intentos guardados</h4>
+                    <DataTable
+                      headers={["Fecha", "Frase", "Modo"]}
+                      rows={profileAttempts.map((attempt) => [
+                        new Date(attempt.createdAt).toLocaleString(),
+                        attempt.phrase,
+                        attempt.mode,
+                      ])}
+                    />
+                  </div>
+                </div>
+
+                <div className="danger-zone">
+                  <label className="checkbox-line">
+                    <input checked={resetConfirmed} onChange={(event) => setResetConfirmed(event.target.checked)} type="checkbox" />
+                    <span>Confirmo que quiero borrar todo el historial de este perfil</span>
+                  </label>
+                  <button
+                    className="danger-btn"
+                    disabled={!resetConfirmed}
+                    type="button"
+                    onClick={() => {
+                      onAttemptsChange(resetSintaxisAttempts(attempts, settings.profileId));
+                      setResetConfirmed(false);
+                    }}
+                  >
+                    Resetear historial
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {page === "settings" ? (
+        <div className="page-grid single-column">
+          <div className="panel">
+            <h3>Perfil</h3>
+
+            <div className="field-grid">
+              <div>
+                <FieldLabel label="Perfil" hint="Afecta el historial local." />
+                <input value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} />
+              </div>
+            </div>
+
+            <button className="primary-btn" type="button" onClick={saveSettingsDraft}>
+              Guardar ajustes
+            </button>
+          </div>
+        </div>
+      ) : null}
+    </section>
+  );
+}
+
+function DerivativeWorkspace({
+  active,
+  page,
+  settings,
+  attempts,
+  questionBank,
+  onSettingsChange,
+  onAttemptsChange,
+}: {
+  active: boolean;
+  page: PageName;
+  settings: DerivativeSettings;
+  attempts: DerivativeAttempt[];
+  questionBank: StoredDerivativeItem[];
+  onSettingsChange: (settings: DerivativeSettings) => void;
+  onAttemptsChange: (attempts: DerivativeAttempt[]) => void;
+}) {
+  const profileAttempts = useMemo(
+    () => attempts.filter((attempt) => attempt.profileId === settings.profileId),
+    [attempts, settings.profileId],
+  );
+  const [currentItem, setCurrentItem] = useState<DerivativeItem | null>(null);
+  const [queue, setQueue] = useState<DerivativeItem[]>([]);
+  const [checkedItemId, setCheckedItemId] = useState<string | null>(null);
+  const [answerVisible, setAnswerVisible] = useState(false);
+  const [isGenerating, setIsGenerating] = useState(false);
+  const [resetConfirmed, setResetConfirmed] = useState(false);
+  const [statusNote, setStatusNote] = useState("");
+  const [statusTone, setStatusTone] = useState<"info" | "warn">("info");
+  const [profileDraft, setProfileDraft] = useState(settings.profileId);
+
+  useEffect(() => {
+    setAnswerVisible(false);
+  }, [currentItem?.id]);
+
+  useEffect(() => {
+    setProfileDraft(settings.profileId);
+  }, [settings.profileId]);
+
+  const handleGenerate = () => {
+    setIsGenerating(true);
+    try {
+      let nextQueue = [...queue];
+      if (nextQueue.length === 0) {
+        const batchSize = coercePracticeBatchSize(settings.batchSize);
+        const recentFunctions = fetchRecentDerivativeFunctions(attempts, settings.profileId, 14);
+        const manualItems = manualDerivativeBatch(
+          batchSize,
+          recentFunctions,
+          questionBank,
+          settings.randomizeOrder,
+        );
+        const finalized = manualItems.filter((item): item is DerivativeItem => item !== null);
+
+        if (finalized.length === 0) {
+          setStatusNote("Banco manual sin items validos para esta seccion.");
+          setStatusTone("warn");
+        } else if (finalized.length < batchSize) {
+          setStatusNote("Lote incompleto.");
+          setStatusTone("warn");
+        } else {
+          setStatusNote("");
+          setStatusTone("info");
+        }
+
+        nextQueue = settings.randomizeOrder ? shuffleList(finalized) : finalized;
+      }
+
+      const [nextItem, ...rest] = nextQueue;
+      setCurrentItem(nextItem ?? null);
+      setQueue(rest);
+      setCheckedItemId(null);
+    } finally {
+      setIsGenerating(false);
+    }
+  };
+
+  const handleRevealAnswer = () => {
+    if (!currentItem) {
+      return;
+    }
+    setAnswerVisible(true);
+
+    if (checkedItemId !== currentItem.id) {
+      onAttemptsChange([...attempts, makeDerivativeAttempt(currentItem, settings)]);
+      setCheckedItemId(currentItem.id);
+    }
+  };
+
+  const saveSettingsDraft = () => {
+    onSettingsChange({
+      ...settings,
+      profileId: profileDraft.trim() || "alumno",
+      itemSource: "manual",
+    });
+  };
+
+  return (
+    <section className={cx("workspace", !active && "hidden-workspace")}>
+      {page === "practice" ? (
+        <div className="page-grid">
+          <div className="panel control-panel">
+            <BatchSizeControl
+              value={settings.batchSize}
+              onChange={(batchSize) => {
+                onSettingsChange({ ...settings, batchSize, itemSource: "manual" });
+                setQueue([]);
+              }}
+            />
+
+            <div className="field-block">
+              <label className="checkbox-line">
+                <input
+                  checked={settings.randomizeOrder}
+                  onChange={(event) => {
+                    onSettingsChange({ ...settings, randomizeOrder: event.target.checked, itemSource: "manual" });
+                    setQueue([]);
+                  }}
+                  type="checkbox"
+                />
+                <span>Orden aleatorio</span>
+              </label>
+              <div className="button-row">
+                <button
+                  className="ghost-btn"
+                  disabled={queue.length < 2}
+                  type="button"
+                  onClick={() => setQueue((current) => shuffleList(current))}
+                >
+                  Barajar pendientes
+                </button>
+              </div>
+            </div>
+
+            {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
+
+            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
+              {isGenerating ? "Preparando lote..." : queue.length > 0 ? "Siguiente funcion" : "Generar lote"}
+            </button>
+          </div>
+
+          <div className="panel practice-panel">
+            {!currentItem ? (
+              <div className="empty-state">
+                <h3>Genera una funcion para empezar.</h3>
+              </div>
+            ) : (
+              <div className="derivative-practice-column">
+                <MathDisplay value={currentItem.functionText} className="derivative-function-display" />
+
+                <button className="primary-btn derivative-answer-btn" type="button" onClick={handleRevealAnswer}>
+                  Mostrar respuesta
+                </button>
+
+                {answerVisible ? (
+                  <div className="info-block derivative-answer-box">
+                    <MathDisplay value={currentItem.derivative} className="derivative-answer-display" />
+                  </div>
+                ) : null}
+              </div>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {page === "history" ? (
+        <div className="page-grid single-column">
+          <div className="panel">
+            <div className="row-between">
+              <div>
+                <h3>Historial local por perfil</h3>
+              </div>
+              <label className="checkbox-line">
+                <input
+                  checked={settings.hideHistory}
+                  onChange={(event) => onSettingsChange({ ...settings, hideHistory: event.target.checked, itemSource: "manual" })}
+                  type="checkbox"
+                />
+                <span>Ocultar historial</span>
+              </label>
+            </div>
+
+            {settings.hideHistory ? (
+              <p>Historial oculto para esta seccion.</p>
+            ) : (
+              <>
+                <div className="row-between">
+                  <p>Intentos totales: {profileAttempts.length}</p>
+                </div>
+
+                <div className="stack-lg">
+                  <div>
+                    <h4 className="section-heading">Intentos guardados</h4>
+                    <DataTable
+                      headers={["Fecha", "Funcion", "Derivada", "Modo"]}
+                      rows={profileAttempts.map((attempt) => [
+                        new Date(attempt.createdAt).toLocaleString(),
+                        attempt.functionText,
+                        attempt.derivative,
+                        attempt.mode,
+                      ])}
+                    />
+                  </div>
+                </div>
+
+                <div className="danger-zone">
+                  <label className="checkbox-line">
+                    <input checked={resetConfirmed} onChange={(event) => setResetConfirmed(event.target.checked)} type="checkbox" />
+                    <span>Confirmo que quiero borrar todo el historial de este perfil</span>
+                  </label>
+                  <button
+                    className="danger-btn"
+                    disabled={!resetConfirmed}
+                    type="button"
+                    onClick={() => {
+                      onAttemptsChange(resetDerivativeAttempts(attempts, settings.profileId));
+                      setResetConfirmed(false);
+                    }}
+                  >
+                    Resetear historial
+                  </button>
+                </div>
+              </>
+            )}
+          </div>
+        </div>
+      ) : null}
+
+      {page === "settings" ? (
+        <div className="page-grid single-column">
+          <div className="panel">
+            <h3>Perfil</h3>
+
+            <div className="field-grid">
+              <div>
+                <FieldLabel label="Perfil" hint="Afecta el historial local." />
+                <input value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} />
+              </div>
+            </div>
+
+            <button className="primary-btn" type="button" onClick={saveSettingsDraft}>
+              Guardar ajustes
+            </button>
           </div>
         </div>
       ) : null}

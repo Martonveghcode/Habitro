@@ -261,6 +261,45 @@ Rules:
 - The app validates that the word rebuilds as prefixes + lexeme + remaining morphemes.
 - For `word_type: "Verbo"`, use only personal conjugated forms, not infinitives, gerunds, or participles.
 
+## Sintaxis
+
+Required item shape:
+
+```json
+{
+  "phrase": "Aunque llovia, salimos temprano.",
+  "difficulty": 2,
+  "correction": "**Analisis:** oracion compuesta por subordinacion adverbial concesiva.\n\n- **Subordinada:** \"Aunque llovia\"\n- **Principal:** \"salimos temprano\""
+}
+```
+
+Allowed `difficulty`: `1`, `2`, `3`.
+
+Rules:
+
+- `correction` supports Markdown formatting.
+- Keep the JSON strict: escape line breaks inside `correction` as `\n`.
+- The uploader also accepts `sentence` or `frase` instead of `phrase`, but `phrase` is the preferred key.
+
+## Derivative
+
+Required item shape:
+
+```json
+{
+  "function": "f(x)=x^3-5x^2+2x",
+  "derivative": "f'(x)=3x^2-10x+2"
+}
+```
+
+Rules:
+
+- Use LaTeX-compatible math strings.
+- The app renders both `function` and `derivative` with KaTeX.
+- The uploader also accepts `function_to_deriv`, `functionToDeriv`, `functionText`, or `funcion` instead of `function`.
+- The uploader also accepts `answer` or `derivada` instead of `derivative`.
+- The correction box is just the `derivative` value.
+
 ## General Sintaxis Sentence Generator
 
 This is the older sentence-generation response shape used by the syntax workspace code:
