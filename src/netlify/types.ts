@@ -2,6 +2,7 @@ export type Difficulty = 1 | 2 | 3;
 
 export type Mode = "normal" | "personalizado_mixto" | "personalizado_objetivo" | "foco_usuario";
 export type ItemSource = "ai" | "manual";
+export type DailyChallengeSection = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative";
 
 export interface ModelOption {
   label: string;
@@ -231,9 +232,27 @@ export interface DerivativeSettings {
   hideHistory: boolean;
 }
 
+export interface DailyChallengeSettings {
+  counts: Record<DailyChallengeSection, number>;
+}
+
+export interface DailyChallengeRecord {
+  id: string;
+  profileId: string;
+  dateKey: string;
+  createdAt: string;
+  completedAt: string;
+  totalMs: number;
+  sectionTimes: Record<DailyChallengeSection, number>;
+  sectionCounts: Record<DailyChallengeSection, number>;
+  itemKeys: Record<DailyChallengeSection, string[]>;
+}
+
 export interface StorageState {
   version: 1;
   geminiApiKey: string;
+  dailyChallengeSettings: DailyChallengeSettings;
+  dailyChallengeRecords: DailyChallengeRecord[];
   seSettings: SeSettings;
   periphrasisSettings: PeriphrasisSettings;
   morfoSettings: MorfoSettings;

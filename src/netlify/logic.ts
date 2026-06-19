@@ -14,6 +14,9 @@ import {
 } from "./data";
 import type {
   Difficulty,
+  DailyChallengeRecord,
+  DailyChallengeSection,
+  DailyChallengeSettings,
   DerivativeAttempt,
   DerivativeItem,
   DerivativeSettings,
@@ -54,6 +57,7 @@ const DEFAULT_MODEL = MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash-lite";
 export const MIN_PRACTICE_BATCH_SIZE = 1;
 export const DEFAULT_PRACTICE_BATCH_SIZE = 5;
 export const MAX_PRACTICE_BATCH_SIZE = 10;
+export const DAILY_CHALLENGE_SECTIONS: DailyChallengeSection[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative"];
 
 export function coercePracticeBatchSize(value: unknown): number {
   const numericValue = typeof value === "number" ? value : Number(value);
@@ -143,6 +147,18 @@ function defaultDerivativeSettings(): DerivativeSettings {
   };
 }
 
+function defaultDailyChallengeSettings(): DailyChallengeSettings {
+  return {
+    counts: {
+      se: 1,
+      perifrasis: 1,
+      morfologia: 1,
+      sintaxis: 1,
+      derivative: 1,
+    },
+  };
+}
+
 function sanitizeItemSource(value: unknown): ItemSource {
   return value === "manual" ? "manual" : "ai";
 }
@@ -153,6 +169,70 @@ function sanitizeDifficulty(value: unknown, fallback: Difficulty = 2): Difficult
 
 function sanitizeStringList(value: unknown): string[] {
   return Array.isArray(value) ? value.map((entry) => String(entry ?? "").trim()).filter(Boolean) : [];
+}
+
+function sanitizeDailyCounts(value: unknown): Record<DailyChallengeSection, number> {
+  const fallback = defaultDailyChallengeSettings().counts;
+  const rawCounts = value && typeof value === "object" ? value as Partial<Record<DailyChallengeSection, unknown>> : {};
+
+  return DAILY_CHALLENGE_SECTIONS.reduce((counts, section) => {
+    counts[section] = coercePracticeBatchSize(rawCounts[section] ?? fallback[section]);
+    return counts;
+  }, {} as Record<DailyChallengeSection, number>);
+}
+
+function sanitizeDailyChallengeSettings(value: unknown): DailyChallengeSettings {
+  const raw = value && typeof value === "object" ? value as Partial<DailyChallengeSettings> : {};
+  return {
+    counts: sanitizeDailyCounts(raw.counts),
+  };
+}
+
+function sanitizeDailySectionTimes(value: unknown): Record<DailyChallengeSection, number> {
+  const raw = value && typeof value === "object" ? value as Partial<Record<DailyChallengeSection, unknown>> : {};
+  return DAILY_CHALLENGE_SECTIONS.reduce((times, section) => {
+    const numericValue = Number(raw[section]);
+    times[section] = Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : 0;
+    return times;
+  }, {} as Record<DailyChallengeSection, number>);
+}
+
+function sanitizeDailyItemKeys(value: unknown): Record<DailyChallengeSection, string[]> {
+  const raw = value && typeof value === "object" ? value as Partial<Record<DailyChallengeSection, unknown>> : {};
+  return DAILY_CHALLENGE_SECTIONS.reduce((keys, section) => {
+    keys[section] = sanitizeStringList(raw[section]);
+    return keys;
+  }, {} as Record<DailyChallengeSection, string[]>);
+}
+
+function sanitizeDailyChallengeRecord(record: unknown): DailyChallengeRecord | null {
+  if (!record || typeof record !== "object") {
+    return null;
+  }
+
+  const raw = record as Partial<DailyChallengeRecord>;
+  const id = typeof raw.id === "string" && raw.id.trim() ? raw.id : createId("daily_record");
+  const profileId = typeof raw.profileId === "string" && raw.profileId.trim() ? raw.profileId : "alumno";
+  const dateKey = typeof raw.dateKey === "string" && raw.dateKey.trim() ? raw.dateKey : "";
+  const createdAt = typeof raw.createdAt === "string" && raw.createdAt.trim() ? raw.createdAt : nowIso();
+  const completedAt = typeof raw.completedAt === "string" && raw.completedAt.trim() ? raw.completedAt : createdAt;
+  const totalMs = Number(raw.totalMs);
+
+  if (!dateKey || !Number.isFinite(totalMs) || totalMs <= 0) {
+    return null;
+  }
+
+  return {
+    id,
+    profileId,
+    dateKey,
+    createdAt,
+    completedAt,
+    totalMs: Math.round(totalMs),
+    sectionTimes: sanitizeDailySectionTimes(raw.sectionTimes),
+    sectionCounts: sanitizeDailyCounts(raw.sectionCounts),
+    itemKeys: sanitizeDailyItemKeys(raw.itemKeys),
+  };
 }
 
 function sanitizeStoredSeItem(item: unknown): StoredSeItem | null {
@@ -432,6 +512,8 @@ export function createDefaultStorageState(): StorageState {
   return {
     version: 1,
     geminiApiKey: "",
+    dailyChallengeSettings: defaultDailyChallengeSettings(),
+    dailyChallengeRecords: [],
     seSettings: defaultSeSettings(),
     periphrasisSettings: defaultPeriphrasisSettings(),
     morfoSettings: defaultMorfoSettings(),
@@ -470,6 +552,12 @@ export function loadStorageState(): StorageState {
     return {
       version: 1,
       geminiApiKey: typeof parsed.geminiApiKey === "string" ? parsed.geminiApiKey : "",
+      dailyChallengeSettings: sanitizeDailyChallengeSettings(parsed.dailyChallengeSettings),
+      dailyChallengeRecords: Array.isArray(parsed.dailyChallengeRecords)
+        ? parsed.dailyChallengeRecords
+            .map((record) => sanitizeDailyChallengeRecord(record))
+            .filter((record): record is DailyChallengeRecord => record !== null)
+        : [],
       seSettings: {
         ...defaultSeSettings(),
         ...parsedSeSettings,

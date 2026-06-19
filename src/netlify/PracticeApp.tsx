@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import ReactMarkdown from "react-markdown";
@@ -15,6 +15,7 @@ import {
   SE_VERBAL_STRUCTURES,
 } from "./data";
 import {
+  DAILY_CHALLENGE_SECTIONS,
   acceptedLexemesForItem,
   chooseMorfoTarget,
   choosePeriphrasisTarget,
@@ -69,6 +70,9 @@ import {
   requestSeRecheck,
 } from "./api";
 import type {
+  DailyChallengeRecord,
+  DailyChallengeSection,
+  DailyChallengeSettings,
   DerivativeAttempt,
   DerivativeItem,
   DerivativeSettings,
@@ -104,6 +108,7 @@ import type {
 
 type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative";
 type PageName = "practice" | "history" | "settings" | "storage";
+type SectionPageName = Exclude<PageName, "settings" | "storage">;
 
 interface SectionMeta {
   navLabel: string;
@@ -131,6 +136,8 @@ const PAGE_META: Record<PageName, PageMeta> = {
     label: "Bancos",
   },
 };
+
+const SECTION_PAGE_ORDER: SectionPageName[] = ["practice", "history"];
 
 const SECTION_META: Record<SectionName, SectionMeta> = {
   se: {
@@ -779,9 +786,1401 @@ function buildRequiredSeStrategy(value: string, mode: SeStrategy["mode"], ratioH
   };
 }
 
+type GlobalPageName = "daily" | "records" | "storage" | "settings";
+
+interface GlobalPageMeta {
+  label: string;
+}
+
+const GLOBAL_PAGE_META: Record<GlobalPageName, GlobalPageMeta> = {
+  daily: {
+    label: "Reto diario",
+  },
+  records: {
+    label: "Tiempos personales",
+  },
+  storage: {
+    label: "Bancos",
+  },
+  settings: {
+    label: "Ajustes",
+  },
+};
+
+const DAILY_SECTION_LABELS: Record<DailyChallengeSection, string> = {
+  se: "Valores del se",
+  perifrasis: "Perifrasis",
+  morfologia: "Morfologia",
+  sintaxis: "Sintaxis",
+  derivative: "Derivative",
+};
+
+type DailyChallengePlan = {
+  se: SeItem[];
+  perifrasis: PeriphrasisItem[];
+  morfologia: MorfoItem[];
+  sintaxis: SintaxisItem[];
+  derivative: DerivativeItem[];
+};
+
+interface DailyChallengeSession {
+  id: string;
+  dateKey: string;
+  startedAt: number;
+  sectionStartedAt: number;
+  currentSectionIndex: number;
+  currentItemIndex: number;
+  checked: boolean;
+  plan: DailyChallengePlan;
+  sectionTimes: Record<DailyChallengeSection, number>;
+  warning: string;
+}
+
+function emptyDailySectionMap<T>(value: T): Record<DailyChallengeSection, T> {
+  return DAILY_CHALLENGE_SECTIONS.reduce((result, section) => {
+    result[section] = value;
+    return result;
+  }, {} as Record<DailyChallengeSection, T>);
+}
+
+function emptyDailyPlan(): DailyChallengePlan {
+  return {
+    se: [],
+    perifrasis: [],
+    morfologia: [],
+    sintaxis: [],
+    derivative: [],
+  };
+}
+
+function localDateKey(date = new Date()): string {
+  const year = date.getFullYear();
+  const month = String(date.getMonth() + 1).padStart(2, "0");
+  const day = String(date.getDate()).padStart(2, "0");
+  return `${year}-${month}-${day}`;
+}
+
+function formatDuration(durationMs: number): string {
+  const totalSeconds = Math.max(0, Math.floor(durationMs / 1000));
+  const minutes = Math.floor(totalSeconds / 60);
+  const seconds = totalSeconds % 60;
+  return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
+}
+
+function formatDateLabel(dateKey: string): string {
+  const [year, month, day] = dateKey.split("-").map(Number);
+  if (!year || !month || !day) {
+    return dateKey;
+  }
+  return new Date(year, month - 1, day).toLocaleDateString("es-ES", {
+    day: "2-digit",
+    month: "short",
+  });
+}
+
+function modelSelectValue(modelName: string): string {
+  return MODEL_OPTIONS.some((option) => option.value === modelName) ? modelName : "custom";
+}
+
+function customModelValue(modelName: string): string {
+  return modelSelectValue(modelName) === "custom" ? modelName : "";
+}
+
+function resolveModelDraft(selectedModel: string, customModel: string): string {
+  return selectedModel === "custom" ? customModel.trim() || MODEL_OPTIONS[0].value : selectedModel;
+}
+
+function dailyKeyForSe(item: Pick<SeItem, "sentence"> | StoredSeItem): string {
+  return normalizeTextToken(item.sentence);
+}
+
+function dailyKeyForPeriphrasis(item: Pick<PeriphrasisItem, "sentence"> | StoredPeriphrasisItem): string {
+  return normalizeTextToken(item.sentence);
+}
+
+function dailyKeyForMorfo(item: Pick<MorfoItem, "word"> | StoredMorfoItem): string {
+  return normalizeTextToken(item.word);
+}
+
+function dailyKeyForSintaxis(item: Pick<SintaxisItem, "phrase"> | StoredSintaxisItem): string {
+  return normalizeTextToken(item.phrase);
+}
+
+function dailyKeyForDerivative(item: Pick<DerivativeItem, "functionText"> | StoredDerivativeItem): string {
+  return normalizeTextToken(item.functionText);
+}
+
+function usedDailyKeys(records: DailyChallengeRecord[], section: DailyChallengeSection): Set<string> {
+  return new Set(records.flatMap((record) => record.itemKeys[section] ?? []).map(normalizeTextToken).filter(Boolean));
+}
+
+function selectDailyItems<T>(
+  bank: readonly T[],
+  count: number,
+  usedKeys: Set<string>,
+  keyForItem: (item: T) => string,
+): T[] {
+  const targetCount = coercePracticeBatchSize(count);
+  const selected: T[] = [];
+  const selectedKeys = new Set<string>();
+  const unused = shuffleList([...bank].filter((item) => !usedKeys.has(keyForItem(item))));
+  const fallback = shuffleList([...bank]);
+
+  [...unused, ...fallback].forEach((item) => {
+    const key = keyForItem(item);
+    if (!key || selectedKeys.has(key) || selected.length >= targetCount) {
+      return;
+    }
+    selectedKeys.add(key);
+    selected.push(item);
+  });
+
+  return selected;
+}
+
+function buildDailyChallengePlan(storageState: StorageState): { plan: DailyChallengePlan; warning: string } {
+  const counts = storageState.dailyChallengeSettings.counts;
+  const records = storageState.dailyChallengeRecords;
+  const plan = emptyDailyPlan();
+
+  plan.se = selectDailyItems(storageState.seQuestionBank, counts.se, usedDailyKeys(records, "se"), dailyKeyForSe)
+    .map((item) => ({ ...item, id: createId("daily_se"), mode: "normal" as const }));
+  plan.perifrasis = selectDailyItems(
+    storageState.periphrasisQuestionBank,
+    counts.perifrasis,
+    usedDailyKeys(records, "perifrasis"),
+    dailyKeyForPeriphrasis,
+  ).map((item) => ({ ...item, id: createId("daily_perifrasis"), mode: "normal" as const }));
+  plan.morfologia = selectDailyItems(
+    storageState.morfoQuestionBank,
+    counts.morfologia,
+    usedDailyKeys(records, "morfologia"),
+    dailyKeyForMorfo,
+  ).map((item) => ({ ...item, id: createId("daily_morfo"), mode: "normal" as const }));
+  plan.sintaxis = selectDailyItems(
+    storageState.sintaxisQuestionBank,
+    counts.sintaxis,
+    usedDailyKeys(records, "sintaxis"),
+    dailyKeyForSintaxis,
+  ).map((item) => ({ ...item, id: createId("daily_sintaxis"), mode: "normal" as const }));
+  plan.derivative = selectDailyItems(
+    storageState.derivativeQuestionBank,
+    counts.derivative,
+    usedDailyKeys(records, "derivative"),
+    dailyKeyForDerivative,
+  ).map((item) => ({ ...item, id: createId("daily_derivative"), mode: "normal" as const }));
+
+  const incompleteSections = DAILY_CHALLENGE_SECTIONS.filter((section) => plan[section].length < counts[section]);
+  const warning = incompleteSections.length > 0
+    ? `Algunas secciones no tienen suficientes preguntas nuevas: ${incompleteSections.map((section) => DAILY_SECTION_LABELS[section]).join(", ")}.`
+    : "";
+
+  return { plan, warning };
+}
+
+function dailyPlanItemKeys(plan: DailyChallengePlan): Record<DailyChallengeSection, string[]> {
+  return {
+    se: plan.se.map(dailyKeyForSe),
+    perifrasis: plan.perifrasis.map(dailyKeyForPeriphrasis),
+    morfologia: plan.morfologia.map(dailyKeyForMorfo),
+    sintaxis: plan.sintaxis.map(dailyKeyForSintaxis),
+    derivative: plan.derivative.map(dailyKeyForDerivative),
+  };
+}
+
+function dailyPlanSectionCounts(plan: DailyChallengePlan): Record<DailyChallengeSection, number> {
+  return DAILY_CHALLENGE_SECTIONS.reduce((counts, section) => {
+    counts[section] = plan[section].length;
+    return counts;
+  }, {} as Record<DailyChallengeSection, number>);
+}
+
+function dailyPlanTotal(plan: DailyChallengePlan): number {
+  return DAILY_CHALLENGE_SECTIONS.reduce((total, section) => total + plan[section].length, 0);
+}
+
+function firstDailySectionIndex(plan: DailyChallengePlan): number {
+  return Math.max(0, DAILY_CHALLENGE_SECTIONS.findIndex((section) => plan[section].length > 0));
+}
+
+function DailyTimerOverlay({ startedAt }: { startedAt: number }) {
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    const timerId = window.setInterval(() => setNow(Date.now()), 500);
+    return () => window.clearInterval(timerId);
+  }, []);
+
+  return <div className="daily-timer-overlay">{formatDuration(now - startedAt)}</div>;
+}
+
+function DailyChallengeSettingsPanel({
+  settings,
+  onSettingsChange,
+}: {
+  settings: DailyChallengeSettings;
+  onSettingsChange: (settings: DailyChallengeSettings) => void;
+}) {
+  const updateCount = (section: DailyChallengeSection, value: string) => {
+    onSettingsChange({
+      ...settings,
+      counts: {
+        ...settings.counts,
+        [section]: coercePracticeBatchSize(value),
+      },
+    });
+  };
+
+  return (
+    <div className="panel daily-settings-panel">
+      <p className="muted-line">Cantidad de ejercicios que saldran en cada seccion del reto diario.</p>
+      <div className="daily-settings-grid">
+        {DAILY_CHALLENGE_SECTIONS.map((section) => (
+          <div key={section}>
+            <FieldLabel label={DAILY_SECTION_LABELS[section]} />
+            <input
+              max={MAX_PRACTICE_BATCH_SIZE}
+              min={MIN_PRACTICE_BATCH_SIZE}
+              step={1}
+              type="number"
+              value={settings.counts[section]}
+              onChange={(event) => updateCount(section, event.target.value)}
+            />
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+function DailySeQuestion({
+  item,
+  settings,
+  availableSeValues,
+  onAttempt,
+  onChecked,
+}: {
+  item: SeItem;
+  settings: SeSettings;
+  availableSeValues: string[];
+  onAttempt: (attempt: SeAttempt) => void;
+  onChecked: () => void;
+}) {
+  const [guessValue, setGuessValue] = useState(availableSeValues[0] ?? SE_VALUES[0]);
+  const [guessFunction, setGuessFunction] = useState<string>(SE_FUNCTIONS[0]);
+  const [evaluation, setEvaluation] = useState<SeEvaluation | null>(null);
+  const [attemptSaved, setAttemptSaved] = useState(false);
+
+  useEffect(() => {
+    setGuessValue(availableSeValues[0] ?? SE_VALUES[0]);
+    setGuessFunction(SE_FUNCTIONS[0]);
+    setEvaluation(null);
+    setAttemptSaved(false);
+  }, [availableSeValues, item.id]);
+
+  const handleCheck = () => {
+    const nextEvaluation = evaluateSeGuess(item, guessValue, guessFunction, item.verbalStructure, item.periphrasisType);
+    setEvaluation(nextEvaluation);
+    if (!attemptSaved) {
+      onAttempt(makeSeAttempt(item, settings, nextEvaluation));
+      setAttemptSaved(true);
+    }
+    onChecked();
+  };
+
+  return (
+    <>
+      <h3 className="prompt-text">{item.sentence}</h3>
+      <div className="field-grid">
+        <div>
+          <FieldLabel label="Valor de se" />
+          <select value={guessValue} onChange={(event) => setGuessValue(event.target.value)}>
+            {availableSeValues.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <FieldLabel label="Funcion de se" />
+          <select value={guessFunction} onChange={(event) => setGuessFunction(event.target.value)}>
+            {SE_FUNCTIONS.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <button className="primary-btn" type="button" onClick={handleCheck}>
+        Comprobar respuesta
+      </button>
+      {evaluation ? (
+        <>
+          <div className="result-panel">
+            <p>
+              Valor:{" "}
+              <strong className={evaluation.valueOk ? "result-ok" : "result-bad"}>
+                {evaluation.valueOk ? "correcto" : `incorrecto (correcto: ${item.seValue})`}
+              </strong>
+            </p>
+            <p>
+              Funcion:{" "}
+              <strong className={evaluation.functionOk ? "result-ok" : "result-bad"}>
+                {evaluation.functionOk ? "correcta" : `incorrecta (correcta: ${item.seFunction})`}
+              </strong>
+            </p>
+            <p>{item.explanation}</p>
+          </div>
+        </>
+      ) : null}
+    </>
+  );
+}
+
+function DailyPeriphrasisQuestion({
+  item,
+  settings,
+  availablePeriphrasisTypes,
+  onAttempt,
+  onChecked,
+}: {
+  item: PeriphrasisItem;
+  settings: PeriphrasisSettings;
+  availablePeriphrasisTypes: string[];
+  onAttempt: (attempt: PeriphrasisAttempt) => void;
+  onChecked: () => void;
+}) {
+  const noAplica = availablePeriphrasisTypes.find((value) => normalizeTextToken(value) === normalizeTextToken("No aplica")) ?? "No aplica";
+  const [guessStructure, setGuessStructure] = useState<string>(PERIPHRASIS_STRUCTURES[0]);
+  const [guessPeriphrasisType, setGuessPeriphrasisType] = useState(noAplica);
+  const [evaluation, setEvaluation] = useState<PeriphrasisEvaluation | null>(null);
+  const [attemptSaved, setAttemptSaved] = useState(false);
+
+  useEffect(() => {
+    setGuessStructure(PERIPHRASIS_STRUCTURES[0]);
+    setGuessPeriphrasisType(noAplica);
+    setEvaluation(null);
+    setAttemptSaved(false);
+  }, [item.id, noAplica]);
+
+  const handleCheck = () => {
+    const nextEvaluation = evaluatePeriphrasisGuess(item, guessStructure, guessPeriphrasisType);
+    setEvaluation(nextEvaluation);
+    if (!attemptSaved) {
+      onAttempt(makePeriphrasisAttempt(item, settings, nextEvaluation));
+      setAttemptSaved(true);
+    }
+    onChecked();
+  };
+
+  return (
+    <>
+      <h3 className="prompt-text">{item.sentence}</h3>
+      <div className="field-grid">
+        <div>
+          <FieldLabel label="Construccion verbal" />
+          <select
+            value={guessStructure}
+            onChange={(event) => {
+              const nextValue = event.target.value;
+              setGuessStructure(nextValue);
+              if (nextValue !== "Perifrasis verbal") {
+                setGuessPeriphrasisType(noAplica);
+              }
+            }}
+          >
+            {PERIPHRASIS_STRUCTURES.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <FieldLabel label="Tipo de perifrasis" />
+          <select
+            disabled={guessStructure !== "Perifrasis verbal"}
+            value={guessPeriphrasisType}
+            onChange={(event) => setGuessPeriphrasisType(event.target.value)}
+          >
+            {availablePeriphrasisTypes.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+      <button className="primary-btn" type="button" onClick={handleCheck}>
+        Comprobar respuesta
+      </button>
+      {evaluation ? (
+        <div className="result-panel">
+          <p>
+            Construccion verbal:{" "}
+            <strong className={evaluation.structureOk ? "result-ok" : "result-bad"}>
+              {evaluation.structureOk ? "correcta" : `incorrecta (correcta: ${item.verbalStructure})`}
+            </strong>
+          </p>
+          <p>
+            Tipo de perifrasis:{" "}
+            <strong className={evaluation.periphrasisTypeOk ? "result-ok" : "result-bad"}>
+              {evaluation.periphrasisTypeOk ? "correcto" : `incorrecto (correcto: ${item.periphrasisType})`}
+            </strong>
+          </p>
+          <p>{item.explanation}</p>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function DailyMorfoQuestion({
+  item,
+  settings,
+  onAttempt,
+  onChecked,
+}: {
+  item: MorfoItem;
+  settings: MorfoSettings;
+  onAttempt: (attempt: MorfoAttempt) => void;
+  onChecked: () => void;
+}) {
+  const [guessWordType, setGuessWordType] = useState<string>(MORFO_WORD_TYPES[0]);
+  const [guessLexeme, setGuessLexeme] = useState("");
+  const [guessMorphemesText, setGuessMorphemesText] = useState("");
+  const [guessMorphemeTypes, setGuessMorphemeTypes] = useState<string[]>([]);
+  const [evaluation, setEvaluation] = useState<MorfoEvaluation | null>(null);
+  const [attemptSaved, setAttemptSaved] = useState(false);
+  const acceptedLexemeLabels = acceptedLexemesForItem(item);
+
+  useEffect(() => {
+    setGuessWordType(MORFO_WORD_TYPES[0]);
+    setGuessLexeme("");
+    setGuessMorphemesText("");
+    setGuessMorphemeTypes([]);
+    setEvaluation(null);
+    setAttemptSaved(false);
+  }, [item.id]);
+
+  const handleCheck = () => {
+    const nextEvaluation = evaluateMorfoGuess(item, guessWordType, guessLexeme, guessMorphemesText, guessMorphemeTypes);
+    setEvaluation(nextEvaluation);
+    if (!attemptSaved) {
+      onAttempt(makeMorfoAttempt(item, settings, nextEvaluation));
+      setAttemptSaved(true);
+    }
+    onChecked();
+  };
+
+  return (
+    <>
+      <h3 className="prompt-text">{item.word}</h3>
+      <div className="field-grid">
+        <div>
+          <FieldLabel label="Tipo de palabra" />
+          <select value={guessWordType} onChange={(event) => setGuessWordType(event.target.value)}>
+            {MORFO_WORD_TYPES.map((value) => (
+              <option key={value} value={value}>
+                {value}
+              </option>
+            ))}
+          </select>
+        </div>
+        <div>
+          <FieldLabel label="Lexema" />
+          <input value={guessLexeme} onChange={(event) => setGuessLexeme(event.target.value)} />
+        </div>
+      </div>
+      <div className="field-grid">
+        <div>
+          <FieldLabel label="Morfemas" />
+          <input value={guessMorphemesText} onChange={(event) => setGuessMorphemesText(event.target.value)} />
+        </div>
+        <div>
+          <FieldLabel label="Tipos de morfema" />
+          <MultiToggleList
+            options={MORFO_MORPHEME_TYPES}
+            selected={guessMorphemeTypes}
+            onToggle={(value) =>
+              setGuessMorphemeTypes((current) =>
+                current.includes(value) ? current.filter((entry) => entry !== value) : [...current, value],
+              )
+            }
+          />
+        </div>
+      </div>
+      <button className="primary-btn" type="button" onClick={handleCheck}>
+        Comprobar respuesta
+      </button>
+      {evaluation ? (
+        <div className="result-panel">
+          <p>
+            Tipo de palabra:{" "}
+            <strong className={evaluation.wordTypeOk ? "result-ok" : "result-bad"}>
+              {evaluation.wordTypeOk ? "correcto" : `incorrecto (correcto: ${item.wordType})`}
+            </strong>
+          </p>
+          <p>
+            Lexema:{" "}
+            <strong className={evaluation.lexemeOk ? "result-ok" : "result-bad"}>
+              {evaluation.lexemeOk ? "correcto" : `incorrecto (aceptados: ${acceptedLexemeLabels.join(", ")})`}
+            </strong>
+          </p>
+          <p>
+            Morfemas:{" "}
+            <strong className={evaluation.morphemesOk ? "result-ok" : "result-bad"}>
+              {evaluation.morphemesOk ? "correctos" : `incorrectos (correctos: ${item.morphemes.join(", ")})`}
+            </strong>
+          </p>
+          <p>
+            Tipos de morfema:{" "}
+            <strong className={evaluation.morphemeTypesOk ? "result-ok" : "result-bad"}>
+              {evaluation.morphemeTypesOk ? "correctos" : `incorrectos (correctos: ${item.morphemeTypes.join(", ")})`}
+            </strong>
+          </p>
+          <p>{item.explanation}</p>
+        </div>
+      ) : null}
+    </>
+  );
+}
+
+function DailySintaxisQuestion({
+  item,
+  settings,
+  onAttempt,
+  onChecked,
+}: {
+  item: SintaxisItem;
+  settings: SintaxisSettings;
+  onAttempt: (attempt: SintaxisAttempt) => void;
+  onChecked: () => void;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [attemptSaved, setAttemptSaved] = useState(false);
+
+  useEffect(() => {
+    setVisible(false);
+    setAttemptSaved(false);
+  }, [item.id]);
+
+  const handleReveal = () => {
+    setVisible(true);
+    if (!attemptSaved) {
+      onAttempt(makeSintaxisAttempt(item, settings, ""));
+      setAttemptSaved(true);
+    }
+    onChecked();
+  };
+
+  return (
+    <div className="sintaxis-practice-column daily-sintaxis-column">
+      <h3 className="prompt-text sintaxis-prompt-text">{item.phrase}</h3>
+      <button className="primary-btn sintaxis-correction-btn" type="button" onClick={handleReveal}>
+        Mostrar correccion
+      </button>
+      {visible ? (
+        <div className="info-block markdown-correction sintaxis-correction-box">
+          <ReactMarkdown>{item.correction}</ReactMarkdown>
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DailyDerivativeQuestion({
+  item,
+  settings,
+  onAttempt,
+  onChecked,
+}: {
+  item: DerivativeItem;
+  settings: DerivativeSettings;
+  onAttempt: (attempt: DerivativeAttempt) => void;
+  onChecked: () => void;
+}) {
+  const [visible, setVisible] = useState(false);
+  const [attemptSaved, setAttemptSaved] = useState(false);
+
+  useEffect(() => {
+    setVisible(false);
+    setAttemptSaved(false);
+  }, [item.id]);
+
+  const handleReveal = () => {
+    setVisible(true);
+    if (!attemptSaved) {
+      onAttempt(makeDerivativeAttempt(item, settings));
+      setAttemptSaved(true);
+    }
+    onChecked();
+  };
+
+  return (
+    <div className="derivative-practice-column">
+      <MathDisplay value={item.functionText} className="derivative-function-display" />
+      <button className="primary-btn derivative-answer-btn" type="button" onClick={handleReveal}>
+        Mostrar respuesta
+      </button>
+      {visible ? (
+        <div className="info-block derivative-answer-box">
+          <MathDisplay value={item.derivative} className="derivative-answer-display" />
+        </div>
+      ) : null}
+    </div>
+  );
+}
+
+function DailyChallengeQuestion({
+  section,
+  item,
+  storageState,
+  onChecked,
+  onAppendSeAttempt,
+  onAppendPeriphrasisAttempt,
+  onAppendMorfoAttempt,
+  onAppendSintaxisAttempt,
+  onAppendDerivativeAttempt,
+}: {
+  section: DailyChallengeSection;
+  item: SeItem | PeriphrasisItem | MorfoItem | SintaxisItem | DerivativeItem;
+  storageState: StorageState;
+  onChecked: () => void;
+  onAppendSeAttempt: (attempt: SeAttempt) => void;
+  onAppendPeriphrasisAttempt: (attempt: PeriphrasisAttempt) => void;
+  onAppendMorfoAttempt: (attempt: MorfoAttempt) => void;
+  onAppendSintaxisAttempt: (attempt: SintaxisAttempt) => void;
+  onAppendDerivativeAttempt: (attempt: DerivativeAttempt) => void;
+}) {
+  const availableSeValues = useMemo(
+    () => mergeLabelGroups(SE_VALUES, storageState.seSettings.customValues),
+    [storageState.seSettings.customValues],
+  );
+  const availablePeriphrasisTypes = useMemo(
+    () => mergeLabelGroups(PERIPHRASIS_TYPES, storageState.periphrasisSettings.customPeriphrasisTypes),
+    [storageState.periphrasisSettings.customPeriphrasisTypes],
+  );
+
+  if (section === "se") {
+    return (
+      <DailySeQuestion
+        item={item as SeItem}
+        settings={storageState.seSettings}
+        availableSeValues={availableSeValues}
+        onAttempt={onAppendSeAttempt}
+        onChecked={onChecked}
+      />
+    );
+  }
+  if (section === "perifrasis") {
+    return (
+      <DailyPeriphrasisQuestion
+        item={item as PeriphrasisItem}
+        settings={storageState.periphrasisSettings}
+        availablePeriphrasisTypes={availablePeriphrasisTypes}
+        onAttempt={onAppendPeriphrasisAttempt}
+        onChecked={onChecked}
+      />
+    );
+  }
+  if (section === "morfologia") {
+    return (
+      <DailyMorfoQuestion
+        item={item as MorfoItem}
+        settings={storageState.morfoSettings}
+        onAttempt={onAppendMorfoAttempt}
+        onChecked={onChecked}
+      />
+    );
+  }
+  if (section === "sintaxis") {
+    return (
+      <DailySintaxisQuestion
+        item={item as SintaxisItem}
+        settings={storageState.sintaxisSettings}
+        onAttempt={onAppendSintaxisAttempt}
+        onChecked={onChecked}
+      />
+    );
+  }
+  return (
+    <DailyDerivativeQuestion
+      item={item as DerivativeItem}
+      settings={storageState.derivativeSettings}
+      onAttempt={onAppendDerivativeAttempt}
+      onChecked={onChecked}
+    />
+  );
+}
+
+function DailyChallengePage({
+  storageState,
+  onActiveSectionChange,
+  onAppendSeAttempt,
+  onAppendPeriphrasisAttempt,
+  onAppendMorfoAttempt,
+  onAppendSintaxisAttempt,
+  onAppendDerivativeAttempt,
+  onCompleteRecord,
+}: {
+  storageState: StorageState;
+  onActiveSectionChange: (section: DailyChallengeSection) => void;
+  onAppendSeAttempt: (attempt: SeAttempt) => void;
+  onAppendPeriphrasisAttempt: (attempt: PeriphrasisAttempt) => void;
+  onAppendMorfoAttempt: (attempt: MorfoAttempt) => void;
+  onAppendSintaxisAttempt: (attempt: SintaxisAttempt) => void;
+  onAppendDerivativeAttempt: (attempt: DerivativeAttempt) => void;
+  onCompleteRecord: (record: DailyChallengeRecord) => void;
+}) {
+  const [session, setSession] = useState<DailyChallengeSession | null>(null);
+  const [completedRecord, setCompletedRecord] = useState<DailyChallengeRecord | null>(null);
+  const todayKey = localDateKey();
+  const todaysRecord = storageState.dailyChallengeRecords
+    .filter((record) => record.dateKey === todayKey)
+    .sort((left, right) => right.completedAt.localeCompare(left.completedAt))[0];
+
+  const startChallenge = () => {
+    const { plan, warning } = buildDailyChallengePlan(storageState);
+    if (dailyPlanTotal(plan) === 0) {
+      setCompletedRecord(null);
+      return;
+    }
+
+    const startedAt = Date.now();
+    const firstIndex = firstDailySectionIndex(plan);
+    setCompletedRecord(null);
+    setSession({
+      id: createId("daily_session"),
+      dateKey: todayKey,
+      startedAt,
+      sectionStartedAt: startedAt,
+      currentSectionIndex: firstIndex,
+      currentItemIndex: 0,
+      checked: false,
+      plan,
+      sectionTimes: emptyDailySectionMap(0),
+      warning,
+    });
+    onActiveSectionChange(DAILY_CHALLENGE_SECTIONS[firstIndex]);
+  };
+
+  const currentSection = session ? DAILY_CHALLENGE_SECTIONS[session.currentSectionIndex] : null;
+  const currentItems = session && currentSection ? session.plan[currentSection] : [];
+  const currentItem = currentItems[session?.currentItemIndex ?? 0] ?? null;
+
+  useEffect(() => {
+    if (currentSection) {
+      onActiveSectionChange(currentSection);
+    }
+  }, [currentSection]);
+
+  const markChecked = () => {
+    setSession((current) => current ? { ...current, checked: true } : current);
+  };
+
+  const advanceChallenge = () => {
+    if (!session || !currentSection) {
+      return;
+    }
+
+    const now = Date.now();
+    const currentSectionItems = session.plan[currentSection];
+    if (session.currentItemIndex + 1 < currentSectionItems.length) {
+      setSession({
+        ...session,
+        currentItemIndex: session.currentItemIndex + 1,
+        checked: false,
+      });
+      return;
+    }
+
+    const sectionTimes = {
+      ...session.sectionTimes,
+      [currentSection]: now - session.sectionStartedAt,
+    };
+    const nextSectionIndex = DAILY_CHALLENGE_SECTIONS.findIndex(
+      (section, index) => index > session.currentSectionIndex && session.plan[section].length > 0,
+    );
+
+    if (nextSectionIndex >= 0) {
+      setSession({
+        ...session,
+        sectionTimes,
+        currentSectionIndex: nextSectionIndex,
+        currentItemIndex: 0,
+        sectionStartedAt: now,
+        checked: false,
+      });
+      onActiveSectionChange(DAILY_CHALLENGE_SECTIONS[nextSectionIndex]);
+      return;
+    }
+
+    const completedAt = new Date();
+    const record: DailyChallengeRecord = {
+      id: createId("daily_record"),
+      profileId: storageState.seSettings.profileId.trim() || "alumno",
+      dateKey: session.dateKey,
+      createdAt: new Date(session.startedAt).toISOString(),
+      completedAt: completedAt.toISOString(),
+      totalMs: now - session.startedAt,
+      sectionTimes,
+      sectionCounts: dailyPlanSectionCounts(session.plan),
+      itemKeys: dailyPlanItemKeys(session.plan),
+    };
+    onCompleteRecord(record);
+    setCompletedRecord(record);
+    setSession(null);
+  };
+
+  if (!session) {
+    const plannedTotal = DAILY_CHALLENGE_SECTIONS.reduce(
+      (total, section) => total + storageState.dailyChallengeSettings.counts[section],
+      0,
+    );
+    const bankCounts = {
+      se: storageState.seQuestionBank.length,
+      perifrasis: storageState.periphrasisQuestionBank.length,
+      morfologia: storageState.morfoQuestionBank.length,
+      sintaxis: storageState.sintaxisQuestionBank.length,
+      derivative: storageState.derivativeQuestionBank.length,
+    };
+    const hasAnyBankItems = Object.values(bankCounts).some((count) => count > 0);
+
+    return (
+      <section className="workspace daily-challenge-page">
+        <div className="panel daily-start-panel">
+          <p className="muted-line">
+            Empieza en Valores del se y avanza automaticamente por Perifrasis, Morfologia, Sintaxis y Derivative.
+          </p>
+          <div className="daily-target-grid">
+            {DAILY_CHALLENGE_SECTIONS.map((section) => (
+              <article className="daily-target-card" key={section}>
+                <span>{DAILY_SECTION_LABELS[section]}</span>
+                <strong>{storageState.dailyChallengeSettings.counts[section]}</strong>
+                <small>{bankCounts[section]} en banco</small>
+              </article>
+            ))}
+          </div>
+          {todaysRecord ? (
+            <div className="inline-banner">
+              Hoy ya hay un tiempo guardado: {formatDuration(todaysRecord.totalMs)}.
+            </div>
+          ) : null}
+          {completedRecord ? (
+            <div className="inline-banner">
+              Ultimo reto terminado: {formatDuration(completedRecord.totalMs)} total.
+            </div>
+          ) : null}
+          {!hasAnyBankItems ? (
+            <div className="inline-banner warn">No hay preguntas en los bancos todavia.</div>
+          ) : null}
+          <button className="primary-btn daily-start-btn" disabled={!hasAnyBankItems || plannedTotal === 0} type="button" onClick={startChallenge}>
+            Empezar
+          </button>
+        </div>
+      </section>
+    );
+  }
+
+  const itemNumber = session.currentItemIndex + 1;
+  const sectionTotal = currentItems.length;
+  const isLastSection = !DAILY_CHALLENGE_SECTIONS.some(
+    (section, index) => index > session.currentSectionIndex && session.plan[section].length > 0,
+  );
+  const isLastItemInSection = session.currentItemIndex + 1 >= sectionTotal;
+  const nextLabel = isLastSection && isLastItemInSection ? "Finalizar" : "Siguiente";
+
+  return (
+    <section className="workspace daily-challenge-page">
+      <DailyTimerOverlay startedAt={session.startedAt} />
+      <div className="daily-session-header">
+        <div>
+          <p className="section-heading">Reto diario</p>
+          <h3>{currentSection ? DAILY_SECTION_LABELS[currentSection] : ""}</h3>
+        </div>
+        <div className="daily-session-meta">
+          {itemNumber}/{sectionTotal}
+        </div>
+      </div>
+      {session.warning ? <div className="inline-banner warn">{session.warning}</div> : null}
+      <div className="page-grid single-column">
+        <div className="panel practice-panel daily-practice-panel">
+          {currentSection && currentItem ? (
+            <DailyChallengeQuestion
+              key={`${currentSection}-${currentItem.id}`}
+              section={currentSection}
+              item={currentItem}
+              storageState={storageState}
+              onChecked={markChecked}
+              onAppendSeAttempt={onAppendSeAttempt}
+              onAppendPeriphrasisAttempt={onAppendPeriphrasisAttempt}
+              onAppendMorfoAttempt={onAppendMorfoAttempt}
+              onAppendSintaxisAttempt={onAppendSintaxisAttempt}
+              onAppendDerivativeAttempt={onAppendDerivativeAttempt}
+            />
+          ) : (
+            <div className="empty-state">
+              <h3>No hay pregunta disponible para esta seccion.</h3>
+            </div>
+          )}
+          {session.checked ? (
+            <button className="primary-btn daily-next-btn" type="button" onClick={advanceChallenge}>
+              {nextLabel}
+            </button>
+          ) : null}
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function PersonalTimesPage({ records }: { records: DailyChallengeRecord[] }) {
+  const sortedRecords = [...records].sort((left, right) => left.dateKey.localeCompare(right.dateKey));
+  const recentRecords = sortedRecords.slice(-14);
+  const maxTime = Math.max(1, ...recentRecords.map((record) => record.totalMs));
+  const chartWidth = 720;
+  const chartHeight = 260;
+  const chartPadding = { top: 20, right: 28, bottom: 46, left: 58 };
+  const plotWidth = chartWidth - chartPadding.left - chartPadding.right;
+  const plotHeight = chartHeight - chartPadding.top - chartPadding.bottom;
+  const chartPoints = recentRecords.map((record, index) => {
+    const x = chartPadding.left + (recentRecords.length === 1 ? plotWidth / 2 : (plotWidth * index) / (recentRecords.length - 1));
+    const y = chartPadding.top + plotHeight - (record.totalMs / maxTime) * plotHeight;
+    return {
+      id: record.id,
+      date: formatDateLabel(record.dateKey),
+      duration: formatDuration(record.totalMs),
+      title: `${record.dateKey}: ${formatDuration(record.totalMs)}`,
+      x,
+      y,
+    };
+  });
+  const linePath = chartPoints.map((point, index) => `${index === 0 ? "M" : "L"} ${point.x} ${point.y}`).join(" ");
+  const areaPath =
+    chartPoints.length > 1
+      ? `${linePath} L ${chartPoints[chartPoints.length - 1].x} ${chartPadding.top + plotHeight} L ${chartPoints[0].x} ${chartPadding.top + plotHeight} Z`
+      : "";
+  const yTicks = [0, 0.25, 0.5, 0.75, 1].map((ratio) => {
+    const value = maxTime * (1 - ratio);
+    return {
+      label: formatDuration(value),
+      y: chartPadding.top + plotHeight * ratio,
+    };
+  });
+  const bestRecord = records.length > 0
+    ? records.reduce((best, record) => record.totalMs < best.totalMs ? record : best, records[0])
+    : null;
+  const latestRecord = [...records].sort((left, right) => right.completedAt.localeCompare(left.completedAt))[0] ?? null;
+
+  return (
+    <section className="workspace personal-times-page">
+      {records.length === 0 ? (
+        <div className="empty-state">
+          <h3>Aun no hay tiempos guardados.</h3>
+        </div>
+      ) : (
+        <>
+          <div className="library-overview daily-record-overview">
+            <article className="library-stat">
+              <span>Retos completados</span>
+              <strong>{records.length}</strong>
+            </article>
+            <article className="library-stat">
+              <span>Mejor total</span>
+              <strong>{bestRecord ? formatDuration(bestRecord.totalMs) : "-"}</strong>
+              <small>{bestRecord ? bestRecord.dateKey : "sin datos"}</small>
+            </article>
+            <article className="library-stat">
+              <span>Ultimo total</span>
+              <strong>{latestRecord ? formatDuration(latestRecord.totalMs) : "-"}</strong>
+              <small>{latestRecord ? latestRecord.dateKey : "sin datos"}</small>
+            </article>
+            <article className="library-stat">
+              <span>Promedio</span>
+              <strong>{formatDuration(records.reduce((total, record) => total + record.totalMs, 0) / records.length)}</strong>
+              <small>total por reto</small>
+            </article>
+          </div>
+
+          <div className="daily-times-chart">
+            <div className="chart-header">
+              <h2>Tiempos por dia</h2>
+              <span>ultimos {recentRecords.length}</span>
+            </div>
+            <div className="daily-line-chart" aria-label="Grafica de tiempos por dia" role="img">
+              <svg className="daily-line-chart__svg" viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
+                <defs>
+                  <linearGradient id="daily-time-fill" x1="0" x2="0" y1="0" y2="1">
+                    <stop offset="0%" stopColor="currentColor" stopOpacity="0.16" />
+                    <stop offset="100%" stopColor="currentColor" stopOpacity="0" />
+                  </linearGradient>
+                </defs>
+                {yTicks.map((tick) => (
+                  <g key={tick.y}>
+                    <line
+                      className="daily-line-chart__grid"
+                      x1={chartPadding.left}
+                      x2={chartWidth - chartPadding.right}
+                      y1={tick.y}
+                      y2={tick.y}
+                    />
+                    <text className="daily-line-chart__axis" x={chartPadding.left - 10} y={tick.y + 4} textAnchor="end">
+                      {tick.label}
+                    </text>
+                  </g>
+                ))}
+                <line
+                  className="daily-line-chart__axis-line"
+                  x1={chartPadding.left}
+                  x2={chartWidth - chartPadding.right}
+                  y1={chartPadding.top + plotHeight}
+                  y2={chartPadding.top + plotHeight}
+                />
+                {areaPath ? <path className="daily-line-chart__area" d={areaPath} /> : null}
+                {linePath ? <path className="daily-line-chart__line" d={linePath} /> : null}
+                {chartPoints.map((point) => (
+                  <g key={point.id}>
+                    <title>{point.title}</title>
+                    <circle className="daily-line-chart__dot" cx={point.x} cy={point.y} r="5" />
+                    <text className="daily-line-chart__value" x={point.x} y={point.y - 12} textAnchor="middle">
+                      {point.duration}
+                    </text>
+                    <text className="daily-line-chart__date" x={point.x} y={chartHeight - 16} textAnchor="middle">
+                      {point.date}
+                    </text>
+                  </g>
+                ))}
+              </svg>
+            </div>
+          </div>
+
+          <DataTable
+            headers={["Fecha", "Total", "Valores del se", "Perifrasis", "Morfologia", "Sintaxis", "Derivative"]}
+            rows={[...records]
+              .sort((left, right) => right.completedAt.localeCompare(left.completedAt))
+              .map((record) => [
+                record.dateKey,
+                formatDuration(record.totalMs),
+                formatDuration(record.sectionTimes.se),
+                formatDuration(record.sectionTimes.perifrasis),
+                formatDuration(record.sectionTimes.morfologia),
+                formatDuration(record.sectionTimes.sintaxis),
+                formatDuration(record.sectionTimes.derivative),
+              ])}
+          />
+        </>
+      )}
+    </section>
+  );
+}
+
+interface CompactSettingsProps {
+  storageState: StorageState;
+  onSeSettingsChange: (settings: SeSettings) => void;
+  onPeriphrasisSettingsChange: (settings: PeriphrasisSettings) => void;
+  onMorfoSettingsChange: (settings: MorfoSettings) => void;
+  onSintaxisSettingsChange: (settings: SintaxisSettings) => void;
+  onDerivativeSettingsChange: (settings: DerivativeSettings) => void;
+}
+
+type AiSettingsKey = "se" | "perifrasis" | "morfologia";
+
+interface AiModelDraft {
+  selectedModel: string;
+  customModel: string;
+}
+
+function modelDraftFor(modelName: string): AiModelDraft {
+  return {
+    selectedModel: modelSelectValue(modelName),
+    customModel: customModelValue(modelName),
+  };
+}
+
+function CompactProfileSettingsPanel({
+  storageState,
+  onSeSettingsChange,
+  onPeriphrasisSettingsChange,
+  onMorfoSettingsChange,
+  onSintaxisSettingsChange,
+  onDerivativeSettingsChange,
+}: CompactSettingsProps) {
+  const seProfileId = storageState.seSettings.profileId;
+  const periphrasisProfileId = storageState.periphrasisSettings.profileId;
+  const morfoProfileId = storageState.morfoSettings.profileId;
+  const sintaxisProfileId = storageState.sintaxisSettings.profileId;
+  const derivativeProfileId = storageState.derivativeSettings.profileId;
+  const [profiles, setProfiles] = useState<Record<DailyChallengeSection, string>>({
+    se: seProfileId,
+    perifrasis: periphrasisProfileId,
+    morfologia: morfoProfileId,
+    sintaxis: sintaxisProfileId,
+    derivative: derivativeProfileId,
+  });
+
+  useEffect(() => {
+    setProfiles({
+      se: seProfileId,
+      perifrasis: periphrasisProfileId,
+      morfologia: morfoProfileId,
+      sintaxis: sintaxisProfileId,
+      derivative: derivativeProfileId,
+    });
+  }, [derivativeProfileId, morfoProfileId, periphrasisProfileId, seProfileId, sintaxisProfileId]);
+
+  const updateProfileDraft = (section: DailyChallengeSection, value: string) => {
+    setProfiles((current) => ({ ...current, [section]: value }));
+  };
+
+  const profileFor = (section: DailyChallengeSection) => profiles[section].trim() || "alumno";
+
+  const saveProfiles = () => {
+    onSeSettingsChange({ ...storageState.seSettings, profileId: profileFor("se") });
+    onPeriphrasisSettingsChange({ ...storageState.periphrasisSettings, profileId: profileFor("perifrasis") });
+    onMorfoSettingsChange({ ...storageState.morfoSettings, profileId: profileFor("morfologia") });
+    onSintaxisSettingsChange({ ...storageState.sintaxisSettings, profileId: profileFor("sintaxis") });
+    onDerivativeSettingsChange({ ...storageState.derivativeSettings, profileId: profileFor("derivative") });
+  };
+
+  return (
+    <section className="panel compact-settings-panel">
+      <h3>Perfiles</h3>
+      <div className="compact-settings-grid">
+        {DAILY_CHALLENGE_SECTIONS.map((section) => (
+          <div key={section}>
+            <FieldLabel label={DAILY_SECTION_LABELS[section]} />
+            <input value={profiles[section]} onChange={(event) => updateProfileDraft(section, event.target.value)} />
+          </div>
+        ))}
+      </div>
+      <button className="primary-btn" type="button" onClick={saveProfiles}>
+        Guardar perfiles
+      </button>
+    </section>
+  );
+}
+
+function CompactAiSettingsPanel({
+  storageState,
+  onGeminiApiKeyChange,
+  onSeSettingsChange,
+  onPeriphrasisSettingsChange,
+  onMorfoSettingsChange,
+}: {
+  storageState: StorageState;
+  onGeminiApiKeyChange: (value: string) => void;
+  onSeSettingsChange: (settings: SeSettings) => void;
+  onPeriphrasisSettingsChange: (settings: PeriphrasisSettings) => void;
+  onMorfoSettingsChange: (settings: MorfoSettings) => void;
+}) {
+  const seModelName = storageState.seSettings.modelName;
+  const periphrasisModelName = storageState.periphrasisSettings.modelName;
+  const morfoModelName = storageState.morfoSettings.modelName;
+  const customPeriphrasisTypes = storageState.periphrasisSettings.customPeriphrasisTypes.join(", ");
+  const [drafts, setDrafts] = useState<Record<AiSettingsKey, AiModelDraft>>({
+    se: modelDraftFor(seModelName),
+    perifrasis: modelDraftFor(periphrasisModelName),
+    morfologia: modelDraftFor(morfoModelName),
+  });
+  const [customTypesDraft, setCustomTypesDraft] = useState(customPeriphrasisTypes);
+
+  useEffect(() => {
+    setDrafts({
+      se: modelDraftFor(seModelName),
+      perifrasis: modelDraftFor(periphrasisModelName),
+      morfologia: modelDraftFor(morfoModelName),
+    });
+    setCustomTypesDraft(customPeriphrasisTypes);
+  }, [customPeriphrasisTypes, morfoModelName, periphrasisModelName, seModelName]);
+
+  const updateModelDraft = (section: AiSettingsKey, next: Partial<AiModelDraft>) => {
+    setDrafts((current) => ({
+      ...current,
+      [section]: {
+        ...current[section],
+        ...next,
+      },
+    }));
+  };
+
+  const saveAiSettings = () => {
+    onSeSettingsChange({
+      ...storageState.seSettings,
+      modelName: resolveModelDraft(drafts.se.selectedModel, drafts.se.customModel),
+    });
+    onPeriphrasisSettingsChange({
+      ...storageState.periphrasisSettings,
+      modelName: resolveModelDraft(drafts.perifrasis.selectedModel, drafts.perifrasis.customModel),
+      customPeriphrasisTypes: stripBaseLabels(parseCustomList(customTypesDraft), PERIPHRASIS_TYPES),
+    });
+    onMorfoSettingsChange({
+      ...storageState.morfoSettings,
+      modelName: resolveModelDraft(drafts.morfologia.selectedModel, drafts.morfologia.customModel),
+    });
+  };
+
+  const renderModelRow = (section: AiSettingsKey, label: string) => (
+    <div className="compact-model-row" key={section}>
+      <FieldLabel label={label} />
+      <div className="compact-model-controls">
+        <select
+          value={drafts[section].selectedModel}
+          onChange={(event) => updateModelDraft(section, { selectedModel: event.target.value })}
+        >
+          {MODEL_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+          <option value="custom">Personalizado (manual)</option>
+        </select>
+        <input
+          disabled={drafts[section].selectedModel !== "custom"}
+          placeholder="Modelo personalizado"
+          value={drafts[section].customModel}
+          onChange={(event) => updateModelDraft(section, { customModel: event.target.value })}
+        />
+      </div>
+    </div>
+  );
+
+  return (
+    <section className="panel compact-settings-panel">
+      <h3>AI y API</h3>
+      <div className="compact-model-list">
+        {renderModelRow("se", DAILY_SECTION_LABELS.se)}
+        {renderModelRow("perifrasis", DAILY_SECTION_LABELS.perifrasis)}
+        {renderModelRow("morfologia", DAILY_SECTION_LABELS.morfologia)}
+      </div>
+
+      <div className="field-block">
+        <FieldLabel
+          label="Tipos de perifrasis personalizados"
+          hint="Separados por comas. Se suman a la lista base."
+        />
+        <input
+          placeholder="Ej. Obligacion atenuada, enfatica"
+          value={customTypesDraft}
+          onChange={(event) => setCustomTypesDraft(event.target.value)}
+        />
+      </div>
+
+      <button className="primary-btn" type="button" onClick={saveAiSettings}>
+        Guardar AI
+      </button>
+
+      <GeminiKeyPanel apiKey={storageState.geminiApiKey} onApiKeyChange={onGeminiApiKeyChange} />
+    </section>
+  );
+}
+
+function PersonalTimesSettingsPanel({
+  recordCount,
+  onClearRecords,
+}: {
+  recordCount: number;
+  onClearRecords: () => void;
+}) {
+  const [clearConfirmed, setClearConfirmed] = useState(false);
+
+  useEffect(() => {
+    if (recordCount === 0) {
+      setClearConfirmed(false);
+    }
+  }, [recordCount]);
+
+  return (
+    <section className="panel compact-settings-panel">
+      <h3>Tiempos personales</h3>
+      <p className="muted-line">Borra los tiempos guardados del reto diario.</p>
+      <div className="danger-zone">
+        <label className="checkbox-line">
+          <input
+            checked={clearConfirmed}
+            disabled={recordCount === 0}
+            type="checkbox"
+            onChange={(event) => setClearConfirmed(event.target.checked)}
+          />
+          <span>Confirmo que quiero borrar {recordCount} registro{recordCount === 1 ? "" : "s"} de tiempos</span>
+        </label>
+        <button
+          className="danger-btn"
+          disabled={!clearConfirmed || recordCount === 0}
+          type="button"
+          onClick={() => {
+            onClearRecords();
+            setClearConfirmed(false);
+          }}
+        >
+          Borrar tiempos personales
+        </button>
+      </div>
+    </section>
+  );
+}
+
+function GlobalSettingsPage({
+  storageState,
+  onDailyChallengeSettingsChange,
+  onDailyChallengeRecordsClear,
+  onGeminiApiKeyChange,
+  onSeSettingsChange,
+  onPeriphrasisSettingsChange,
+  onMorfoSettingsChange,
+  onSintaxisSettingsChange,
+  onDerivativeSettingsChange,
+}: {
+  storageState: StorageState;
+  onDailyChallengeSettingsChange: (settings: DailyChallengeSettings) => void;
+  onDailyChallengeRecordsClear: () => void;
+  onGeminiApiKeyChange: (value: string) => void;
+  onSeSettingsChange: (settings: SeSettings) => void;
+  onPeriphrasisSettingsChange: (settings: PeriphrasisSettings) => void;
+  onMorfoSettingsChange: (settings: MorfoSettings) => void;
+  onSintaxisSettingsChange: (settings: SintaxisSettings) => void;
+  onDerivativeSettingsChange: (settings: DerivativeSettings) => void;
+}) {
+  return (
+    <section className="workspace global-settings-page">
+      <DailyChallengeSettingsPanel
+        settings={storageState.dailyChallengeSettings}
+        onSettingsChange={onDailyChallengeSettingsChange}
+      />
+
+      <CompactProfileSettingsPanel
+        storageState={storageState}
+        onDerivativeSettingsChange={onDerivativeSettingsChange}
+        onMorfoSettingsChange={onMorfoSettingsChange}
+        onPeriphrasisSettingsChange={onPeriphrasisSettingsChange}
+        onSeSettingsChange={onSeSettingsChange}
+        onSintaxisSettingsChange={onSintaxisSettingsChange}
+      />
+
+      <CompactAiSettingsPanel
+        storageState={storageState}
+        onGeminiApiKeyChange={onGeminiApiKeyChange}
+        onMorfoSettingsChange={onMorfoSettingsChange}
+        onPeriphrasisSettingsChange={onPeriphrasisSettingsChange}
+        onSeSettingsChange={onSeSettingsChange}
+      />
+
+      <PersonalTimesSettingsPanel
+        recordCount={storageState.dailyChallengeRecords.length}
+        onClearRecords={onDailyChallengeRecordsClear}
+      />
+    </section>
+  );
+}
+
 export function NetlifyPracticeApp() {
   const [storageState, setStorageState] = useState<StorageState>(() => loadStorageState());
   const [activeSection, setActiveSection] = useState<SectionName>("se");
+  const [globalPage, setGlobalPage] = useState<GlobalPageName | null>(null);
+  const [exerciseMenuOpen, setExerciseMenuOpen] = useState(false);
+  const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
   const [sePage, setSePage] = useState<PageName>("practice");
   const [periphrasisPage, setPeriphrasisPage] = useState<PageName>("practice");
   const [morfoPage, setMorfoPage] = useState<PageName>("practice");
@@ -791,6 +2190,32 @@ export function NetlifyPracticeApp() {
   useEffect(() => {
     saveStorageState(storageState);
   }, [storageState]);
+
+  useEffect(() => {
+    if (!exerciseMenuOpen) {
+      return undefined;
+    }
+
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (target instanceof Node && exerciseMenuRef.current && !exerciseMenuRef.current.contains(target)) {
+        setExerciseMenuOpen(false);
+      }
+    };
+
+    const handleKeyDown = (event: KeyboardEvent) => {
+      if (event.key === "Escape") {
+        setExerciseMenuOpen(false);
+      }
+    };
+
+    document.addEventListener("pointerdown", handlePointerDown);
+    document.addEventListener("keydown", handleKeyDown);
+    return () => {
+      document.removeEventListener("pointerdown", handlePointerDown);
+      document.removeEventListener("keydown", handleKeyDown);
+    };
+  }, [exerciseMenuOpen]);
 
   const updateSeSettings = (next: SeSettings) => {
     setStorageState((current) => ({ ...current, seSettings: next }));
@@ -856,6 +2281,38 @@ export function NetlifyPracticeApp() {
     setStorageState((current) => ({ ...current, geminiApiKey: next }));
   };
 
+  const updateDailyChallengeSettings = (next: DailyChallengeSettings) => {
+    setStorageState((current) => ({ ...current, dailyChallengeSettings: next }));
+  };
+
+  const appendDailyRecord = (record: DailyChallengeRecord) => {
+    setStorageState((current) => ({ ...current, dailyChallengeRecords: [...current.dailyChallengeRecords, record] }));
+  };
+
+  const clearDailyRecords = () => {
+    setStorageState((current) => ({ ...current, dailyChallengeRecords: [] }));
+  };
+
+  const appendDailySeAttempt = (attempt: SeAttempt) => {
+    setStorageState((current) => ({ ...current, seAttempts: [...current.seAttempts, attempt] }));
+  };
+
+  const appendDailyPeriphrasisAttempt = (attempt: PeriphrasisAttempt) => {
+    setStorageState((current) => ({ ...current, periphrasisAttempts: [...current.periphrasisAttempts, attempt] }));
+  };
+
+  const appendDailyMorfoAttempt = (attempt: MorfoAttempt) => {
+    setStorageState((current) => ({ ...current, morfoAttempts: [...current.morfoAttempts, attempt] }));
+  };
+
+  const appendDailySintaxisAttempt = (attempt: SintaxisAttempt) => {
+    setStorageState((current) => ({ ...current, sintaxisAttempts: [...current.sintaxisAttempts, attempt] }));
+  };
+
+  const appendDailyDerivativeAttempt = (attempt: DerivativeAttempt) => {
+    setStorageState((current) => ({ ...current, derivativeAttempts: [...current.derivativeAttempts, attempt] }));
+  };
+
   const currentPage =
     activeSection === "se"
       ? sePage
@@ -867,9 +2324,12 @@ export function NetlifyPracticeApp() {
             ? sintaxisPage
             : derivativePage;
   const activeSectionMeta = SECTION_META[activeSection];
-  const pageTitle = currentPage === "storage" ? "Bancos" : activeSectionMeta.title;
+  const pageTitle = globalPage
+    ? GLOBAL_PAGE_META[globalPage].label
+    : activeSectionMeta.title;
 
   const setPageForSection = (section: SectionName, page: PageName) => {
+    setGlobalPage(null);
     if (section === "se") {
       setSePage(page);
       return;
@@ -897,6 +2357,8 @@ export function NetlifyPracticeApp() {
             className="globalnav__brand"
             type="button"
             onClick={() => {
+              setExerciseMenuOpen(false);
+              setGlobalPage(null);
               setActiveSection("se");
               setSePage("practice");
             }}
@@ -905,15 +2367,52 @@ export function NetlifyPracticeApp() {
           </button>
 
           <nav className="globalnav__menu" aria-label="Secciones">
-            {SECTION_ORDER.map((section) => (
+            <div className="globalnav__group" ref={exerciseMenuRef}>
               <button
-                key={section}
-                aria-pressed={activeSection === section}
-                className={cx("globalnav__link", activeSection === section && "globalnav__link--current")}
+                aria-expanded={exerciseMenuOpen}
+                aria-haspopup="menu"
+                aria-pressed={!globalPage}
+                className={cx("globalnav__link", !globalPage && "globalnav__link--current")}
                 type="button"
-                onClick={() => setActiveSection(section)}
+                onClick={() => setExerciseMenuOpen((current) => !current)}
               >
-                {SECTION_META[section].navLabel}
+                Ejercicios
+              </button>
+              {exerciseMenuOpen ? (
+                <div className="globalnav__dropdown" role="menu" aria-label="Ejercicios">
+                  {SECTION_ORDER.map((section) => (
+                    <button
+                      key={section}
+                      className={cx(
+                        "globalnav__dropdown-link",
+                        !globalPage && activeSection === section && "globalnav__dropdown-link--current",
+                      )}
+                      role="menuitem"
+                      type="button"
+                      onClick={() => {
+                        setExerciseMenuOpen(false);
+                        setGlobalPage(null);
+                        setActiveSection(section);
+                      }}
+                    >
+                      {SECTION_META[section].navLabel}
+                    </button>
+                  ))}
+                </div>
+              ) : null}
+            </div>
+            {(Object.entries(GLOBAL_PAGE_META) as Array<[GlobalPageName, GlobalPageMeta]>).map(([pageKey, pageMeta]) => (
+              <button
+                key={pageKey}
+                aria-pressed={globalPage === pageKey}
+                className={cx("globalnav__link", globalPage === pageKey && "globalnav__link--current")}
+                type="button"
+                onClick={() => {
+                  setExerciseMenuOpen(false);
+                  setGlobalPage(pageKey);
+                }}
+              >
+                {pageMeta.label}
               </button>
             ))}
           </nav>
@@ -923,24 +2422,39 @@ export function NetlifyPracticeApp() {
 
       <div className="app-frame">
         <section className="workspace-shell">
-          <section className={cx("hero-banner", currentPage !== "storage" && activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
+          <section className={cx("hero-banner", !globalPage && activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
             <div className="hero-banner__copy">
               <h1>{pageTitle}</h1>
-              <div className="cta-links">
-                {(Object.entries(PAGE_META) as Array<[PageName, PageMeta]>).map(([pageKey, pageMeta]) => (
-                  <PageAction
-                    key={pageKey}
-                    active={currentPage === pageKey}
-                    label={pageMeta.label}
-                    onClick={() => setPageForSection(activeSection, pageKey)}
-                  />
-                ))}
-              </div>
+              {!globalPage ? (
+                <div className="cta-links">
+                  {SECTION_PAGE_ORDER.map((pageKey) => (
+                    <PageAction
+                      key={pageKey}
+                      active={currentPage === pageKey}
+                      label={PAGE_META[pageKey].label}
+                      onClick={() => setPageForSection(activeSection, pageKey)}
+                    />
+                  ))}
+                </div>
+              ) : null}
             </div>
           </section>
 
           <main className="main-stage">
-            {currentPage === "storage" ? (
+            {globalPage === "daily" ? (
+              <DailyChallengePage
+                storageState={storageState}
+                onActiveSectionChange={setActiveSection}
+                onAppendDerivativeAttempt={appendDailyDerivativeAttempt}
+                onAppendMorfoAttempt={appendDailyMorfoAttempt}
+                onAppendPeriphrasisAttempt={appendDailyPeriphrasisAttempt}
+                onAppendSeAttempt={appendDailySeAttempt}
+                onAppendSintaxisAttempt={appendDailySintaxisAttempt}
+                onCompleteRecord={appendDailyRecord}
+              />
+            ) : globalPage === "records" ? (
+              <PersonalTimesPage records={storageState.dailyChallengeRecords} />
+            ) : globalPage === "storage" ? (
               <QuestionBankStoragePage
                 derivativeQuestionBank={storageState.derivativeQuestionBank}
                 morfoQuestionBank={storageState.morfoQuestionBank}
@@ -956,6 +2470,18 @@ export function NetlifyPracticeApp() {
                 onPeriphrasisQuestionBankChange={updatePeriphrasisQuestionBank}
                 onSeQuestionBankChange={updateSeQuestionBank}
                 onSintaxisQuestionBankChange={updateSintaxisQuestionBank}
+              />
+            ) : globalPage === "settings" ? (
+              <GlobalSettingsPage
+                storageState={storageState}
+                onDailyChallengeRecordsClear={clearDailyRecords}
+                onDailyChallengeSettingsChange={updateDailyChallengeSettings}
+                onDerivativeSettingsChange={updateDerivativeSettings}
+                onGeminiApiKeyChange={updateGeminiApiKey}
+                onMorfoSettingsChange={updateMorfoSettings}
+                onPeriphrasisSettingsChange={updatePeriphrasisSettings}
+                onSeSettingsChange={updateSeSettings}
+                onSintaxisSettingsChange={updateSintaxisSettings}
               />
             ) : (
               <>
