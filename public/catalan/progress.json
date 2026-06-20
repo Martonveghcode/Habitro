@@ -1,0 +1,1512 @@
+{
+  "s": {
+    "fac3e60f91905d6c-16": {
+      "seen": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-03-30T21:03:46"
+    },
+    "95b45876ba0ecc66-72": {
+      "seen": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-03-30T21:03:56"
+    },
+    "81a006549ce5a5d0-123": {
+      "seen": 2,
+      "correct": 0,
+      "incorrect": 2,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-01T09:18:55"
+    },
+    "0ffa66e25446b245-93": {
+      "seen": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-03-30T21:04:12"
+    },
+    "547987691735e451-64": {
+      "seen": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-03-30T21:04:15"
+    },
+    "f56c3dfd5a79e5fc-124": {
+      "seen": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-03-30T21:04:21"
+    },
+    "c1231655931e2731-92": {
+      "seen": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-01T09:18:30"
+    },
+    "5543f6b059889564-85": {
+      "seen": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-01T09:18:35"
+    },
+    "190f9e8382aefd95-138": {
+      "seen": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-01T09:18:40"
+    },
+    "bd81e3fd25fd72cc-99": {
+      "seen": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-01T09:18:45"
+    },
+    "9adc06719ca721a2-26": {
+      "seen": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-01T09:18:48"
+    },
+    "096e650af116f5dc-98": {
+      "seen": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-01T09:18:57"
+    },
+    "3fa4b6a3c7ee039d-36": {
+      "seen": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-01T11:11:37"
+    }
+  },
+  "Classe 17 - G j tg tj": {
+    "b7a2a264418eb346-139": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:34:25"
+    },
+    "05f81a809006516f-56": {
+      "seen": 5,
+      "correct": 4,
+      "incorrect": 1,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:37"
+    },
+    "5dbfe93b147290f0-60": {
+      "seen": 5,
+      "correct": 5,
+      "incorrect": 0,
+      "streak": 5,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:14"
+    },
+    "2b82d5e0cee3e408-120": {
+      "seen": 5,
+      "correct": 3,
+      "incorrect": 2,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:28"
+    },
+    "e2668030822458cb-26": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:31"
+    },
+    "1a8d788a717a909c-86": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:07"
+    },
+    "d2679b67cf750ca9-133": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:38"
+    },
+    "fb2238066de6daaa-51": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:45:44"
+    },
+    "74e629cfc52b7be3-39": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:37"
+    },
+    "15ff6681a608fe53-149": {
+      "seen": 5,
+      "correct": 5,
+      "incorrect": 0,
+      "streak": 5,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:46"
+    },
+    "4aeef00a54ab88af-8": {
+      "seen": 6,
+      "correct": 5,
+      "incorrect": 1,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:23"
+    },
+    "a5ed6995f52c821e-110": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:13"
+    },
+    "689dab8d98ac8d25-159": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:03"
+    },
+    "d1716983d07e997c-155": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:15"
+    },
+    "f086d2f45e19792b-59": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:59:45"
+    },
+    "5acb3b69ed4cc699-82": {
+      "seen": 5,
+      "correct": 5,
+      "incorrect": 0,
+      "streak": 5,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:40:05"
+    },
+    "57806813f28b9646-14": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:21:58"
+    },
+    "3207fd2c1bc7d566-50": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:02"
+    },
+    "50d87b8e55db3aa9-163": {
+      "seen": 5,
+      "correct": 5,
+      "incorrect": 0,
+      "streak": 5,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:18"
+    },
+    "e3d6fc3b4e172891-172": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:30"
+    },
+    "d5b9d610a9d76413-25": {
+      "seen": 6,
+      "correct": 3,
+      "incorrect": 3,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:43:11"
+    },
+    "badb399b29bbd4b0-123": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:17"
+    },
+    "af62e6d46a7a66a7-61": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:32"
+    },
+    "2ce891112ddabf32-87": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:00"
+    },
+    "0a5cdf5bd33687d2-53": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:29"
+    },
+    "5fdb1269443f3d50-34": {
+      "seen": 6,
+      "correct": 3,
+      "incorrect": 3,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:46:13"
+    },
+    "c59000ec2d0756a2-113": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:13"
+    },
+    "15a9b2de41003437-100": {
+      "seen": 2,
+      "correct": 1,
+      "incorrect": 1,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T21:02:19"
+    },
+    "735e441bd21cbde0-160": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:45:58"
+    },
+    "896bff00a9b1d4be-40": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:43:17"
+    },
+    "86f2b465a0797e11-91": {
+      "seen": 5,
+      "correct": 5,
+      "incorrect": 0,
+      "streak": 5,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:03"
+    },
+    "898f14bb02ae878c-81": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:31"
+    },
+    "b47b59c92010aec7-63": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:22"
+    },
+    "29a21ede319e3558-52": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:45:55"
+    },
+    "bfa6a69f0b7223da-1": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:44"
+    },
+    "dc5defe6e9b88796-57": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:43"
+    },
+    "e0a11496e6178b5b-151": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:05"
+    },
+    "86e4333a6a7180f4-137": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:53"
+    },
+    "fc8106779b198135-143": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:45:40"
+    },
+    "9fb799018577164d-24": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:40:27"
+    },
+    "40a66783cd787c2a-114": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:31:46"
+    },
+    "c050839dc53d3754-62": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:10"
+    },
+    "61be4364406f78b4-103": {
+      "seen": 3,
+      "correct": 2,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:40:16"
+    },
+    "29dd0d75222e2d52-108": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:40:38"
+    },
+    "390b8108b60f4098-129": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:39:22"
+    },
+    "a59460bb9ae98335-98": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:30"
+    },
+    "5d61a22756c1865c-27": {
+      "seen": 5,
+      "correct": 4,
+      "incorrect": 1,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:03"
+    },
+    "b0d811c5c00026b3-132": {
+      "seen": 5,
+      "correct": 3,
+      "incorrect": 2,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:57"
+    },
+    "debbe2a852722e5b-92": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:37:15"
+    },
+    "c56c2282df3e2aae-41": {
+      "seen": 4,
+      "correct": 0,
+      "incorrect": 4,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:42:43"
+    },
+    "9f01a32375158d5b-35": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:28"
+    },
+    "6fd4bb03c251d056-66": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:56"
+    },
+    "2c847b09c0edc8b7-4": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:57"
+    },
+    "6342c3490bf158ef-94": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:25"
+    },
+    "587250bc564e08cf-144": {
+      "seen": 5,
+      "correct": 1,
+      "incorrect": 4,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:18"
+    },
+    "3d2f081863b9d51a-28": {
+      "seen": 3,
+      "correct": 2,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:40:35"
+    },
+    "22240ea2be71c384-136": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:40:29"
+    },
+    "1db2044fc49cd282-145": {
+      "seen": 5,
+      "correct": 5,
+      "incorrect": 0,
+      "streak": 5,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:22"
+    },
+    "5e73f048c837684e-131": {
+      "seen": 3,
+      "correct": 0,
+      "incorrect": 3,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:42:59"
+    },
+    "02d7d0ce04646970-161": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:40:46"
+    },
+    "e813814283bb318a-95": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:44"
+    },
+    "643b3396de3a4e3c-173": {
+      "seen": 4,
+      "correct": 1,
+      "incorrect": 3,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:41:35"
+    },
+    "36b1c686f2ee480a-64": {
+      "seen": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:12:23"
+    },
+    "ac924e2932ebf9e3-126": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:40:11"
+    },
+    "b90b0476f56cc2e0-99": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:20"
+    },
+    "99b9073e65e32b25-44": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:45:34"
+    },
+    "3a386338dabd5c97-146": {
+      "seen": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:12:51"
+    },
+    "5ebf825a6a851747-77": {
+      "seen": 6,
+      "correct": 5,
+      "incorrect": 1,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:54"
+    },
+    "6aefee56c9877f55-156": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:16"
+    },
+    "5c3949dfdc71e39d-79": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:45:28"
+    },
+    "41740021b06e3fc1-111": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:01"
+    },
+    "de74e55167bd62f8-170": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:54"
+    },
+    "0e7a18f26ee16e83-125": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:46:34"
+    },
+    "3601172e8d1cafae-36": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:44:33"
+    },
+    "d6226b1a94bba94e-47": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:23:03"
+    },
+    "39d4c2e052e572a0-130": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:40:18"
+    },
+    "04c2e98eea3c8563-15": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:13"
+    },
+    "815897fd68bc4c8a-138": {
+      "seen": 6,
+      "correct": 5,
+      "incorrect": 1,
+      "streak": 5,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:52"
+    },
+    "22f430d364ce6076-17": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:29"
+    },
+    "e7e9259b6b2ae594-88": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:16"
+    },
+    "51d0e94ce8db8205-13": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:40"
+    },
+    "af14a5ec167f5a57-150": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:12"
+    },
+    "4813b8fa936ef3b4-127": {
+      "seen": 3,
+      "correct": 2,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:46:09"
+    },
+    "8c7734349297cf3b-20": {
+      "seen": 5,
+      "correct": 3,
+      "incorrect": 2,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T21:03:11"
+    },
+    "75fa7f8e4e500bab-67": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:55"
+    },
+    "057946fb07ff4eb1-96": {
+      "seen": 2,
+      "correct": 1,
+      "incorrect": 1,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T21:00:53"
+    },
+    "44dc32a1f7fbd8e7-76": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:29"
+    },
+    "1ffb7801566e9ed6-164": {
+      "seen": 5,
+      "correct": 4,
+      "incorrect": 1,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:36"
+    },
+    "70205e31ea77bdd4-167": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:21:13"
+    },
+    "f191b61ebe5d5ed9-33": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:46"
+    },
+    "b553212eb61e5b6c-135": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:34"
+    },
+    "81b0742283bf1a87-58": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:26"
+    },
+    "86e9037cd83777f5-72": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:32"
+    },
+    "95e32645a727c269-38": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:36"
+    },
+    "7fff2196fd2b14d4-109": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:35:00"
+    },
+    "5532520036e6ec19-169": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:40:13"
+    },
+    "9d61f8fb4de0605e-7": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:45"
+    },
+    "dcc38e45ee539d8e-18": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:45:16"
+    },
+    "da567be130d19ea2-46": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:45:38"
+    },
+    "498c7a6a532e7c7d-118": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:05"
+    },
+    "983b24bb816cc5a7-68": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:48"
+    },
+    "76ce922fc1c9f667-116": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:45:22"
+    },
+    "fd90528ff6dec7b1-54": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:40:14"
+    },
+    "97214a027c3d5b65-23": {
+      "seen": 4,
+      "correct": 1,
+      "incorrect": 3,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:01"
+    },
+    "0bc2b80585dae299-2": {
+      "seen": 5,
+      "correct": 1,
+      "incorrect": 4,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:47:51"
+    },
+    "8d5059a7ec1b856c-78": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:25"
+    },
+    "bbbb4ae0c0e3209b-21": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:40:09"
+    },
+    "d2d02c6c7de861af-55": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:38"
+    },
+    "b7b50277a15d1dbc-83": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:40:32"
+    },
+    "2f5a5f9fe25b2acc-93": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:40:33"
+    },
+    "a23d18d208e4f728-134": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:49"
+    },
+    "f987f9f1e8a0c0e1-30": {
+      "seen": 4,
+      "correct": 1,
+      "incorrect": 3,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:48:45"
+    },
+    "07e964a34ebef25e-32": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:43:06"
+    },
+    "f89a047ae327eed2-70": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:51"
+    },
+    "9ae09defc7b0780d-84": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:22:06"
+    },
+    "c058d70ca0d58d6e-65": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:30:55"
+    },
+    "e2ee903ecc171bed-121": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:55"
+    },
+    "574089f98a590aac-42": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:42:50"
+    },
+    "85d5bb23f293170e-43": {
+      "seen": 4,
+      "correct": 1,
+      "incorrect": 3,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:42:10"
+    },
+    "41867b6a01eea687-85": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:25"
+    },
+    "76fba707e6fc6708-5": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:48"
+    },
+    "fcd92bd5cb1ed093-11": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:49"
+    },
+    "f8bb2aff6392fbbb-119": {
+      "seen": 3,
+      "correct": 2,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:46:03"
+    },
+    "82a14dd0c3942358-124": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:45:54"
+    },
+    "b8d39e152e99d64e-104": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:45:30"
+    },
+    "8bb88de5e6c43199-165": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:21:18"
+    },
+    "cd70335cf1a92ff2-31": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:59"
+    },
+    "ec7fa06ebe8fe44d-69": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:42"
+    },
+    "8d1f882faacc984d-117": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:36:11"
+    },
+    "ffe0f730d1b44b4d-101": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:15"
+    },
+    "1eeb554af0f7b68c-9": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:39"
+    },
+    "b1f3725a8fa2f57d-37": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:06"
+    },
+    "a582a24f005881d5-102": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:41:02"
+    },
+    "3296bbda7f8f8125-12": {
+      "seen": 4,
+      "correct": 1,
+      "incorrect": 3,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:43:34"
+    },
+    "e71a3364b89b9404-128": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:20"
+    },
+    "b06371875756a152-22": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:59"
+    },
+    "05cfd6402eff4a58-141": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:02"
+    },
+    "92127c7d5ed33125-122": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:49"
+    },
+    "1ad8c48be646be07-71": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:00"
+    },
+    "3b083e4ca22eba22-158": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:32:32"
+    },
+    "c03b91bcf0a9dbb4-74": {
+      "seen": 3,
+      "correct": 2,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:46:51"
+    },
+    "abbd2d3e4290fd78-80": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:56"
+    },
+    "d7b05c488b24abc4-148": {
+      "seen": 4,
+      "correct": 4,
+      "incorrect": 0,
+      "streak": 4,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:18"
+    },
+    "f10d59c9361efbe4-166": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:00"
+    },
+    "66c8d6490f1f1070-115": {
+      "seen": 3,
+      "correct": 2,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:44:10"
+    },
+    "22d69e40947c3c67-10": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:20"
+    },
+    "2b130cb7fe8708f7-6": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:27"
+    },
+    "6a71ac043e429eb5-162": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:28"
+    },
+    "c730dab828082fd8-3": {
+      "seen": 5,
+      "correct": 1,
+      "incorrect": 4,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:45:49"
+    },
+    "cdd4c93e3897bb06-152": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:33"
+    },
+    "57cc5f44d03f0bd1-106": {
+      "seen": 4,
+      "correct": 3,
+      "incorrect": 1,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:43:40"
+    },
+    "17fc0781aae84ff7-147": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:44:20"
+    },
+    "bd90d9107427ee23-75": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:40:22"
+    },
+    "654f6805efff8d17-97": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:31"
+    },
+    "ec5336f9f5794fce-140": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:07"
+    },
+    "b1d05511d58dd84a-107": {
+      "seen": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T20:33:21"
+    },
+    "bb5d1fd1c51c5659-49": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:46:42"
+    },
+    "39338f6e6ebe0e27-171": {
+      "seen": 4,
+      "correct": 2,
+      "incorrect": 2,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-04T21:03:12"
+    },
+    "a4ddd5220c6b5ff5-16": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:40"
+    },
+    "ba41c8c00d6804fc-48": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:12"
+    },
+    "681997c2045be46c-29": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:23:27"
+    },
+    "c696ca817393fe13-19": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:39"
+    },
+    "ef4f48c4a58d53fb-90": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:44:39"
+    },
+    "22ae0db45ffacdb9-157": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:41:54"
+    },
+    "49db9fb415c128cf-168": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:45:32"
+    },
+    "9a715d2b410bbbf6-154": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:29"
+    },
+    "8a92fdd21560cf10-105": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:42"
+    },
+    "1b364b446e7764a9-73": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:26"
+    },
+    "4bc952075e063609-142": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:47:14"
+    },
+    "9919d75757354af4-112": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:12"
+    },
+    "fe80841a95bcc212-153": {
+      "seen": 2,
+      "correct": 2,
+      "incorrect": 0,
+      "streak": 2,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:42:45"
+    },
+    "eb016166ed08540a-89": {
+      "seen": 3,
+      "correct": 3,
+      "incorrect": 0,
+      "streak": 3,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:45:20"
+    },
+    "bee3cbe58988ab17-45": {
+      "seen": 1,
+      "correct": 1,
+      "incorrect": 0,
+      "streak": 1,
+      "last_result": "correct",
+      "last_seen": "2026-05-16T11:48:25"
+    }
+  },
+  "Classe 10 - L'accent i la dièresi": {
+    "bd61e1baf6008407-168": {
+      "seen": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:20:00"
+    },
+    "c2661efc5ebf6718-107": {
+      "seen": 1,
+      "correct": 0,
+      "incorrect": 1,
+      "streak": 0,
+      "last_result": "incorrect",
+      "last_seen": "2026-05-16T11:20:15"
+    }
+  }
+}

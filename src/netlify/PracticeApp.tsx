@@ -4,6 +4,23 @@ import "katex/dist/katex.min.css";
 import ReactMarkdown from "react-markdown";
 
 import {
+  CATALAN_DECKS_UPDATED_EVENT,
+  CatalanPracticeApp,
+  catalanAccentBaseWord,
+  displayCatalanPrompt,
+  expectedCatalanAccentIndices,
+  expectedCatalanAccentInput,
+  isCatalanAccentCard,
+  loadBuiltInCatalanDecks,
+  loadImportedCatalanDecks,
+  loadStoredCatalanProgress,
+  normalizeCatalanAnswer,
+  previewCatalanMaskedWord,
+  saveStoredCatalanProgress,
+  updateCatalanProgressWithAttempt,
+} from "./CatalanPracticeApp";
+import type { CatalanCard, CatalanDeck } from "./CatalanPracticeApp";
+import {
   MODEL_OPTIONS,
   MORFO_MORPHEME_TYPES,
   MORFO_WORD_TYPES,
@@ -106,7 +123,7 @@ import type {
   SummaryRow,
 } from "./types";
 
-type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative";
+type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative" | "catalan";
 type PageName = "practice" | "history" | "settings" | "storage";
 type SectionPageName = Exclude<PageName, "settings" | "storage">;
 
@@ -120,7 +137,7 @@ interface PageMeta {
   label: string;
 }
 
-const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative"];
+const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative", "catalan"];
 
 const PAGE_META: Record<PageName, PageMeta> = {
   practice: {
@@ -160,6 +177,10 @@ const SECTION_META: Record<SectionName, SectionMeta> = {
   derivative: {
     navLabel: "Derivative",
     title: "Derivative",
+  },
+  catalan: {
+    navLabel: "Catalan",
+    title: "Catalan",
   },
 };
 
@@ -811,14 +832,20 @@ const DAILY_SECTION_LABELS: Record<DailyChallengeSection, string> = {
   se: "Valores del se",
   perifrasis: "Perifrasis",
   morfologia: "Morfologia",
+  catalan: "Catalan",
   sintaxis: "Sintaxis",
   derivative: "Derivative",
 };
+
+type ProfileSection = Exclude<DailyChallengeSection, "catalan">;
+
+const PROFILE_SECTIONS: ProfileSection[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative"];
 
 type DailyChallengePlan = {
   se: SeItem[];
   perifrasis: PeriphrasisItem[];
   morfologia: MorfoItem[];
+  catalan: CatalanCard[];
   sintaxis: SintaxisItem[];
   derivative: DerivativeItem[];
 };
@@ -848,6 +875,7 @@ function emptyDailyPlan(): DailyChallengePlan {
     se: [],
     perifrasis: [],
     morfologia: [],
+    catalan: [],
     sintaxis: [],
     derivative: [],
   };
@@ -902,6 +930,10 @@ function dailyKeyForMorfo(item: Pick<MorfoItem, "word"> | StoredMorfoItem): stri
   return normalizeTextToken(item.word);
 }
 
+function dailyKeyForCatalan(item: CatalanCard): string {
+  return normalizeTextToken(`${item.deckName}::${item.termId}`);
+}
+
 function dailyKeyForSintaxis(item: Pick<SintaxisItem, "phrase"> | StoredSintaxisItem): string {
   return normalizeTextToken(item.phrase);
 }
@@ -938,10 +970,21 @@ function selectDailyItems<T>(
   return selected;
 }
 
-function buildDailyChallengePlan(storageState: StorageState): { plan: DailyChallengePlan; warning: string } {
+function selectedDailyCatalanCards(decks: CatalanDeck[], settings: DailyChallengeSettings): CatalanCard[] {
+  const selectedDecks = new Set(settings.catalanDeckNames);
+  const selectedSections = new Set(settings.catalanSectionNames);
+
+  return decks
+    .filter((deck) => selectedDecks.size === 0 || selectedDecks.has(deck.name))
+    .flatMap((deck) => deck.cards)
+    .filter((card) => selectedSections.size === 0 || selectedSections.has(card.section));
+}
+
+function buildDailyChallengePlan(storageState: StorageState, catalanDecks: CatalanDeck[]): { plan: DailyChallengePlan; warning: string } {
   const counts = storageState.dailyChallengeSettings.counts;
   const records = storageState.dailyChallengeRecords;
   const plan = emptyDailyPlan();
+  const catalanCards = selectedDailyCatalanCards(catalanDecks, storageState.dailyChallengeSettings);
 
   plan.se = selectDailyItems(storageState.seQuestionBank, counts.se, usedDailyKeys(records, "se"), dailyKeyForSe)
     .map((item) => ({ ...item, id: createId("daily_se"), mode: "normal" as const }));
@@ -957,6 +1000,12 @@ function buildDailyChallengePlan(storageState: StorageState): { plan: DailyChall
     usedDailyKeys(records, "morfologia"),
     dailyKeyForMorfo,
   ).map((item) => ({ ...item, id: createId("daily_morfo"), mode: "normal" as const }));
+  plan.catalan = selectDailyItems(
+    catalanCards,
+    counts.catalan,
+    usedDailyKeys(records, "catalan"),
+    dailyKeyForCatalan,
+  );
   plan.sintaxis = selectDailyItems(
     storageState.sintaxisQuestionBank,
     counts.sintaxis,
@@ -983,6 +1032,7 @@ function dailyPlanItemKeys(plan: DailyChallengePlan): Record<DailyChallengeSecti
     se: plan.se.map(dailyKeyForSe),
     perifrasis: plan.perifrasis.map(dailyKeyForPeriphrasis),
     morfologia: plan.morfologia.map(dailyKeyForMorfo),
+    catalan: plan.catalan.map(dailyKeyForCatalan),
     sintaxis: plan.sintaxis.map(dailyKeyForSintaxis),
     derivative: plan.derivative.map(dailyKeyForDerivative),
   };
@@ -1015,9 +1065,11 @@ function DailyTimerOverlay({ startedAt }: { startedAt: number }) {
 }
 
 function DailyChallengeSettingsPanel({
+  catalanDecks,
   settings,
   onSettingsChange,
 }: {
+  catalanDecks: CatalanDeck[];
   settings: DailyChallengeSettings;
   onSettingsChange: (settings: DailyChallengeSettings) => void;
 }) {
@@ -1028,6 +1080,43 @@ function DailyChallengeSettingsPanel({
         ...settings.counts,
         [section]: coercePracticeBatchSize(value),
       },
+    });
+  };
+  const catalanDeckNames = catalanDecks.map((deck) => deck.name);
+  const selectedCatalanDeckNames = settings.catalanDeckNames.filter((name) => catalanDeckNames.includes(name));
+  const effectiveCatalanDeckNames = selectedCatalanDeckNames.length ? selectedCatalanDeckNames : catalanDeckNames;
+  const catalanSectionNames = [
+    ...new Set(
+      catalanDecks
+        .filter((deck) => effectiveCatalanDeckNames.includes(deck.name))
+        .flatMap((deck) => deck.cards.map((card) => card.section)),
+    ),
+  ].sort((left, right) => left.localeCompare(right));
+  const selectedCatalanSectionNames = settings.catalanSectionNames.filter((name) => catalanSectionNames.includes(name));
+  const effectiveCatalanSectionNames = selectedCatalanSectionNames.length ? selectedCatalanSectionNames : catalanSectionNames;
+
+  const updateCatalanDecks = (deckName: string) => {
+    const currentSelection = selectedCatalanDeckNames.length ? selectedCatalanDeckNames : catalanDeckNames;
+    const nextSelection = currentSelection.includes(deckName)
+      ? currentSelection.filter((name) => name !== deckName)
+      : [...currentSelection, deckName];
+    const normalizedSelection = nextSelection.length === catalanDeckNames.length ? [] : nextSelection;
+    onSettingsChange({
+      ...settings,
+      catalanDeckNames: normalizedSelection,
+      catalanSectionNames: [],
+    });
+  };
+
+  const updateCatalanSections = (sectionName: string) => {
+    const currentSelection = selectedCatalanSectionNames.length ? selectedCatalanSectionNames : catalanSectionNames;
+    const nextSelection = currentSelection.includes(sectionName)
+      ? currentSelection.filter((name) => name !== sectionName)
+      : [...currentSelection, sectionName];
+    const normalizedSelection = nextSelection.length === catalanSectionNames.length ? [] : nextSelection;
+    onSettingsChange({
+      ...settings,
+      catalanSectionNames: normalizedSelection,
     });
   };
 
@@ -1048,6 +1137,48 @@ function DailyChallengeSettingsPanel({
             />
           </div>
         ))}
+      </div>
+      <div className="field-block daily-catalan-settings">
+        <h3 className="section-heading">Catalan en el reto diario</h3>
+        <p className="muted-line">Sin filtros guardados, Catalan usa todas las cartas disponibles de todos los decks.</p>
+        <div className="field-block">
+          <FieldLabel label="Decks" />
+          <div className="chip-cloud">
+            {catalanDeckNames.length ? (
+              catalanDeckNames.map((deckName) => (
+                <button
+                  key={deckName}
+                  className={cx("choice-pill", effectiveCatalanDeckNames.includes(deckName) && "active")}
+                  type="button"
+                  onClick={() => updateCatalanDecks(deckName)}
+                >
+                  {deckName}
+                </button>
+              ))
+            ) : (
+              <p className="muted-line">No hay decks de Catalan cargados.</p>
+            )}
+          </div>
+        </div>
+        <div className="field-block">
+          <FieldLabel label="Secciones" />
+          <div className="chip-cloud catalan-section-cloud">
+            {catalanSectionNames.length ? (
+              catalanSectionNames.map((sectionName) => (
+                <button
+                  key={sectionName}
+                  className={cx("choice-pill", effectiveCatalanSectionNames.includes(sectionName) && "active")}
+                  type="button"
+                  onClick={() => updateCatalanSections(sectionName)}
+                >
+                  {sectionName}
+                </button>
+              ))
+            ) : (
+              <p className="muted-line">No hay secciones para los decks seleccionados.</p>
+            )}
+          </div>
+        </div>
       </div>
     </div>
   );
@@ -1348,6 +1479,129 @@ function DailyMorfoQuestion({
   );
 }
 
+function DailyCatalanQuestion({
+  item,
+  onChecked,
+}: {
+  item: CatalanCard;
+  onChecked: () => void;
+}) {
+  const [answerDraft, setAnswerDraft] = useState("");
+  const [accentSelection, setAccentSelection] = useState<number[]>([]);
+  const [feedback, setFeedback] = useState<{
+    correct: boolean;
+    userText: string;
+    selectedIndices: number[];
+  } | null>(null);
+  const [attemptSaved, setAttemptSaved] = useState(false);
+
+  useEffect(() => {
+    setAnswerDraft("");
+    setAccentSelection([]);
+    setFeedback(null);
+    setAttemptSaved(false);
+  }, [item.termId]);
+
+  const checkAnswer = () => {
+    const selectedIndices = [...accentSelection].sort((left, right) => left - right);
+    const expected = item.missing || item.answer;
+    const correct = isCatalanAccentCard(item)
+      ? expectedCatalanAccentIndices(item).length === selectedIndices.length &&
+        expectedCatalanAccentIndices(item).every((index, itemIndex) => index === selectedIndices[itemIndex]) &&
+        normalizeCatalanAnswer(answerDraft) === normalizeCatalanAnswer(expectedCatalanAccentInput(item))
+      : normalizeCatalanAnswer(answerDraft) === normalizeCatalanAnswer(expected);
+
+    setFeedback({ correct, userText: answerDraft, selectedIndices });
+    if (!attemptSaved) {
+      const nextProgress = updateCatalanProgressWithAttempt(loadStoredCatalanProgress(), item, correct);
+      saveStoredCatalanProgress(nextProgress);
+      setAttemptSaved(true);
+    }
+    onChecked();
+  };
+
+  const previewWord = previewCatalanMaskedWord(item.masked, answerDraft);
+
+  return (
+    <div className="daily-catalan-column">
+      <section className="catalan-question-card">
+        <div className="question-section">{item.section}</div>
+        <div className="question-prompt">{displayCatalanPrompt(item)}</div>
+        {isCatalanAccentCard(item) ? (
+          <div className="catalan-accent-word">
+            {Array.from(catalanAccentBaseWord(item)).map((letter, index) => {
+              const selected = accentSelection.includes(index);
+              return (
+                <button
+                  key={`${letter}-${index}`}
+                  aria-pressed={selected}
+                  className={cx("catalan-accent-letter", selected && "selected")}
+                  disabled={Boolean(feedback)}
+                  type="button"
+                  onClick={() => {
+                    setAccentSelection((current) =>
+                      current.includes(index)
+                        ? current.filter((itemIndex) => itemIndex !== index)
+                        : [...current, index].sort((left, right) => left - right),
+                    );
+                  }}
+                >
+                  {letter}
+                </button>
+              );
+            })}
+          </div>
+        ) : (
+          <div className="question-word">{previewWord}</div>
+        )}
+      </section>
+
+      <form
+        className="catalan-answer-row"
+        onSubmit={(event) => {
+          event.preventDefault();
+          checkAnswer();
+        }}
+      >
+        <input
+          aria-label="Answer"
+          autoComplete="off"
+          disabled={Boolean(feedback)}
+          spellCheck={false}
+          value={answerDraft}
+          onChange={(event) => setAnswerDraft(event.target.value)}
+        />
+        <button className="primary-btn catalan-check-btn" disabled={Boolean(feedback)} type="submit">
+          Check
+        </button>
+      </form>
+
+      {feedback ? (
+        <section className={cx("catalan-feedback", feedback.correct ? "success" : "danger")}>
+          <strong>{feedback.correct ? "Correct" : "Incorrect"}</strong>
+          <div>{item.answer}</div>
+          {isCatalanAccentCard(item) ? null : <div>Gap: {item.missing || "-"}</div>}
+          <div>
+            Expected:{" "}
+            {isCatalanAccentCard(item)
+              ? expectedCatalanAccentInput(item) || "no accent"
+              : item.missing || item.answer}
+          </div>
+          {isCatalanAccentCard(item) ? (
+            <div>
+              Clicked:{" "}
+              {feedback.selectedIndices.length
+                ? feedback.selectedIndices.map((index) => Array.from(catalanAccentBaseWord(item))[index]).join(", ")
+                : "none"}
+            </div>
+          ) : null}
+          <div>You typed: {feedback.userText || "-"}</div>
+        </section>
+      ) : null}
+    </div>
+  );
+}
+
 function DailySintaxisQuestion({
   item,
   settings,
@@ -1446,7 +1700,7 @@ function DailyChallengeQuestion({
   onAppendDerivativeAttempt,
 }: {
   section: DailyChallengeSection;
-  item: SeItem | PeriphrasisItem | MorfoItem | SintaxisItem | DerivativeItem;
+  item: SeItem | PeriphrasisItem | MorfoItem | CatalanCard | SintaxisItem | DerivativeItem;
   storageState: StorageState;
   onChecked: () => void;
   onAppendSeAttempt: (attempt: SeAttempt) => void;
@@ -1496,6 +1750,9 @@ function DailyChallengeQuestion({
       />
     );
   }
+  if (section === "catalan") {
+    return <DailyCatalanQuestion item={item as CatalanCard} onChecked={onChecked} />;
+  }
   if (section === "sintaxis") {
     return (
       <DailySintaxisQuestion
@@ -1517,6 +1774,7 @@ function DailyChallengeQuestion({
 }
 
 function DailyChallengePage({
+  catalanDecks,
   storageState,
   onActiveSectionChange,
   onAppendSeAttempt,
@@ -1526,6 +1784,7 @@ function DailyChallengePage({
   onAppendDerivativeAttempt,
   onCompleteRecord,
 }: {
+  catalanDecks: CatalanDeck[];
   storageState: StorageState;
   onActiveSectionChange: (section: DailyChallengeSection) => void;
   onAppendSeAttempt: (attempt: SeAttempt) => void;
@@ -1543,7 +1802,7 @@ function DailyChallengePage({
     .sort((left, right) => right.completedAt.localeCompare(left.completedAt))[0];
 
   const startChallenge = () => {
-    const { plan, warning } = buildDailyChallengePlan(storageState);
+    const { plan, warning } = buildDailyChallengePlan(storageState, catalanDecks);
     if (dailyPlanTotal(plan) === 0) {
       setCompletedRecord(null);
       return;
@@ -1644,6 +1903,7 @@ function DailyChallengePage({
       se: storageState.seQuestionBank.length,
       perifrasis: storageState.periphrasisQuestionBank.length,
       morfologia: storageState.morfoQuestionBank.length,
+      catalan: selectedDailyCatalanCards(catalanDecks, storageState.dailyChallengeSettings).length,
       sintaxis: storageState.sintaxisQuestionBank.length,
       derivative: storageState.derivativeQuestionBank.length,
     };
@@ -1653,7 +1913,7 @@ function DailyChallengePage({
       <section className="workspace daily-challenge-page">
         <div className="panel daily-start-panel">
           <p className="muted-line">
-            Empieza en Valores del se y avanza automaticamente por Perifrasis, Morfologia, Sintaxis y Derivative.
+            Empieza en Valores del se y avanza automaticamente por Perifrasis, Morfologia, Catalan, Sintaxis y Derivative.
           </p>
           <div className="daily-target-grid">
             {DAILY_CHALLENGE_SECTIONS.map((section) => (
@@ -1710,7 +1970,7 @@ function DailyChallengePage({
         <div className="panel practice-panel daily-practice-panel">
           {currentSection && currentItem ? (
             <DailyChallengeQuestion
-              key={`${currentSection}-${currentItem.id}`}
+              key={`${currentSection}-${currentSection === "catalan" ? (currentItem as CatalanCard).termId : (currentItem as { id: string }).id}`}
               section={currentSection}
               item={currentItem}
               storageState={storageState}
@@ -1858,7 +2118,7 @@ function PersonalTimesPage({ records }: { records: DailyChallengeRecord[] }) {
           </div>
 
           <DataTable
-            headers={["Fecha", "Total", "Valores del se", "Perifrasis", "Morfologia", "Sintaxis", "Derivative"]}
+            headers={["Fecha", "Total", "Valores del se", "Perifrasis", "Morfologia", "Catalan", "Sintaxis", "Derivative"]}
             rows={[...records]
               .sort((left, right) => right.completedAt.localeCompare(left.completedAt))
               .map((record) => [
@@ -1867,6 +2127,7 @@ function PersonalTimesPage({ records }: { records: DailyChallengeRecord[] }) {
                 formatDuration(record.sectionTimes.se),
                 formatDuration(record.sectionTimes.perifrasis),
                 formatDuration(record.sectionTimes.morfologia),
+                formatDuration(record.sectionTimes.catalan),
                 formatDuration(record.sectionTimes.sintaxis),
                 formatDuration(record.sectionTimes.derivative),
               ])}
@@ -1913,7 +2174,7 @@ function CompactProfileSettingsPanel({
   const morfoProfileId = storageState.morfoSettings.profileId;
   const sintaxisProfileId = storageState.sintaxisSettings.profileId;
   const derivativeProfileId = storageState.derivativeSettings.profileId;
-  const [profiles, setProfiles] = useState<Record<DailyChallengeSection, string>>({
+  const [profiles, setProfiles] = useState<Record<ProfileSection, string>>({
     se: seProfileId,
     perifrasis: periphrasisProfileId,
     morfologia: morfoProfileId,
@@ -1931,11 +2192,11 @@ function CompactProfileSettingsPanel({
     });
   }, [derivativeProfileId, morfoProfileId, periphrasisProfileId, seProfileId, sintaxisProfileId]);
 
-  const updateProfileDraft = (section: DailyChallengeSection, value: string) => {
+  const updateProfileDraft = (section: ProfileSection, value: string) => {
     setProfiles((current) => ({ ...current, [section]: value }));
   };
 
-  const profileFor = (section: DailyChallengeSection) => profiles[section].trim() || "alumno";
+  const profileFor = (section: ProfileSection) => profiles[section].trim() || "alumno";
 
   const saveProfiles = () => {
     onSeSettingsChange({ ...storageState.seSettings, profileId: profileFor("se") });
@@ -1949,7 +2210,7 @@ function CompactProfileSettingsPanel({
     <section className="panel compact-settings-panel">
       <h3>Perfiles</h3>
       <div className="compact-settings-grid">
-        {DAILY_CHALLENGE_SECTIONS.map((section) => (
+        {PROFILE_SECTIONS.map((section) => (
           <div key={section}>
             <FieldLabel label={DAILY_SECTION_LABELS[section]} />
             <input value={profiles[section]} onChange={(event) => updateProfileDraft(section, event.target.value)} />
@@ -2123,6 +2384,7 @@ function PersonalTimesSettingsPanel({
 }
 
 function GlobalSettingsPage({
+  catalanDecks,
   storageState,
   onDailyChallengeSettingsChange,
   onDailyChallengeRecordsClear,
@@ -2133,6 +2395,7 @@ function GlobalSettingsPage({
   onSintaxisSettingsChange,
   onDerivativeSettingsChange,
 }: {
+  catalanDecks: CatalanDeck[];
   storageState: StorageState;
   onDailyChallengeSettingsChange: (settings: DailyChallengeSettings) => void;
   onDailyChallengeRecordsClear: () => void;
@@ -2146,6 +2409,7 @@ function GlobalSettingsPage({
   return (
     <section className="workspace global-settings-page">
       <DailyChallengeSettingsPanel
+        catalanDecks={catalanDecks}
         settings={storageState.dailyChallengeSettings}
         onSettingsChange={onDailyChallengeSettingsChange}
       />
@@ -2177,6 +2441,8 @@ function GlobalSettingsPage({
 
 export function NetlifyPracticeApp() {
   const [storageState, setStorageState] = useState<StorageState>(() => loadStorageState());
+  const [builtInCatalanDecks, setBuiltInCatalanDecks] = useState<CatalanDeck[]>([]);
+  const [importedCatalanDecks, setImportedCatalanDecks] = useState<CatalanDeck[]>(() => loadImportedCatalanDecks());
   const [activeSection, setActiveSection] = useState<SectionName>("se");
   const [globalPage, setGlobalPage] = useState<GlobalPageName | null>(null);
   const [exerciseMenuOpen, setExerciseMenuOpen] = useState(false);
@@ -2190,6 +2456,30 @@ export function NetlifyPracticeApp() {
   useEffect(() => {
     saveStorageState(storageState);
   }, [storageState]);
+
+  useEffect(() => {
+    let cancelled = false;
+    void loadBuiltInCatalanDecks()
+      .then((decks) => {
+        if (!cancelled) {
+          setBuiltInCatalanDecks(decks);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setBuiltInCatalanDecks([]);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    const reloadImportedDecks = () => setImportedCatalanDecks(loadImportedCatalanDecks());
+    window.addEventListener(CATALAN_DECKS_UPDATED_EVENT, reloadImportedDecks);
+    return () => window.removeEventListener(CATALAN_DECKS_UPDATED_EVENT, reloadImportedDecks);
+  }, []);
 
   useEffect(() => {
     if (!exerciseMenuOpen) {
@@ -2322,8 +2612,11 @@ export function NetlifyPracticeApp() {
           ? morfoPage
           : activeSection === "sintaxis"
             ? sintaxisPage
-            : derivativePage;
+            : activeSection === "derivative"
+              ? derivativePage
+              : "practice";
   const activeSectionMeta = SECTION_META[activeSection];
+  const catalanDecks = useMemo(() => [...builtInCatalanDecks, ...importedCatalanDecks], [builtInCatalanDecks, importedCatalanDecks]);
   const pageTitle = globalPage
     ? GLOBAL_PAGE_META[globalPage].label
     : activeSectionMeta.title;
@@ -2425,7 +2718,7 @@ export function NetlifyPracticeApp() {
           <section className={cx("hero-banner", !globalPage && activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
             <div className="hero-banner__copy">
               <h1>{pageTitle}</h1>
-              {!globalPage ? (
+              {!globalPage && activeSection !== "catalan" ? (
                 <div className="cta-links">
                   {SECTION_PAGE_ORDER.map((pageKey) => (
                     <PageAction
@@ -2443,6 +2736,7 @@ export function NetlifyPracticeApp() {
           <main className="main-stage">
             {globalPage === "daily" ? (
               <DailyChallengePage
+                catalanDecks={catalanDecks}
                 storageState={storageState}
                 onActiveSectionChange={setActiveSection}
                 onAppendDerivativeAttempt={appendDailyDerivativeAttempt}
@@ -2473,6 +2767,7 @@ export function NetlifyPracticeApp() {
               />
             ) : globalPage === "settings" ? (
               <GlobalSettingsPage
+                catalanDecks={catalanDecks}
                 storageState={storageState}
                 onDailyChallengeRecordsClear={clearDailyRecords}
                 onDailyChallengeSettingsChange={updateDailyChallengeSettings}
@@ -2536,6 +2831,7 @@ export function NetlifyPracticeApp() {
                   onSettingsChange={updateDerivativeSettings}
                   onAttemptsChange={updateDerivativeAttempts}
                 />
+                <CatalanPracticeApp active={activeSection === "catalan"} />
               </>
             )}
           </main>

@@ -57,7 +57,7 @@ const DEFAULT_MODEL = MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash-lite";
 export const MIN_PRACTICE_BATCH_SIZE = 1;
 export const DEFAULT_PRACTICE_BATCH_SIZE = 5;
 export const MAX_PRACTICE_BATCH_SIZE = 10;
-export const DAILY_CHALLENGE_SECTIONS: DailyChallengeSection[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative"];
+export const DAILY_CHALLENGE_SECTIONS: DailyChallengeSection[] = ["se", "perifrasis", "morfologia", "catalan", "sintaxis", "derivative"];
 
 export function coercePracticeBatchSize(value: unknown): number {
   const numericValue = typeof value === "number" ? value : Number(value);
@@ -153,9 +153,12 @@ function defaultDailyChallengeSettings(): DailyChallengeSettings {
       se: 1,
       perifrasis: 1,
       morfologia: 1,
+      catalan: 1,
       sintaxis: 1,
       derivative: 1,
     },
+    catalanDeckNames: [],
+    catalanSectionNames: [],
   };
 }
 
@@ -185,6 +188,8 @@ function sanitizeDailyChallengeSettings(value: unknown): DailyChallengeSettings 
   const raw = value && typeof value === "object" ? value as Partial<DailyChallengeSettings> : {};
   return {
     counts: sanitizeDailyCounts(raw.counts),
+    catalanDeckNames: sanitizeStringList(raw.catalanDeckNames),
+    catalanSectionNames: sanitizeStringList(raw.catalanSectionNames),
   };
 }
 

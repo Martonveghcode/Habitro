@@ -2,7 +2,7 @@ export type Difficulty = 1 | 2 | 3;
 
 export type Mode = "normal" | "personalizado_mixto" | "personalizado_objetivo" | "foco_usuario";
 export type ItemSource = "ai" | "manual";
-export type DailyChallengeSection = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative";
+export type DailyChallengeSection = "se" | "perifrasis" | "morfologia" | "catalan" | "sintaxis" | "derivative";
 
 export interface ModelOption {
   label: string;
@@ -234,6 +234,8 @@ export interface DerivativeSettings {
 
 export interface DailyChallengeSettings {
   counts: Record<DailyChallengeSection, number>;
+  catalanDeckNames: string[];
+  catalanSectionNames: string[];
 }
 
 export interface DailyChallengeRecord {
