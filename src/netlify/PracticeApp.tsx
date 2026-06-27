@@ -126,6 +126,7 @@ import type {
 type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative" | "catalan";
 type PageName = "practice" | "history" | "settings" | "storage";
 type SectionPageName = Exclude<PageName, "settings" | "storage">;
+type InterfaceLanguage = "es" | "ca" | "en" | "fr" | "de" | "hu";
 
 interface SectionMeta {
   navLabel: string;
@@ -138,6 +139,15 @@ interface PageMeta {
 }
 
 const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative", "catalan"];
+const INTERFACE_LANGUAGE_STORAGE_KEY = "habitro-interface-language";
+const INTERFACE_LANGUAGE_OPTIONS: Array<{ value: InterfaceLanguage; label: string }> = [
+  { value: "es", label: "Espanol" },
+  { value: "ca", label: "Catala" },
+  { value: "en", label: "English" },
+  { value: "fr", label: "Francais" },
+  { value: "de", label: "Deutsch" },
+  { value: "hu", label: "Magyar" },
+];
 
 const PAGE_META: Record<PageName, PageMeta> = {
   practice: {
@@ -192,6 +202,18 @@ const DERIVATIVE_IMPORT_PLACEHOLDER = `{"items":[{"function":"f(x)=x^3-5x^2+2x",
 
 function cx(...tokens: Array<string | false | null | undefined>): string {
   return tokens.filter(Boolean).join(" ");
+}
+
+function isInterfaceLanguage(value: unknown): value is InterfaceLanguage {
+  return INTERFACE_LANGUAGE_OPTIONS.some((option) => option.value === value);
+}
+
+function loadInterfaceLanguage(): InterfaceLanguage {
+  if (typeof window === "undefined") {
+    return "es";
+  }
+  const stored = window.localStorage.getItem(INTERFACE_LANGUAGE_STORAGE_KEY);
+  return isInterfaceLanguage(stored) ? stored : "es";
 }
 
 function normalizeLatexInput(value: string): string {
@@ -2383,12 +2405,148 @@ function PersonalTimesSettingsPanel({
   );
 }
 
+function collectBrowserStorage(storage: Storage): Record<string, string> {
+  const entries: Record<string, string> = {};
+  for (let index = 0; index < storage.length; index += 1) {
+    const key = storage.key(index);
+    if (key) {
+      entries[key] = storage.getItem(key) ?? "";
+    }
+  }
+  return entries;
+}
+
+function restoreBrowserStorage(storage: Storage, values: unknown): void {
+  if (!values || typeof values !== "object" || Array.isArray(values)) {
+    return;
+  }
+
+  Object.entries(values as Record<string, unknown>).forEach(([key, value]) => {
+    if (typeof value === "string") {
+      storage.setItem(key, value);
+    }
+  });
+}
+
+function StorageBackupSettingsPanel({
+  onBackupImported,
+}: {
+  onBackupImported: () => void;
+}) {
+  const fileInputRef = useRef<HTMLInputElement | null>(null);
+  const [importStatus, setImportStatus] = useState("");
+
+  const downloadBackup = () => {
+    if (typeof window === "undefined") {
+      return;
+    }
+
+    const backup = {
+      app: "Habitro",
+      version: 1,
+      exportedAt: new Date().toISOString(),
+      origin: window.location.origin,
+      localStorage: collectBrowserStorage(window.localStorage),
+      sessionStorage: collectBrowserStorage(window.sessionStorage),
+    };
+    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    const dateStamp = new Date().toISOString().slice(0, 10);
+    link.href = url;
+    link.download = `habitro-data-${dateStamp}.json`;
+    document.body.append(link);
+    link.click();
+    link.remove();
+    URL.revokeObjectURL(url);
+    setImportStatus("Copia descargada.");
+  };
+
+  const importBackup = async (file: File) => {
+    try {
+      const parsed = JSON.parse(await file.text()) as Record<string, unknown>;
+      restoreBrowserStorage(window.localStorage, parsed.localStorage);
+      restoreBrowserStorage(window.sessionStorage, parsed.sessionStorage);
+      onBackupImported();
+      setImportStatus("Datos importados.");
+    } catch {
+      setImportStatus("No se pudo importar ese archivo.");
+    }
+  };
+
+  return (
+    <section className="panel compact-settings-panel">
+      <h3>Guardar mis datos</h3>
+      <p className="muted-line">Descarga o restaura una copia de los datos guardados en este navegador.</p>
+      <div className="backup-actions">
+        <button className="primary-btn" type="button" onClick={downloadBackup}>
+          Descargar datos
+        </button>
+        <button className="ghost-btn" type="button" onClick={() => fileInputRef.current?.click()}>
+          Importar datos
+        </button>
+      </div>
+      <input
+        ref={fileInputRef}
+        accept="application/json,.json"
+        className="hidden-file-input"
+        type="file"
+        onChange={(event) => {
+          const file = event.currentTarget.files?.[0];
+          event.currentTarget.value = "";
+          if (file) {
+            void importBackup(file);
+          }
+        }}
+      />
+      {importStatus ? <p className="muted-line">{importStatus}</p> : null}
+    </section>
+  );
+}
+
+function LanguageSettingsPanel({
+  language,
+  onLanguageChange,
+}: {
+  language: InterfaceLanguage;
+  onLanguageChange: (language: InterfaceLanguage) => void;
+}) {
+  return (
+    <section className="panel compact-settings-panel">
+      <h3>Idioma</h3>
+      <div className="compact-settings-grid">
+        <div>
+          <FieldLabel label="Idioma de la interfaz" />
+          <select
+            value={language}
+            onChange={(event) => {
+              const nextLanguage = event.target.value;
+              if (isInterfaceLanguage(nextLanguage)) {
+                onLanguageChange(nextLanguage);
+              }
+            }}
+          >
+            {INTERFACE_LANGUAGE_OPTIONS.map((option) => (
+              <option key={option.value} value={option.value}>
+                {option.label}
+              </option>
+            ))}
+          </select>
+        </div>
+      </div>
+    </section>
+  );
+}
+
 function GlobalSettingsPage({
   catalanDecks,
   storageState,
+  interfaceLanguage,
   onDailyChallengeSettingsChange,
   onDailyChallengeRecordsClear,
   onGeminiApiKeyChange,
+  onBackupImported,
+  onInterfaceLanguageChange,
   onSeSettingsChange,
   onPeriphrasisSettingsChange,
   onMorfoSettingsChange,
@@ -2397,9 +2555,12 @@ function GlobalSettingsPage({
 }: {
   catalanDecks: CatalanDeck[];
   storageState: StorageState;
+  interfaceLanguage: InterfaceLanguage;
   onDailyChallengeSettingsChange: (settings: DailyChallengeSettings) => void;
   onDailyChallengeRecordsClear: () => void;
   onGeminiApiKeyChange: (value: string) => void;
+  onBackupImported: () => void;
+  onInterfaceLanguageChange: (language: InterfaceLanguage) => void;
   onSeSettingsChange: (settings: SeSettings) => void;
   onPeriphrasisSettingsChange: (settings: PeriphrasisSettings) => void;
   onMorfoSettingsChange: (settings: MorfoSettings) => void;
@@ -2408,6 +2569,10 @@ function GlobalSettingsPage({
 }) {
   return (
     <section className="workspace global-settings-page">
+      <StorageBackupSettingsPanel onBackupImported={onBackupImported} />
+
+      <LanguageSettingsPanel language={interfaceLanguage} onLanguageChange={onInterfaceLanguageChange} />
+
       <DailyChallengeSettingsPanel
         catalanDecks={catalanDecks}
         settings={storageState.dailyChallengeSettings}
@@ -2443,6 +2608,7 @@ export function NetlifyPracticeApp() {
   const [storageState, setStorageState] = useState<StorageState>(() => loadStorageState());
   const [builtInCatalanDecks, setBuiltInCatalanDecks] = useState<CatalanDeck[]>([]);
   const [importedCatalanDecks, setImportedCatalanDecks] = useState<CatalanDeck[]>(() => loadImportedCatalanDecks());
+  const [interfaceLanguage, setInterfaceLanguage] = useState<InterfaceLanguage>(() => loadInterfaceLanguage());
   const [activeSection, setActiveSection] = useState<SectionName>("se");
   const [globalPage, setGlobalPage] = useState<GlobalPageName | null>(null);
   const [exerciseMenuOpen, setExerciseMenuOpen] = useState(false);
@@ -2456,6 +2622,11 @@ export function NetlifyPracticeApp() {
   useEffect(() => {
     saveStorageState(storageState);
   }, [storageState]);
+
+  useEffect(() => {
+    document.documentElement.lang = interfaceLanguage;
+    window.localStorage.setItem(INTERFACE_LANGUAGE_STORAGE_KEY, interfaceLanguage);
+  }, [interfaceLanguage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2581,6 +2752,13 @@ export function NetlifyPracticeApp() {
 
   const clearDailyRecords = () => {
     setStorageState((current) => ({ ...current, dailyChallengeRecords: [] }));
+  };
+
+  const refreshImportedBackup = () => {
+    setStorageState(loadStorageState());
+    setImportedCatalanDecks(loadImportedCatalanDecks());
+    setInterfaceLanguage(loadInterfaceLanguage());
+    window.dispatchEvent(new CustomEvent(CATALAN_DECKS_UPDATED_EVENT));
   };
 
   const appendDailySeAttempt = (attempt: SeAttempt) => {
@@ -2768,11 +2946,14 @@ export function NetlifyPracticeApp() {
             ) : globalPage === "settings" ? (
               <GlobalSettingsPage
                 catalanDecks={catalanDecks}
+                interfaceLanguage={interfaceLanguage}
                 storageState={storageState}
+                onBackupImported={refreshImportedBackup}
                 onDailyChallengeRecordsClear={clearDailyRecords}
                 onDailyChallengeSettingsChange={updateDailyChallengeSettings}
                 onDerivativeSettingsChange={updateDerivativeSettings}
                 onGeminiApiKeyChange={updateGeminiApiKey}
+                onInterfaceLanguageChange={setInterfaceLanguage}
                 onMorfoSettingsChange={updateMorfoSettings}
                 onPeriphrasisSettingsChange={updatePeriphrasisSettings}
                 onSeSettingsChange={updateSeSettings}

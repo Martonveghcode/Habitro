@@ -1052,8 +1052,19 @@ tbody tr:last-child td {
 
 .compact-settings-panel .field-block,
 .compact-settings-panel .info-block,
-.compact-settings-panel .primary-btn {
+.compact-settings-panel .primary-btn,
+.compact-settings-panel .ghost-btn {
   margin-top: var(--space-4);
+}
+
+.backup-actions {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-3);
+}
+
+.hidden-file-input {
+  display: none;
 }
 
 .daily-start-panel {
