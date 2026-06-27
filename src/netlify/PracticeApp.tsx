@@ -134,10 +134,6 @@ interface SectionMeta {
   theme?: "light" | "dark";
 }
 
-interface PageMeta {
-  label: string;
-}
-
 const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative", "catalan"];
 const INTERFACE_LANGUAGE_STORAGE_KEY = "habitro-interface-language";
 const INTERFACE_LANGUAGE_OPTIONS: Array<{ value: InterfaceLanguage; label: string }> = [
@@ -149,18 +145,195 @@ const INTERFACE_LANGUAGE_OPTIONS: Array<{ value: InterfaceLanguage; label: strin
   { value: "hu", label: "Magyar" },
 ];
 
-const PAGE_META: Record<PageName, PageMeta> = {
-  practice: {
-    label: "Practicar",
+type UiTextKey =
+  | "aiAndApi"
+  | "backupDownloaded"
+  | "backupImportFailed"
+  | "backupImported"
+  | "backupIntro"
+  | "customModel"
+  | "customPeriphrasisTypes"
+  | "customPeriphrasisTypesHint"
+  | "daily"
+  | "dailyChallenge"
+  | "dataBackup"
+  | "downloadData"
+  | "exercises"
+  | "history"
+  | "importData"
+  | "interfaceLanguage"
+  | "language"
+  | "manualCustom"
+  | "personalTimes"
+  | "practice"
+  | "profiles"
+  | "saveAi"
+  | "saveProfiles"
+  | "settings"
+  | "storage";
+
+const UI_TEXT: Record<InterfaceLanguage, Record<UiTextKey, string>> = {
+  es: {
+    aiAndApi: "AI y API",
+    backupDownloaded: "Copia descargada.",
+    backupImportFailed: "No se pudo importar ese archivo.",
+    backupImported: "Datos importados.",
+    backupIntro: "Descarga o restaura una copia de los datos guardados en este navegador.",
+    customModel: "Modelo personalizado",
+    customPeriphrasisTypes: "Tipos de perifrasis personalizados",
+    customPeriphrasisTypesHint: "Separados por comas. Se suman a la lista base.",
+    daily: "Reto diario",
+    dailyChallenge: "Reto diario",
+    dataBackup: "Guardar mis datos",
+    downloadData: "Descargar datos",
+    exercises: "Ejercicios",
+    history: "Historial",
+    importData: "Importar datos",
+    interfaceLanguage: "Idioma de la interfaz",
+    language: "Idioma",
+    manualCustom: "Personalizado (manual)",
+    personalTimes: "Tiempos personales",
+    practice: "Practicar",
+    profiles: "Perfiles",
+    saveAi: "Guardar AI",
+    saveProfiles: "Guardar perfiles",
+    settings: "Ajustes",
+    storage: "Bancos",
   },
-  history: {
-    label: "Historial",
+  ca: {
+    aiAndApi: "IA i API",
+    backupDownloaded: "Copia descarregada.",
+    backupImportFailed: "No s'ha pogut importar aquest fitxer.",
+    backupImported: "Dades importades.",
+    backupIntro: "Descarrega o restaura una copia de les dades guardades en aquest navegador.",
+    customModel: "Model personalitzat",
+    customPeriphrasisTypes: "Tipus de perifrasis personalitzats",
+    customPeriphrasisTypesHint: "Separats per comes. S'afegeixen a la llista base.",
+    daily: "Repte diari",
+    dailyChallenge: "Repte diari",
+    dataBackup: "Guardar les meves dades",
+    downloadData: "Descarregar dades",
+    exercises: "Exercicis",
+    history: "Historial",
+    importData: "Importar dades",
+    interfaceLanguage: "Idioma de la interfície",
+    language: "Idioma",
+    manualCustom: "Personalitzat (manual)",
+    personalTimes: "Temps personals",
+    practice: "Practicar",
+    profiles: "Perfils",
+    saveAi: "Guardar IA",
+    saveProfiles: "Guardar perfils",
+    settings: "Configuracio",
+    storage: "Bancs",
   },
-  settings: {
-    label: "Ajustes",
+  en: {
+    aiAndApi: "AI and API",
+    backupDownloaded: "Backup downloaded.",
+    backupImportFailed: "Could not import that file.",
+    backupImported: "Data imported.",
+    backupIntro: "Download or restore a copy of the data saved in this browser.",
+    customModel: "Custom model",
+    customPeriphrasisTypes: "Custom periphrasis types",
+    customPeriphrasisTypesHint: "Comma-separated. Added to the base list.",
+    daily: "Daily challenge",
+    dailyChallenge: "Daily challenge",
+    dataBackup: "Save my data",
+    downloadData: "Download data",
+    exercises: "Exercises",
+    history: "History",
+    importData: "Import data",
+    interfaceLanguage: "Interface language",
+    language: "Language",
+    manualCustom: "Custom (manual)",
+    personalTimes: "Personal times",
+    practice: "Practice",
+    profiles: "Profiles",
+    saveAi: "Save AI",
+    saveProfiles: "Save profiles",
+    settings: "Settings",
+    storage: "Banks",
   },
-  storage: {
-    label: "Bancos",
+  fr: {
+    aiAndApi: "IA et API",
+    backupDownloaded: "Sauvegarde telechargee.",
+    backupImportFailed: "Impossible d'importer ce fichier.",
+    backupImported: "Donnees importees.",
+    backupIntro: "Telechargez ou restaurez une copie des donnees enregistrees dans ce navigateur.",
+    customModel: "Modele personnalise",
+    customPeriphrasisTypes: "Types de periphrases personnalises",
+    customPeriphrasisTypesHint: "Separes par des virgules. Ajoutes a la liste de base.",
+    daily: "Defi quotidien",
+    dailyChallenge: "Defi quotidien",
+    dataBackup: "Sauvegarder mes donnees",
+    downloadData: "Telecharger les donnees",
+    exercises: "Exercices",
+    history: "Historique",
+    importData: "Importer les donnees",
+    interfaceLanguage: "Langue de l'interface",
+    language: "Langue",
+    manualCustom: "Personnalise (manuel)",
+    personalTimes: "Temps personnels",
+    practice: "S'entrainer",
+    profiles: "Profils",
+    saveAi: "Sauvegarder l'IA",
+    saveProfiles: "Sauvegarder les profils",
+    settings: "Parametres",
+    storage: "Banques",
+  },
+  de: {
+    aiAndApi: "KI und API",
+    backupDownloaded: "Sicherung heruntergeladen.",
+    backupImportFailed: "Diese Datei konnte nicht importiert werden.",
+    backupImported: "Daten importiert.",
+    backupIntro: "Lade eine Kopie der in diesem Browser gespeicherten Daten herunter oder stelle sie wieder her.",
+    customModel: "Benutzerdefiniertes Modell",
+    customPeriphrasisTypes: "Eigene Periphrase-Typen",
+    customPeriphrasisTypesHint: "Durch Kommas getrennt. Wird zur Basisliste hinzugefuegt.",
+    daily: "Taegliche Aufgabe",
+    dailyChallenge: "Taegliche Aufgabe",
+    dataBackup: "Meine Daten speichern",
+    downloadData: "Daten herunterladen",
+    exercises: "Uebungen",
+    history: "Verlauf",
+    importData: "Daten importieren",
+    interfaceLanguage: "Sprache der Oberflaeche",
+    language: "Sprache",
+    manualCustom: "Benutzerdefiniert (manuell)",
+    personalTimes: "Persoenliche Zeiten",
+    practice: "Ueben",
+    profiles: "Profile",
+    saveAi: "KI speichern",
+    saveProfiles: "Profile speichern",
+    settings: "Einstellungen",
+    storage: "Banken",
+  },
+  hu: {
+    aiAndApi: "AI es API",
+    backupDownloaded: "Biztonsagi mentes letoltve.",
+    backupImportFailed: "Ezt a fajlt nem sikerult importalni.",
+    backupImported: "Adatok importalva.",
+    backupIntro: "Toltsd le vagy allitsd vissza a bongeszoben mentett adatok masolatat.",
+    customModel: "Egyedi modell",
+    customPeriphrasisTypes: "Egyedi koruliras-tipusok",
+    customPeriphrasisTypesHint: "Vesszovel elvalasztva. Hozzaadodik az alaplistahoz.",
+    daily: "Napi kihivas",
+    dailyChallenge: "Napi kihivas",
+    dataBackup: "Adataim mentese",
+    downloadData: "Adatok letoltese",
+    exercises: "Feladatok",
+    history: "Elozmenyek",
+    importData: "Adatok importalasa",
+    interfaceLanguage: "Feluelet nyelve",
+    language: "Nyelv",
+    manualCustom: "Egyedi (manualis)",
+    personalTimes: "Sajat idok",
+    practice: "Gyakorlas",
+    profiles: "Profilok",
+    saveAi: "AI mentese",
+    saveProfiles: "Profilok mentese",
+    settings: "Beallitasok",
+    storage: "Bankok",
   },
 };
 
@@ -214,6 +387,36 @@ function loadInterfaceLanguage(): InterfaceLanguage {
   }
   const stored = window.localStorage.getItem(INTERFACE_LANGUAGE_STORAGE_KEY);
   return isInterfaceLanguage(stored) ? stored : "es";
+}
+
+function tUi(language: InterfaceLanguage, key: UiTextKey): string {
+  return UI_TEXT[language]?.[key] ?? UI_TEXT.es[key];
+}
+
+function pageLabel(language: InterfaceLanguage, page: PageName): string {
+  if (page === "practice") {
+    return tUi(language, "practice");
+  }
+  if (page === "history") {
+    return tUi(language, "history");
+  }
+  if (page === "settings") {
+    return tUi(language, "settings");
+  }
+  return tUi(language, "storage");
+}
+
+function globalPageLabel(language: InterfaceLanguage, page: GlobalPageName): string {
+  if (page === "daily") {
+    return tUi(language, "daily");
+  }
+  if (page === "records") {
+    return tUi(language, "personalTimes");
+  }
+  if (page === "storage") {
+    return tUi(language, "storage");
+  }
+  return tUi(language, "settings");
 }
 
 function normalizeLatexInput(value: string): string {
@@ -831,24 +1034,7 @@ function buildRequiredSeStrategy(value: string, mode: SeStrategy["mode"], ratioH
 
 type GlobalPageName = "daily" | "records" | "storage" | "settings";
 
-interface GlobalPageMeta {
-  label: string;
-}
-
-const GLOBAL_PAGE_META: Record<GlobalPageName, GlobalPageMeta> = {
-  daily: {
-    label: "Reto diario",
-  },
-  records: {
-    label: "Tiempos personales",
-  },
-  storage: {
-    label: "Bancos",
-  },
-  settings: {
-    label: "Ajustes",
-  },
-};
+const GLOBAL_PAGE_ORDER: GlobalPageName[] = ["daily", "records", "storage", "settings"];
 
 const DAILY_SECTION_LABELS: Record<DailyChallengeSection, string> = {
   se: "Valores del se",
@@ -2161,6 +2347,7 @@ function PersonalTimesPage({ records }: { records: DailyChallengeRecord[] }) {
 }
 
 interface CompactSettingsProps {
+  interfaceLanguage: InterfaceLanguage;
   storageState: StorageState;
   onSeSettingsChange: (settings: SeSettings) => void;
   onPeriphrasisSettingsChange: (settings: PeriphrasisSettings) => void;
@@ -2184,6 +2371,7 @@ function modelDraftFor(modelName: string): AiModelDraft {
 }
 
 function CompactProfileSettingsPanel({
+  interfaceLanguage,
   storageState,
   onSeSettingsChange,
   onPeriphrasisSettingsChange,
@@ -2230,7 +2418,7 @@ function CompactProfileSettingsPanel({
 
   return (
     <section className="panel compact-settings-panel">
-      <h3>Perfiles</h3>
+      <h3>{tUi(interfaceLanguage, "profiles")}</h3>
       <div className="compact-settings-grid">
         {PROFILE_SECTIONS.map((section) => (
           <div key={section}>
@@ -2240,19 +2428,21 @@ function CompactProfileSettingsPanel({
         ))}
       </div>
       <button className="primary-btn" type="button" onClick={saveProfiles}>
-        Guardar perfiles
+        {tUi(interfaceLanguage, "saveProfiles")}
       </button>
     </section>
   );
 }
 
 function CompactAiSettingsPanel({
+  interfaceLanguage,
   storageState,
   onGeminiApiKeyChange,
   onSeSettingsChange,
   onPeriphrasisSettingsChange,
   onMorfoSettingsChange,
 }: {
+  interfaceLanguage: InterfaceLanguage;
   storageState: StorageState;
   onGeminiApiKeyChange: (value: string) => void;
   onSeSettingsChange: (settings: SeSettings) => void;
@@ -2318,11 +2508,11 @@ function CompactAiSettingsPanel({
               {option.label}
             </option>
           ))}
-          <option value="custom">Personalizado (manual)</option>
+          <option value="custom">{tUi(interfaceLanguage, "manualCustom")}</option>
         </select>
         <input
           disabled={drafts[section].selectedModel !== "custom"}
-          placeholder="Modelo personalizado"
+          placeholder={tUi(interfaceLanguage, "customModel")}
           value={drafts[section].customModel}
           onChange={(event) => updateModelDraft(section, { customModel: event.target.value })}
         />
@@ -2332,7 +2522,7 @@ function CompactAiSettingsPanel({
 
   return (
     <section className="panel compact-settings-panel">
-      <h3>AI y API</h3>
+      <h3>{tUi(interfaceLanguage, "aiAndApi")}</h3>
       <div className="compact-model-list">
         {renderModelRow("se", DAILY_SECTION_LABELS.se)}
         {renderModelRow("perifrasis", DAILY_SECTION_LABELS.perifrasis)}
@@ -2341,8 +2531,8 @@ function CompactAiSettingsPanel({
 
       <div className="field-block">
         <FieldLabel
-          label="Tipos de perifrasis personalizados"
-          hint="Separados por comas. Se suman a la lista base."
+          label={tUi(interfaceLanguage, "customPeriphrasisTypes")}
+          hint={tUi(interfaceLanguage, "customPeriphrasisTypesHint")}
         />
         <input
           placeholder="Ej. Obligacion atenuada, enfatica"
@@ -2352,7 +2542,7 @@ function CompactAiSettingsPanel({
       </div>
 
       <button className="primary-btn" type="button" onClick={saveAiSettings}>
-        Guardar AI
+        {tUi(interfaceLanguage, "saveAi")}
       </button>
 
       <GeminiKeyPanel apiKey={storageState.geminiApiKey} onApiKeyChange={onGeminiApiKeyChange} />
@@ -2361,9 +2551,11 @@ function CompactAiSettingsPanel({
 }
 
 function PersonalTimesSettingsPanel({
+  interfaceLanguage,
   recordCount,
   onClearRecords,
 }: {
+  interfaceLanguage: InterfaceLanguage;
   recordCount: number;
   onClearRecords: () => void;
 }) {
@@ -2377,7 +2569,7 @@ function PersonalTimesSettingsPanel({
 
   return (
     <section className="panel compact-settings-panel">
-      <h3>Tiempos personales</h3>
+      <h3>{tUi(interfaceLanguage, "personalTimes")}</h3>
       <p className="muted-line">Borra los tiempos guardados del reto diario.</p>
       <div className="danger-zone">
         <label className="checkbox-line">
@@ -2429,8 +2621,10 @@ function restoreBrowserStorage(storage: Storage, values: unknown): void {
 }
 
 function StorageBackupSettingsPanel({
+  interfaceLanguage,
   onBackupImported,
 }: {
+  interfaceLanguage: InterfaceLanguage;
   onBackupImported: () => void;
 }) {
   const fileInputRef = useRef<HTMLInputElement | null>(null);
@@ -2459,7 +2653,7 @@ function StorageBackupSettingsPanel({
     link.click();
     link.remove();
     URL.revokeObjectURL(url);
-    setImportStatus("Copia descargada.");
+    setImportStatus(tUi(interfaceLanguage, "backupDownloaded"));
   };
 
   const importBackup = async (file: File) => {
@@ -2468,22 +2662,22 @@ function StorageBackupSettingsPanel({
       restoreBrowserStorage(window.localStorage, parsed.localStorage);
       restoreBrowserStorage(window.sessionStorage, parsed.sessionStorage);
       onBackupImported();
-      setImportStatus("Datos importados.");
+      setImportStatus(tUi(interfaceLanguage, "backupImported"));
     } catch {
-      setImportStatus("No se pudo importar ese archivo.");
+      setImportStatus(tUi(interfaceLanguage, "backupImportFailed"));
     }
   };
 
   return (
     <section className="panel compact-settings-panel">
-      <h3>Guardar mis datos</h3>
-      <p className="muted-line">Descarga o restaura una copia de los datos guardados en este navegador.</p>
+      <h3>{tUi(interfaceLanguage, "dataBackup")}</h3>
+      <p className="muted-line">{tUi(interfaceLanguage, "backupIntro")}</p>
       <div className="backup-actions">
         <button className="primary-btn" type="button" onClick={downloadBackup}>
-          Descargar datos
+          {tUi(interfaceLanguage, "downloadData")}
         </button>
         <button className="ghost-btn" type="button" onClick={() => fileInputRef.current?.click()}>
-          Importar datos
+          {tUi(interfaceLanguage, "importData")}
         </button>
       </div>
       <input
@@ -2513,10 +2707,10 @@ function LanguageSettingsPanel({
 }) {
   return (
     <section className="panel compact-settings-panel">
-      <h3>Idioma</h3>
+      <h3>{tUi(language, "language")}</h3>
       <div className="compact-settings-grid">
         <div>
-          <FieldLabel label="Idioma de la interfaz" />
+          <FieldLabel label={tUi(language, "interfaceLanguage")} />
           <select
             value={language}
             onChange={(event) => {
@@ -2569,7 +2763,7 @@ function GlobalSettingsPage({
 }) {
   return (
     <section className="workspace global-settings-page">
-      <StorageBackupSettingsPanel onBackupImported={onBackupImported} />
+      <StorageBackupSettingsPanel interfaceLanguage={interfaceLanguage} onBackupImported={onBackupImported} />
 
       <LanguageSettingsPanel language={interfaceLanguage} onLanguageChange={onInterfaceLanguageChange} />
 
@@ -2580,6 +2774,7 @@ function GlobalSettingsPage({
       />
 
       <CompactProfileSettingsPanel
+        interfaceLanguage={interfaceLanguage}
         storageState={storageState}
         onDerivativeSettingsChange={onDerivativeSettingsChange}
         onMorfoSettingsChange={onMorfoSettingsChange}
@@ -2589,6 +2784,7 @@ function GlobalSettingsPage({
       />
 
       <CompactAiSettingsPanel
+        interfaceLanguage={interfaceLanguage}
         storageState={storageState}
         onGeminiApiKeyChange={onGeminiApiKeyChange}
         onMorfoSettingsChange={onMorfoSettingsChange}
@@ -2597,6 +2793,7 @@ function GlobalSettingsPage({
       />
 
       <PersonalTimesSettingsPanel
+        interfaceLanguage={interfaceLanguage}
         recordCount={storageState.dailyChallengeRecords.length}
         onClearRecords={onDailyChallengeRecordsClear}
       />
@@ -2796,7 +2993,7 @@ export function NetlifyPracticeApp() {
   const activeSectionMeta = SECTION_META[activeSection];
   const catalanDecks = useMemo(() => [...builtInCatalanDecks, ...importedCatalanDecks], [builtInCatalanDecks, importedCatalanDecks]);
   const pageTitle = globalPage
-    ? GLOBAL_PAGE_META[globalPage].label
+    ? globalPageLabel(interfaceLanguage, globalPage)
     : activeSectionMeta.title;
 
   const setPageForSection = (section: SectionName, page: PageName) => {
@@ -2837,7 +3034,7 @@ export function NetlifyPracticeApp() {
             <span>Habitro</span>
           </button>
 
-          <nav className="globalnav__menu" aria-label="Secciones">
+          <nav className="globalnav__menu" aria-label={tUi(interfaceLanguage, "exercises")}>
             <div className="globalnav__group" ref={exerciseMenuRef}>
               <button
                 aria-expanded={exerciseMenuOpen}
@@ -2847,10 +3044,10 @@ export function NetlifyPracticeApp() {
                 type="button"
                 onClick={() => setExerciseMenuOpen((current) => !current)}
               >
-                Ejercicios
+                {tUi(interfaceLanguage, "exercises")}
               </button>
               {exerciseMenuOpen ? (
-                <div className="globalnav__dropdown" role="menu" aria-label="Ejercicios">
+                <div className="globalnav__dropdown" role="menu" aria-label={tUi(interfaceLanguage, "exercises")}>
                   {SECTION_ORDER.map((section) => (
                     <button
                       key={section}
@@ -2872,7 +3069,7 @@ export function NetlifyPracticeApp() {
                 </div>
               ) : null}
             </div>
-            {(Object.entries(GLOBAL_PAGE_META) as Array<[GlobalPageName, GlobalPageMeta]>).map(([pageKey, pageMeta]) => (
+            {GLOBAL_PAGE_ORDER.map((pageKey) => (
               <button
                 key={pageKey}
                 aria-pressed={globalPage === pageKey}
@@ -2883,7 +3080,7 @@ export function NetlifyPracticeApp() {
                   setGlobalPage(pageKey);
                 }}
               >
-                {pageMeta.label}
+                {globalPageLabel(interfaceLanguage, pageKey)}
               </button>
             ))}
           </nav>
@@ -2902,7 +3099,7 @@ export function NetlifyPracticeApp() {
                     <PageAction
                       key={pageKey}
                       active={currentPage === pageKey}
-                      label={PAGE_META[pageKey].label}
+                      label={pageLabel(interfaceLanguage, pageKey)}
                       onClick={() => setPageForSection(activeSection, pageKey)}
                     />
                   ))}
