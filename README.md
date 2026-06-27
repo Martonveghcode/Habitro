@@ -1,47 +1,37 @@
-# Valores del se App (Streamlit)
+# Habitro
 
-Nueva version centrada solo en practica de **valores del se**.
+A daily learning system optimized for retaining and learning school material.
 
-## Incluye
+![Habitro derivative practice preview](docs/habitro-preview.png)
 
-- Generacion de frases (dificultad 1-3) con "se".
-- Respuesta correcta incluida en el mismo llamado al LLM:
-  - valor de "se"
-  - funcion (CD/CI/etc.)
-  - tipo de oracion
-  - explicacion breve
-- Comprobacion inmediata de tu respuesta.
-- Historial de errores con:
-  - ocultar/mostrar
-  - reset completo
-- Modo personalizado usando tus errores guardados.
-- Navegacion lateral (`Practicar`, `Historial`, `Ajustes`).
+Habitro combines individualized SQLite-based performance tracking with a daily learning workflow. In my current setup it covers Spanish grammar, Catalan, and maths exercises that I do daily.
 
-## Requisitos
+## What It Does
 
-- Python 3.10+
+- Tracks practice performance per exercise type with SQLite-backed history.
+- Builds daily sessions across Spanish grammar, Catalan, syntax, morphology, and derivatives.
+- Keeps mistakes and previous attempts available for review.
+- Supports manual question banks and generated practice where configured.
+- Runs as a React/Vite web app, with an older Streamlit workflow still present for local experimentation.
 
-## Instalacion
+## Run The Web App
+
+```bash
+npm install
+npm run dev
+```
+
+## Build
+
+```bash
+npm run build
+```
+
+## Optional Streamlit Workflow
 
 ```bash
 pip install -r requirements-streamlit.txt
-```
-
-Opcional (Gemini):
-
-- En variable de entorno:
-  - `GEMINI_API_KEY=...`
-  - `GEMINI_MODEL=gemini-2.5-flash-lite` (opcional)
-- O en `.streamlit/secrets.toml`:
-  ```toml
-  GEMINI_API_KEY = "tu_clave"
-  GEMINI_MODEL = "gemini-2.5-flash-lite"
-  ```
-
-Si no hay API key, la app usa ejemplos locales para que siga funcionando.
-
-## Ejecutar
-
-```bash
 streamlit run streamlit_app.py
 ```
+
+If no API key is configured, local examples and manually imported decks can still be used where supported.
