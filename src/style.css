@@ -1799,3 +1799,518 @@ code {
     min-width: 640px;
   }
 }
+
+/* Philosophy flashcards */
+
+.philosophy-workspace {
+  --philosophy-accent: #6f42c1;
+  --philosophy-accent-soft: #f3effb;
+  --philosophy-ink: #24292f;
+}
+
+.philosophy-layout {
+  display: grid;
+  grid-template-columns: 272px minmax(0, 1fr);
+  gap: 40px;
+  align-items: start;
+}
+
+.philosophy-sidebar {
+  position: sticky;
+  top: 72px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  padding-right: 24px;
+  border-right: 1px solid var(--border-muted);
+}
+
+.philosophy-sidebar__heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 6px;
+}
+
+.philosophy-sidebar__heading h2,
+.philosophy-start-card h2,
+.philosophy-finished-card h2 {
+  margin: 2px 0 0;
+  font-size: 22px;
+  line-height: 1.25;
+}
+
+.eyebrow {
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.philosophy-selected-count {
+  min-width: 38px;
+  padding: 2px 8px;
+  border-radius: var(--radius-pill);
+  background: var(--bg-muted);
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 700;
+  text-align: center;
+}
+
+.philosophy-chapter-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.philosophy-chapter {
+  position: relative;
+  display: grid;
+  grid-template-columns: 22px minmax(0, 1fr);
+  gap: 10px;
+  width: 100%;
+  padding: 11px 12px;
+  border: 1px solid transparent;
+  border-radius: var(--radius-lg);
+  color: var(--fg-muted);
+  text-align: left;
+  cursor: pointer;
+  transition:
+    border-color 120ms ease,
+    background-color 120ms ease,
+    color 120ms ease,
+    transform 120ms ease;
+}
+
+.philosophy-chapter:hover:not(:disabled) {
+  border-color: var(--border-default);
+  background: var(--bg-muted);
+  color: var(--fg-default);
+  transform: translateX(2px);
+}
+
+.philosophy-chapter:focus-visible {
+  outline: none;
+  box-shadow: var(--focus-ring);
+}
+
+.philosophy-chapter:disabled {
+  cursor: default;
+}
+
+.philosophy-chapter--all {
+  margin-bottom: 2px;
+  border-color: var(--border-default);
+}
+
+.philosophy-chapter--selected {
+  border-color: #cbbbea;
+  background: var(--philosophy-accent-soft);
+  color: var(--philosophy-ink);
+}
+
+.philosophy-chapter__marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 20px;
+  height: 20px;
+  margin-top: 1px;
+  border: 1px solid var(--border-strong);
+  border-radius: 5px;
+  background: var(--bg-default);
+  color: var(--fg-on-emphasis);
+  font-size: 12px;
+  font-weight: 800;
+}
+
+.philosophy-chapter--selected .philosophy-chapter__marker {
+  border-color: var(--philosophy-accent);
+  background: var(--philosophy-accent);
+}
+
+.philosophy-chapter__copy {
+  display: flex;
+  min-width: 0;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.philosophy-chapter__copy strong {
+  color: inherit;
+  font-size: 13px;
+  line-height: 1.3;
+}
+
+.philosophy-chapter__copy > span {
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1.3;
+}
+
+.philosophy-chapter__copy small {
+  color: var(--fg-subtle);
+  font-size: 11px;
+}
+
+.philosophy-sidebar__note {
+  margin: 4px 0 0;
+  color: var(--fg-subtle);
+  font-size: 11px;
+}
+
+.philosophy-main {
+  min-width: 0;
+}
+
+.philosophy-start-card,
+.philosophy-finished-card {
+  max-width: 760px;
+  padding: 32px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-xl);
+  background:
+    radial-gradient(circle at 100% 0, rgba(111, 66, 193, 0.08), transparent 260px),
+    var(--bg-default);
+}
+
+.philosophy-start-card__header p,
+.philosophy-finished-card p {
+  max-width: 620px;
+  margin: 10px 0 0;
+  color: var(--fg-muted);
+  font-size: 15px;
+}
+
+.philosophy-settings-grid {
+  display: grid;
+  grid-template-columns: minmax(0, 1.3fr) minmax(220px, 1fr);
+  gap: 16px;
+  margin: 30px 0 24px;
+}
+
+.philosophy-setting,
+.philosophy-random-setting {
+  padding: 16px;
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  background: rgba(255, 255, 255, 0.82);
+}
+
+.philosophy-setting > span,
+.philosophy-random-setting strong {
+  display: block;
+  margin-bottom: 10px;
+  color: var(--fg-default);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.philosophy-batch-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 72px;
+  gap: 12px;
+  align-items: center;
+}
+
+.philosophy-batch-number {
+  text-align: center;
+  font-weight: 700;
+}
+
+.philosophy-random-setting {
+  display: flex;
+  gap: 12px;
+  align-items: flex-start;
+  cursor: pointer;
+}
+
+.philosophy-random-setting input {
+  width: 18px;
+  min-height: 18px;
+  margin: 2px 0 0;
+  accent-color: var(--philosophy-accent);
+}
+
+.philosophy-random-setting span {
+  display: block;
+}
+
+.philosophy-random-setting strong {
+  margin-bottom: 3px;
+}
+
+.philosophy-random-setting small {
+  display: block;
+  color: var(--fg-muted);
+  font-size: 12px;
+  line-height: 1.4;
+}
+
+.philosophy-start-btn {
+  min-width: 220px;
+  margin-top: 20px;
+}
+
+.philosophy-source-note {
+  max-width: 650px;
+  margin: 18px 0 0;
+  color: var(--fg-subtle);
+  font-size: 12px;
+}
+
+.philosophy-session {
+  width: 100%;
+}
+
+.philosophy-session__topbar {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto;
+  gap: 24px;
+  align-items: end;
+  margin-bottom: 16px;
+}
+
+.philosophy-progress {
+  width: min(420px, 60vw);
+  height: 5px;
+  margin-top: 7px;
+  overflow: hidden;
+  border-radius: var(--radius-pill);
+  background: var(--bg-inset);
+}
+
+.philosophy-progress span {
+  display: block;
+  height: 100%;
+  border-radius: inherit;
+  background: var(--philosophy-accent);
+  transition: width 180ms ease;
+}
+
+.philosophy-end-btn {
+  min-width: auto;
+}
+
+.philosophy-flashcard {
+  min-height: 500px;
+  padding: clamp(28px, 5vw, 56px);
+  border: 1px solid var(--border-default);
+  border-radius: 16px;
+  background:
+    linear-gradient(135deg, rgba(111, 66, 193, 0.035), transparent 40%),
+    var(--bg-default);
+  box-shadow: 0 16px 44px rgba(31, 35, 40, 0.08);
+}
+
+.philosophy-card-meta {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+}
+
+.philosophy-topic-badge,
+.philosophy-source-badge {
+  display: inline-flex;
+  align-items: center;
+  min-height: 25px;
+  padding: 0 9px;
+  border-radius: var(--radius-pill);
+  font-size: 11px;
+  font-weight: 700;
+}
+
+.philosophy-topic-badge {
+  background: var(--philosophy-accent-soft);
+  color: #553098;
+}
+
+.philosophy-source-badge--anki {
+  background: #dafbe1;
+  color: #116329;
+}
+
+.philosophy-source-badge--book {
+  background: var(--bg-muted);
+  color: var(--fg-muted);
+}
+
+.philosophy-section-label {
+  margin: 20px 0 0;
+  color: var(--fg-subtle);
+  font-size: 12px;
+  font-weight: 650;
+}
+
+.philosophy-question {
+  max-width: 900px;
+  margin: 14px 0 0;
+  color: var(--philosophy-ink);
+  font-size: clamp(28px, 4.2vw, 44px);
+  font-weight: 650;
+  letter-spacing: -0.025em;
+  line-height: 1.16;
+}
+
+.philosophy-reveal-area {
+  display: flex;
+  gap: 14px;
+  align-items: center;
+  margin-top: 56px;
+}
+
+.philosophy-reveal-area > span {
+  color: var(--fg-subtle);
+  font-size: 12px;
+}
+
+.philosophy-reveal-btn {
+  min-width: 190px;
+}
+
+.philosophy-answer-shell {
+  margin-top: 42px;
+  padding: 24px 26px;
+  border-left: 4px solid var(--philosophy-accent);
+  border-radius: 0 var(--radius-lg) var(--radius-lg) 0;
+  background: var(--philosophy-accent-soft);
+}
+
+.philosophy-answer-label {
+  margin-bottom: 8px;
+  color: #553098;
+  font-size: 11px;
+  font-weight: 750;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
+.philosophy-answer {
+  color: var(--philosophy-ink);
+  font-size: 17px;
+  line-height: 1.68;
+  white-space: pre-wrap;
+}
+
+.philosophy-answer > :first-child {
+  margin-top: 0;
+}
+
+.philosophy-answer > :last-child {
+  margin-bottom: 0;
+}
+
+.philosophy-answer ul,
+.philosophy-answer ol {
+  padding-left: 22px;
+}
+
+.philosophy-next-row {
+  display: flex;
+  justify-content: space-between;
+  gap: 20px;
+  align-items: center;
+  margin-top: 18px;
+}
+
+.philosophy-next-row > span {
+  color: var(--fg-subtle);
+  font-size: 12px;
+}
+
+.philosophy-next-btn {
+  min-width: 150px;
+}
+
+.philosophy-finished-card {
+  text-align: center;
+}
+
+.philosophy-finished-card__icon {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 54px;
+  height: 54px;
+  margin-bottom: 20px;
+  border-radius: 50%;
+  background: var(--success-muted);
+  color: var(--success-emphasis);
+  font-size: 26px;
+  font-weight: 800;
+}
+
+.philosophy-finished-card p {
+  margin-right: auto;
+  margin-left: auto;
+}
+
+.philosophy-finished-actions {
+  justify-content: center;
+  margin-top: 24px;
+}
+
+@media (max-width: 900px) {
+  .philosophy-layout {
+    grid-template-columns: 1fr;
+    gap: 24px;
+  }
+
+  .philosophy-sidebar {
+    position: static;
+    padding-right: 0;
+    padding-bottom: 20px;
+    border-right: 0;
+    border-bottom: 1px solid var(--border-muted);
+  }
+
+  .philosophy-chapter-list {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
+@media (max-width: 640px) {
+  .philosophy-chapter-list,
+  .philosophy-settings-grid {
+    grid-template-columns: 1fr;
+  }
+
+  .philosophy-start-card,
+  .philosophy-finished-card,
+  .philosophy-flashcard {
+    padding: 22px;
+  }
+
+  .philosophy-flashcard {
+    min-height: 440px;
+  }
+
+  .philosophy-next-row {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .philosophy-next-row > span {
+    order: 2;
+  }
+
+  .philosophy-reveal-area {
+    align-items: stretch;
+    flex-direction: column;
+  }
+
+  .philosophy-reveal-area > span {
+    text-align: center;
+  }
+
+  .philosophy-start-btn,
+  .philosophy-reveal-btn,
+  .philosophy-next-btn {
+    width: 100%;
+  }
+}

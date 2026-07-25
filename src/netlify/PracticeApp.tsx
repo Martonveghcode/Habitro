@@ -20,6 +20,7 @@ import {
   updateCatalanProgressWithAttempt,
 } from "./CatalanPracticeApp";
 import type { CatalanCard, CatalanDeck } from "./CatalanPracticeApp";
+import { PhilosophyPracticeApp } from "./PhilosophyPracticeApp";
 import {
   MODEL_OPTIONS,
   MORFO_MORPHEME_TYPES,
@@ -123,7 +124,7 @@ import type {
   SummaryRow,
 } from "./types";
 
-type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative" | "catalan";
+type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative" | "catalan" | "philosophy";
 type PageName = "practice" | "history" | "settings" | "storage";
 type SectionPageName = Exclude<PageName, "settings" | "storage">;
 
@@ -137,7 +138,7 @@ interface PageMeta {
   label: string;
 }
 
-const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative", "catalan"];
+const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative", "catalan", "philosophy"];
 
 const PAGE_META: Record<PageName, PageMeta> = {
   practice: {
@@ -181,6 +182,10 @@ const SECTION_META: Record<SectionName, SectionMeta> = {
   catalan: {
     navLabel: "Catalan",
     title: "Catalan",
+  },
+  philosophy: {
+    navLabel: "Philosophy",
+    title: "Philosophy",
   },
 };
 
@@ -2718,7 +2723,7 @@ export function NetlifyPracticeApp() {
           <section className={cx("hero-banner", !globalPage && activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
             <div className="hero-banner__copy">
               <h1>{pageTitle}</h1>
-              {!globalPage && activeSection !== "catalan" ? (
+              {!globalPage && activeSection !== "catalan" && activeSection !== "philosophy" ? (
                 <div className="cta-links">
                   {SECTION_PAGE_ORDER.map((pageKey) => (
                     <PageAction
@@ -2832,6 +2837,7 @@ export function NetlifyPracticeApp() {
                   onAttemptsChange={updateDerivativeAttempts}
                 />
                 <CatalanPracticeApp active={activeSection === "catalan"} />
+                <PhilosophyPracticeApp active={activeSection === "philosophy"} />
               </>
             )}
           </main>
