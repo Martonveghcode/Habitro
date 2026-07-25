@@ -990,6 +990,11 @@ tbody tr:last-child td {
   border-bottom: 1px solid var(--border-default);
 }
 
+.daily-settings-panel > h3 {
+  margin: 0 0 var(--space-2);
+  font-size: 20px;
+}
+
 .global-settings-page {
   gap: var(--space-6);
 }
@@ -1022,8 +1027,125 @@ tbody tr:last-child td {
 }
 
 .daily-settings-grid {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(150px, 1fr));
   margin-top: var(--space-4);
+}
+
+.daily-count-heading {
+  margin-top: var(--space-5);
+}
+
+.daily-count-control {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 70px;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-3);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-lg);
+  background: var(--bg-muted);
+}
+
+.daily-count-control > span {
+  color: var(--fg-default);
+  font-size: 13px;
+  font-weight: 650;
+}
+
+.daily-count-control select {
+  min-height: 38px;
+  padding: 0 var(--space-2);
+}
+
+.settings-checklist,
+.daily-catalan-settings {
+  margin-top: var(--space-4);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: var(--bg-default);
+}
+
+.settings-checklist > summary,
+.daily-catalan-settings > summary {
+  display: flex;
+  min-height: 46px;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-3);
+  padding: 0 var(--space-4);
+  cursor: pointer;
+  font-size: 14px;
+  font-weight: 650;
+  list-style: none;
+}
+
+.settings-checklist > summary::-webkit-details-marker,
+.daily-catalan-settings > summary::-webkit-details-marker {
+  display: none;
+}
+
+.settings-checklist > summary::after,
+.daily-catalan-settings > summary::after {
+  content: "⌄";
+  margin-left: auto;
+  color: var(--fg-subtle);
+  font-size: 16px;
+  transition: transform 120ms ease;
+}
+
+.settings-checklist[open] > summary::after,
+.daily-catalan-settings[open] > summary::after {
+  transform: rotate(180deg);
+}
+
+.settings-checklist > summary small,
+.daily-catalan-settings > summary small {
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 500;
+}
+
+.settings-checklist__menu {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  gap: 1px;
+  padding: var(--space-2);
+  border-top: 1px solid var(--border-muted);
+  background: var(--border-muted);
+}
+
+.settings-checklist__option {
+  display: flex;
+  min-height: 42px;
+  gap: var(--space-2);
+  align-items: center;
+  padding: var(--space-2) var(--space-3);
+  background: var(--bg-default);
+  cursor: pointer;
+  font-size: 13px;
+}
+
+.settings-checklist__option:hover {
+  background: var(--bg-muted);
+}
+
+.settings-checklist__option input {
+  width: 17px;
+  min-height: 17px;
+  accent-color: var(--accent-emphasis);
+}
+
+.daily-catalan-settings__content {
+  padding: 0 var(--space-4) var(--space-4);
+  border-top: 1px solid var(--border-muted);
+}
+
+.daily-catalan-settings__content .settings-checklist {
+  margin-top: var(--space-3);
+}
+
+.compact-profile-field {
+  max-width: 420px;
 }
 
 .compact-settings-grid {
@@ -1066,7 +1188,7 @@ tbody tr:last-child td {
 }
 
 .daily-target-grid {
-  grid-template-columns: repeat(6, minmax(0, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(130px, 1fr));
   margin-top: var(--space-5);
 }
 
@@ -1091,6 +1213,17 @@ tbody tr:last-child td {
   margin-top: var(--space-2);
   font-size: 28px;
   line-height: 1;
+}
+
+.daily-philosophy-question {
+  max-width: 900px;
+}
+
+.daily-philosophy-question__prompt {
+  max-width: 860px;
+  margin: var(--space-4) 0 var(--space-6);
+  font-size: clamp(26px, 4vw, 42px);
+  line-height: 1.2;
 }
 
 .daily-target-card small {

@@ -2,6 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 
 import { PHILOSOPHY_CARDS, PHILOSOPHY_CHAPTERS, type PhilosophyCard } from "./philosophyData";
+import { useUiText } from "./uiLanguage";
 
 const SETTINGS_KEY = "habitro-philosophy-settings-v1";
 const DEFAULT_BATCH_SIZE = 20;
@@ -73,6 +74,7 @@ function shuffled<T>(items: T[]): T[] {
 }
 
 export function PhilosophyPracticeApp({ active }: { active: boolean }) {
+  const uiText = useUiText();
   const [settings, setSettings] = useState<PhilosophySettings>(() => loadSettings());
   const [session, setSession] = useState<PhilosophySession | null>(null);
   const [answerVisible, setAnswerVisible] = useState(false);
@@ -198,11 +200,11 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
   return (
     <section className={`workspace philosophy-workspace${active ? "" : " hidden-workspace"}`} aria-hidden={!active}>
       <div className="philosophy-layout">
-        <aside className="philosophy-sidebar" aria-label="Capítulos de filosofía">
+        <aside className="philosophy-sidebar" aria-label={uiText.philosophyChaptersAria}>
           <div className="philosophy-sidebar__heading">
             <div>
-              <span className="eyebrow">Temario</span>
-              <h2>Capítulos</h2>
+              <span className="eyebrow">{uiText.syllabus}</span>
+              <h2>{uiText.chapters}</h2>
             </div>
             <span className="philosophy-selected-count">{settings.selectedChapterIds.length}/6</span>
           </div>
@@ -218,8 +220,8 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
               {selectedAll ? "✓" : ""}
             </span>
             <span className="philosophy-chapter__copy">
-              <strong>Todos los temas</strong>
-              <small>{PHILOSOPHY_CARDS.length} tarjetas</small>
+              <strong>{uiText.allTopics}</strong>
+              <small>{uiText.cardsCount(PHILOSOPHY_CARDS.length)}</small>
             </span>
           </button>
 
@@ -241,7 +243,7 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
                   <span className="philosophy-chapter__copy">
                     <strong>{chapter.shortTitle}</strong>
                     <span>{chapter.title}</span>
-                    <small>{cardsByChapter.get(chapter.id) ?? 0} tarjetas</small>
+                    <small>{uiText.cardsCount(cardsByChapter.get(chapter.id) ?? 0)}</small>
                   </span>
                 </button>
               );
@@ -249,7 +251,7 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
           </div>
 
           {session && !session.finished ? (
-            <p className="philosophy-sidebar__note">La selección queda fijada durante esta sesión.</p>
+            <p className="philosophy-sidebar__note">{uiText.selectionLocked}</p>
           ) : null}
         </aside>
 
@@ -257,25 +259,17 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
           {!session ? (
             <section className="philosophy-start-card">
               <div className="philosophy-start-card__header">
-                <span className="eyebrow">Sesión de repaso</span>
-                <h2>Prepara tus tarjetas</h2>
-                <p>
-                  Has seleccionado{" "}
-                  <strong>
-                    {settings.selectedChapterIds.length}{" "}
-                    {settings.selectedChapterIds.length === 1 ? "tema" : "temas"}
-                  </strong>{" "}
-                  con{" "}
-                  <strong>{selectedCards.length} tarjetas disponibles</strong>.
-                </p>
+                <span className="eyebrow">{uiText.reviewSession}</span>
+                <h2>{uiText.prepareCards}</h2>
+                <p>{uiText.philosophySelectionSummary(settings.selectedChapterIds.length, selectedCards.length)}</p>
               </div>
 
               <div className="philosophy-settings-grid">
                 <label className="philosophy-setting">
-                  <span>Cantidad del lote</span>
+                  <span>{uiText.batchSize}</span>
                   <div className="philosophy-batch-row">
                     <input
-                      aria-label="Cantidad del lote"
+                      aria-label={uiText.batchSize}
                       disabled={!selectedCards.length}
                       max={Math.max(1, selectedCards.length)}
                       min={1}
@@ -289,7 +283,7 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
                       }
                     />
                     <input
-                      aria-label="Cantidad exacta del lote"
+                      aria-label={uiText.exactBatchSize}
                       className="philosophy-batch-number"
                       disabled={!selectedCards.length}
                       max={Math.max(1, selectedCards.length)}
@@ -315,39 +309,36 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
                     }
                   />
                   <span>
-                    <strong>Orden aleatorio</strong>
-                    <small>Mezcla las tarjetas de todos los temas elegidos.</small>
+                    <strong>{uiText.randomOrder}</strong>
+                    <small>{uiText.philosophyRandomHelp}</small>
                   </span>
                 </label>
               </div>
 
               {!selectedCards.length ? (
-                <div className="inline-banner warn">Selecciona al menos un capítulo para empezar.</div>
+                <div className="inline-banner warn">{uiText.selectChapterToStart}</div>
               ) : null}
 
               <button className="primary-btn philosophy-start-btn" disabled={!selectedCards.length} type="button" onClick={startSession}>
-                Empezar · {displayedBatchSize} {displayedBatchSize === 1 ? "tarjeta" : "tarjetas"}
+                {uiText.startCards(displayedBatchSize)}
               </button>
 
-              <p className="philosophy-source-note">
-                Las tarjetas marcadas como <strong>Anki</strong> conservan literalmente el mazo local. Las demás se han
-                preparado a partir de los apartados indicados del libro.
-              </p>
+              <p className="philosophy-source-note">{uiText.philosophySourceNote}</p>
             </section>
           ) : session.finished ? (
             <section className="philosophy-finished-card">
               <span className="philosophy-finished-card__icon" aria-hidden="true">
                 ✓
               </span>
-              <span className="eyebrow">Sesión completada</span>
-              <h2>Has repasado {session.cards.length} tarjetas</h2>
-              <p>Puedes repetir la misma selección o ajustar los capítulos y el tamaño del lote.</p>
+              <span className="eyebrow">{uiText.sessionCompleted}</span>
+              <h2>{uiText.reviewedCards(session.cards.length)}</h2>
+              <p>{uiText.philosophyCompletedHelp}</p>
               <div className="button-row philosophy-finished-actions">
                 <button className="primary-btn" type="button" onClick={startSession}>
-                  Repetir sesión
+                  {uiText.repeatSession}
                 </button>
                 <button className="ghost-btn" type="button" onClick={endSession}>
-                  Cambiar selección
+                  {uiText.changeSelection}
                 </button>
               </div>
             </section>
@@ -355,13 +346,16 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
             <section className="philosophy-session">
               <div className="philosophy-session__topbar">
                 <div>
-                  <span className="eyebrow">Tarjeta {session.currentIndex + 1} de {session.cards.length}</span>
-                  <div className="philosophy-progress" aria-label={`Progreso: ${session.currentIndex + 1} de ${session.cards.length}`}>
+                  <span className="eyebrow">{uiText.cardProgress(session.currentIndex + 1, session.cards.length)}</span>
+                  <div
+                    className="philosophy-progress"
+                    aria-label={`${uiText.progress}: ${session.currentIndex + 1}/${session.cards.length}`}
+                  >
                     <span style={{ width: `${((session.currentIndex + 1) / session.cards.length) * 100}%` }} />
                   </div>
                 </div>
                 <button className="ghost-btn philosophy-end-btn" type="button" onClick={endSession}>
-                  Terminar
+                  {uiText.endSession}
                 </button>
               </div>
 
@@ -369,7 +363,7 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
                 <div className="philosophy-card-meta">
                   <span className="philosophy-topic-badge">{currentCard.chapterTitle}</span>
                   <span className={`philosophy-source-badge philosophy-source-badge--${currentCard.source}`}>
-                    {currentCard.source === "anki" ? "Anki" : "Libro"}
+                    {currentCard.source === "anki" ? "Anki" : uiText.book}
                   </span>
                 </div>
                 <p className="philosophy-section-label">{currentCard.section}</p>
@@ -378,13 +372,13 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
                 {!answerVisible ? (
                   <div className="philosophy-reveal-area">
                     <button className="primary-btn philosophy-reveal-btn" type="button" onClick={() => setAnswerVisible(true)}>
-                      Mostrar respuesta
+                      {uiText.showAnswer}
                     </button>
-                    <span>Espacio o Intro para revelar</span>
+                    <span>{uiText.revealShortcut}</span>
                   </div>
                 ) : (
                   <div className="philosophy-answer-shell">
-                    <div className="philosophy-answer-label">Respuesta</div>
+                    <div className="philosophy-answer-label">{uiText.answer}</div>
                     <div className="philosophy-answer">
                       <ReactMarkdown>{currentCard.answer}</ReactMarkdown>
                     </div>
@@ -394,9 +388,9 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
 
               {answerVisible ? (
                 <div className="philosophy-next-row">
-                  <span>← Revisa la respuesta y continúa cuando estés listo.</span>
+                  <span>← {uiText.reviewThenContinue}</span>
                   <button className="primary-btn philosophy-next-btn" type="button" onClick={showNextCard}>
-                    {session.currentIndex + 1 === session.cards.length ? "Finalizar" : "Siguiente"} →
+                    {session.currentIndex + 1 === session.cards.length ? uiText.finalize : uiText.next} →
                   </button>
                 </div>
               ) : null}
