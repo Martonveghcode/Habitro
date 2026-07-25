@@ -259,9 +259,7 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
           {!session ? (
             <section className="philosophy-start-card">
               <div className="philosophy-start-card__header">
-                <span className="eyebrow">{uiText.reviewSession}</span>
                 <h2>{uiText.prepareCards}</h2>
-                <p>{uiText.philosophySelectionSummary(settings.selectedChapterIds.length, selectedCards.length)}</p>
               </div>
 
               <div className="philosophy-settings-grid">
@@ -323,7 +321,6 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
                 {uiText.startCards(displayedBatchSize)}
               </button>
 
-              <p className="philosophy-source-note">{uiText.philosophySourceNote}</p>
             </section>
           ) : session.finished ? (
             <section className="philosophy-finished-card">

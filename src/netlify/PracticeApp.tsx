@@ -1207,7 +1207,6 @@ function DailyChallengeSettingsPanel({
   return (
     <div className="panel daily-settings-panel">
       <h3>{uiText.dailyChallenge}</h3>
-      <p className="muted-line">{uiText.dailySettingsHelp}</p>
 
       <SettingsChecklistDropdown
         emptyText={uiText.noDailySections}
@@ -2338,7 +2337,6 @@ function CompactProfileSettingsPanel({
   return (
     <section className="panel compact-settings-panel">
       <h3>{uiText.profileForAll}</h3>
-      <p className="muted-line">{uiText.profileForAllHelp}</p>
       <div className="field-block compact-profile-field">
         <FieldLabel label={uiText.profile} />
         <input value={profileId} onChange={(event) => setProfileId(event.target.value)} />
@@ -2523,7 +2521,6 @@ function UiLanguageSettingsPanel({
   return (
     <section className="panel compact-settings-panel">
       <h3>{uiText.languageSettingsTitle}</h3>
-      <p className="muted-line">{uiText.languageHelp}</p>
       <div className="field-block">
         <FieldLabel label={uiText.languageFieldLabel} />
         <select value={language} onChange={(event) => onLanguageChange(event.target.value as UiLanguage)}>
