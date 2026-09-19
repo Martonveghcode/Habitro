@@ -1,0 +1,20 @@
+.physics-revision-workspace {
+  gap: 0;
+}
+
+.physics-revision-frame {
+  display: block;
+  width: 100%;
+  height: calc(100vh - 190px);
+  min-height: 720px;
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  background: #f5f5f3;
+}
+
+@media (max-width: 544px) {
+  .physics-revision-frame {
+    height: calc(100vh - 170px);
+    min-height: 680px;
+  }
+}
