@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import ReactMarkdown from "react-markdown";
+import { CatalanPresentations } from "./presentations/CatalanPresentations";
 
 import {
   CATALAN_DECKS_UPDATED_EVENT,
@@ -123,7 +124,7 @@ import type {
   SummaryRow,
 } from "./types";
 
-type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative" | "catalan";
+type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative" | "catalan" | "presentations";
 type PageName = "practice" | "history" | "settings" | "storage";
 type SectionPageName = Exclude<PageName, "settings" | "storage">;
 type InterfaceLanguage = "es" | "ca" | "en" | "fr" | "de" | "hu";
@@ -134,7 +135,7 @@ interface SectionMeta {
   theme?: "light" | "dark";
 }
 
-const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative", "catalan"];
+const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative", "catalan", "presentations"];
 const INTERFACE_LANGUAGE_STORAGE_KEY = "habitro-interface-language";
 const INTERFACE_LANGUAGE_OPTIONS: Array<{ value: InterfaceLanguage; label: string }> = [
   { value: "es", label: "Espanol" },
@@ -340,6 +341,7 @@ const UI_TEXT: Record<InterfaceLanguage, Record<UiTextKey, string>> = {
 const SECTION_PAGE_ORDER: SectionPageName[] = ["practice", "history"];
 
 const SECTION_META: Record<SectionName, SectionMeta> = {
+  presentations: { navLabel: "Catalan presentations", title: "Catalan presentations" },
   se: {
     navLabel: "Valores del se",
     title: "Valores del se",
@@ -3093,7 +3095,7 @@ export function NetlifyPracticeApp() {
           <section className={cx("hero-banner", !globalPage && activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
             <div className="hero-banner__copy">
               <h1>{pageTitle}</h1>
-              {!globalPage && activeSection !== "catalan" ? (
+              {!globalPage && activeSection !== "catalan" && activeSection !== "presentations" ? (
                 <div className="cta-links">
                   {SECTION_PAGE_ORDER.map((pageKey) => (
                     <PageAction
@@ -3212,6 +3214,7 @@ export function NetlifyPracticeApp() {
                 <CatalanPracticeApp active={activeSection === "catalan"} />
               </>
             )}
+            <CatalanPresentations active={!globalPage && activeSection === "presentations"} />
           </main>
         </section>
       </div>

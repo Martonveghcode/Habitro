@@ -38,3 +38,8 @@ dist-ssr
 
 # Local Netlify folder
 .netlify
+
+# Local test artifacts and scratch work
+work/
+test-results/
+playwright-report/
