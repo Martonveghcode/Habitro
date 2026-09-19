@@ -1,0 +1,3 @@
+# Preserve source materials byte for byte, including their original line endings.
+public/catalan/presentations/*.pdf binary
+public/catalan/presentations/*.txt -text

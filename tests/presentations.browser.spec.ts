@@ -127,3 +127,20 @@ test("multiple tabs cannot overwrite one another's study data", async ({ page, c
   await expect(scope(second).getByRole("heading", { name: "Session paused" })).toBeVisible();
   expect((await downloadData(second)).data.data.reviews).toHaveLength(1);
 });
+
+test("deployed Philosophy and existing app backup settings remain available", async ({ page }) => {
+  await page.goto("/");
+  await page.locator(".globalnav__group > button").click();
+  await page.getByRole("menuitem", { name: "Filosofia", exact: true }).click();
+  await expect(page.locator(".philosophy-workspace")).toBeVisible();
+  await page.locator(".philosophy-workspace").getByRole("button", { name: /Empezar/ }).click();
+  await expect(page.locator(".philosophy-session")).toBeVisible();
+  await page.locator(".globalnav__menu > button").last().click();
+  await expect(page.getByRole("heading", { name: "Guardar mis datos" })).toBeVisible();
+  const event = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Descargar datos", exact: true }).click();
+  const download = await event;
+  const backup = JSON.parse(await readFile((await download.path())!, "utf8"));
+  expect(backup.app).toBe("Habitro");
+  expect(backup.localStorage).toBeDefined();
+});

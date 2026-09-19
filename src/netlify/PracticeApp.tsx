@@ -3,6 +3,7 @@ import katex from "katex";
 import "katex/dist/katex.min.css";
 import ReactMarkdown from "react-markdown";
 import { CatalanPresentations } from "./presentations/CatalanPresentations";
+import { StorageBackupSettingsPanel } from "./BrowserStorageBackup";
 
 import {
   CATALAN_DECKS_UPDATED_EVENT,
@@ -21,6 +22,8 @@ import {
   updateCatalanProgressWithAttempt,
 } from "./CatalanPracticeApp";
 import type { CatalanCard, CatalanDeck } from "./CatalanPracticeApp";
+import { PhilosophyPracticeApp } from "./PhilosophyPracticeApp";
+import { PHILOSOPHY_CARDS, type PhilosophyCard } from "./philosophyData";
 import {
   MODEL_OPTIONS,
   MORFO_MORPHEME_TYPES,
@@ -87,6 +90,14 @@ import {
   requestSeQuestion,
   requestSeRecheck,
 } from "./api";
+import {
+  getUiText,
+  UI_LANGUAGE_OPTIONS,
+  UiTextProvider,
+  useUiText,
+  type UiLanguage,
+  type UiText,
+} from "./uiLanguage";
 import type {
   DailyChallengeRecord,
   DailyChallengeSection,
@@ -124,249 +135,29 @@ import type {
   SummaryRow,
 } from "./types";
 
-type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative" | "catalan" | "presentations";
+type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative" | "catalan" | "philosophy" | "presentations";
 type PageName = "practice" | "history" | "settings" | "storage";
 type SectionPageName = Exclude<PageName, "settings" | "storage">;
-type InterfaceLanguage = "es" | "ca" | "en" | "fr" | "de" | "hu";
 
 interface SectionMeta {
-  navLabel: string;
-  title: string;
   theme?: "light" | "dark";
 }
 
-const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative", "catalan", "presentations"];
-const INTERFACE_LANGUAGE_STORAGE_KEY = "habitro-interface-language";
-const INTERFACE_LANGUAGE_OPTIONS: Array<{ value: InterfaceLanguage; label: string }> = [
-  { value: "es", label: "Espanol" },
-  { value: "ca", label: "Catala" },
-  { value: "en", label: "English" },
-  { value: "fr", label: "Francais" },
-  { value: "de", label: "Deutsch" },
-  { value: "hu", label: "Magyar" },
-];
-
-type UiTextKey =
-  | "aiAndApi"
-  | "backupDownloaded"
-  | "backupImportFailed"
-  | "backupImported"
-  | "backupIntro"
-  | "customModel"
-  | "customPeriphrasisTypes"
-  | "customPeriphrasisTypesHint"
-  | "daily"
-  | "dailyChallenge"
-  | "dataBackup"
-  | "downloadData"
-  | "exercises"
-  | "history"
-  | "importData"
-  | "interfaceLanguage"
-  | "language"
-  | "manualCustom"
-  | "personalTimes"
-  | "practice"
-  | "profiles"
-  | "saveAi"
-  | "saveProfiles"
-  | "settings"
-  | "storage";
-
-const UI_TEXT: Record<InterfaceLanguage, Record<UiTextKey, string>> = {
-  es: {
-    aiAndApi: "AI y API",
-    backupDownloaded: "Copia descargada.",
-    backupImportFailed: "No se pudo importar ese archivo.",
-    backupImported: "Datos importados.",
-    backupIntro: "Descarga o restaura una copia de los datos guardados en este navegador.",
-    customModel: "Modelo personalizado",
-    customPeriphrasisTypes: "Tipos de perifrasis personalizados",
-    customPeriphrasisTypesHint: "Separados por comas. Se suman a la lista base.",
-    daily: "Reto diario",
-    dailyChallenge: "Reto diario",
-    dataBackup: "Guardar mis datos",
-    downloadData: "Descargar datos",
-    exercises: "Ejercicios",
-    history: "Historial",
-    importData: "Importar datos",
-    interfaceLanguage: "Idioma de la interfaz",
-    language: "Idioma",
-    manualCustom: "Personalizado (manual)",
-    personalTimes: "Tiempos personales",
-    practice: "Practicar",
-    profiles: "Perfiles",
-    saveAi: "Guardar AI",
-    saveProfiles: "Guardar perfiles",
-    settings: "Ajustes",
-    storage: "Bancos",
-  },
-  ca: {
-    aiAndApi: "IA i API",
-    backupDownloaded: "Copia descarregada.",
-    backupImportFailed: "No s'ha pogut importar aquest fitxer.",
-    backupImported: "Dades importades.",
-    backupIntro: "Descarrega o restaura una copia de les dades guardades en aquest navegador.",
-    customModel: "Model personalitzat",
-    customPeriphrasisTypes: "Tipus de perifrasis personalitzats",
-    customPeriphrasisTypesHint: "Separats per comes. S'afegeixen a la llista base.",
-    daily: "Repte diari",
-    dailyChallenge: "Repte diari",
-    dataBackup: "Guardar les meves dades",
-    downloadData: "Descarregar dades",
-    exercises: "Exercicis",
-    history: "Historial",
-    importData: "Importar dades",
-    interfaceLanguage: "Idioma de la interfície",
-    language: "Idioma",
-    manualCustom: "Personalitzat (manual)",
-    personalTimes: "Temps personals",
-    practice: "Practicar",
-    profiles: "Perfils",
-    saveAi: "Guardar IA",
-    saveProfiles: "Guardar perfils",
-    settings: "Configuracio",
-    storage: "Bancs",
-  },
-  en: {
-    aiAndApi: "AI and API",
-    backupDownloaded: "Backup downloaded.",
-    backupImportFailed: "Could not import that file.",
-    backupImported: "Data imported.",
-    backupIntro: "Download or restore a copy of the data saved in this browser.",
-    customModel: "Custom model",
-    customPeriphrasisTypes: "Custom periphrasis types",
-    customPeriphrasisTypesHint: "Comma-separated. Added to the base list.",
-    daily: "Daily challenge",
-    dailyChallenge: "Daily challenge",
-    dataBackup: "Save my data",
-    downloadData: "Download data",
-    exercises: "Exercises",
-    history: "History",
-    importData: "Import data",
-    interfaceLanguage: "Interface language",
-    language: "Language",
-    manualCustom: "Custom (manual)",
-    personalTimes: "Personal times",
-    practice: "Practice",
-    profiles: "Profiles",
-    saveAi: "Save AI",
-    saveProfiles: "Save profiles",
-    settings: "Settings",
-    storage: "Banks",
-  },
-  fr: {
-    aiAndApi: "IA et API",
-    backupDownloaded: "Sauvegarde telechargee.",
-    backupImportFailed: "Impossible d'importer ce fichier.",
-    backupImported: "Donnees importees.",
-    backupIntro: "Telechargez ou restaurez une copie des donnees enregistrees dans ce navigateur.",
-    customModel: "Modele personnalise",
-    customPeriphrasisTypes: "Types de periphrases personnalises",
-    customPeriphrasisTypesHint: "Separes par des virgules. Ajoutes a la liste de base.",
-    daily: "Defi quotidien",
-    dailyChallenge: "Defi quotidien",
-    dataBackup: "Sauvegarder mes donnees",
-    downloadData: "Telecharger les donnees",
-    exercises: "Exercices",
-    history: "Historique",
-    importData: "Importer les donnees",
-    interfaceLanguage: "Langue de l'interface",
-    language: "Langue",
-    manualCustom: "Personnalise (manuel)",
-    personalTimes: "Temps personnels",
-    practice: "S'entrainer",
-    profiles: "Profils",
-    saveAi: "Sauvegarder l'IA",
-    saveProfiles: "Sauvegarder les profils",
-    settings: "Parametres",
-    storage: "Banques",
-  },
-  de: {
-    aiAndApi: "KI und API",
-    backupDownloaded: "Sicherung heruntergeladen.",
-    backupImportFailed: "Diese Datei konnte nicht importiert werden.",
-    backupImported: "Daten importiert.",
-    backupIntro: "Lade eine Kopie der in diesem Browser gespeicherten Daten herunter oder stelle sie wieder her.",
-    customModel: "Benutzerdefiniertes Modell",
-    customPeriphrasisTypes: "Eigene Periphrase-Typen",
-    customPeriphrasisTypesHint: "Durch Kommas getrennt. Wird zur Basisliste hinzugefuegt.",
-    daily: "Taegliche Aufgabe",
-    dailyChallenge: "Taegliche Aufgabe",
-    dataBackup: "Meine Daten speichern",
-    downloadData: "Daten herunterladen",
-    exercises: "Uebungen",
-    history: "Verlauf",
-    importData: "Daten importieren",
-    interfaceLanguage: "Sprache der Oberflaeche",
-    language: "Sprache",
-    manualCustom: "Benutzerdefiniert (manuell)",
-    personalTimes: "Persoenliche Zeiten",
-    practice: "Ueben",
-    profiles: "Profile",
-    saveAi: "KI speichern",
-    saveProfiles: "Profile speichern",
-    settings: "Einstellungen",
-    storage: "Banken",
-  },
-  hu: {
-    aiAndApi: "AI es API",
-    backupDownloaded: "Biztonsagi mentes letoltve.",
-    backupImportFailed: "Ezt a fajlt nem sikerult importalni.",
-    backupImported: "Adatok importalva.",
-    backupIntro: "Toltsd le vagy allitsd vissza a bongeszoben mentett adatok masolatat.",
-    customModel: "Egyedi modell",
-    customPeriphrasisTypes: "Egyedi koruliras-tipusok",
-    customPeriphrasisTypesHint: "Vesszovel elvalasztva. Hozzaadodik az alaplistahoz.",
-    daily: "Napi kihivas",
-    dailyChallenge: "Napi kihivas",
-    dataBackup: "Adataim mentese",
-    downloadData: "Adatok letoltese",
-    exercises: "Feladatok",
-    history: "Elozmenyek",
-    importData: "Adatok importalasa",
-    interfaceLanguage: "Feluelet nyelve",
-    language: "Nyelv",
-    manualCustom: "Egyedi (manualis)",
-    personalTimes: "Sajat idok",
-    practice: "Gyakorlas",
-    profiles: "Profilok",
-    saveAi: "AI mentese",
-    saveProfiles: "Profilok mentese",
-    settings: "Beallitasok",
-    storage: "Bankok",
-  },
-};
+const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative", "catalan", "philosophy", "presentations"];
 
 const SECTION_PAGE_ORDER: SectionPageName[] = ["practice", "history"];
 
 const SECTION_META: Record<SectionName, SectionMeta> = {
-  presentations: { navLabel: "Catalan presentations", title: "Catalan presentations" },
-  se: {
-    navLabel: "Valores del se",
-    title: "Valores del se",
-  },
-  perifrasis: {
-    navLabel: "Perifrasis",
-    title: "Perifrasis",
-  },
+  presentations: {},
+  se: {},
+  perifrasis: {},
   morfologia: {
-    navLabel: "Morfologia",
-    title: "Morfologia",
     theme: "dark",
   },
-  sintaxis: {
-    navLabel: "Sintaxis",
-    title: "Sintaxis",
-  },
-  derivative: {
-    navLabel: "Derivative",
-    title: "Derivative",
-  },
-  catalan: {
-    navLabel: "Catalan",
-    title: "Catalan",
-  },
+  sintaxis: {},
+  derivative: {},
+  catalan: {},
+  philosophy: {},
 };
 
 const SE_IMPORT_PLACEHOLDER = `{"items":[{"sentence":"Se venden pisos en este barrio.","difficulty":2,"se_value":"Pasiva refleja","se_function":"Marca de pasiva","accepted_functions":["Marca de pasiva","Sin funcion sintactica propia"],"verbal_structure":"Verbo simple","periphrasis_type":"No aplica","phrase_type":"Oracion simple pasiva refleja","explanation":"El verbo concuerda con el sujeto paciente 'pisos'."}]}`;
@@ -377,48 +168,6 @@ const DERIVATIVE_IMPORT_PLACEHOLDER = `{"items":[{"function":"f(x)=x^3-5x^2+2x",
 
 function cx(...tokens: Array<string | false | null | undefined>): string {
   return tokens.filter(Boolean).join(" ");
-}
-
-function isInterfaceLanguage(value: unknown): value is InterfaceLanguage {
-  return INTERFACE_LANGUAGE_OPTIONS.some((option) => option.value === value);
-}
-
-function loadInterfaceLanguage(): InterfaceLanguage {
-  if (typeof window === "undefined") {
-    return "es";
-  }
-  const stored = window.localStorage.getItem(INTERFACE_LANGUAGE_STORAGE_KEY);
-  return isInterfaceLanguage(stored) ? stored : "es";
-}
-
-function tUi(language: InterfaceLanguage, key: UiTextKey): string {
-  return UI_TEXT[language]?.[key] ?? UI_TEXT.es[key];
-}
-
-function pageLabel(language: InterfaceLanguage, page: PageName): string {
-  if (page === "practice") {
-    return tUi(language, "practice");
-  }
-  if (page === "history") {
-    return tUi(language, "history");
-  }
-  if (page === "settings") {
-    return tUi(language, "settings");
-  }
-  return tUi(language, "storage");
-}
-
-function globalPageLabel(language: InterfaceLanguage, page: GlobalPageName): string {
-  if (page === "daily") {
-    return tUi(language, "daily");
-  }
-  if (page === "records") {
-    return tUi(language, "personalTimes");
-  }
-  if (page === "storage") {
-    return tUi(language, "storage");
-  }
-  return tUi(language, "settings");
 }
 
 function normalizeLatexInput(value: string): string {
@@ -480,6 +229,7 @@ function FieldLabel({ label, hint: _hint }: { label: string; hint?: string }) {
 }
 
 function BatchSizeControl({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+  const uiText = useUiText();
   const safeValue = coercePracticeBatchSize(value);
   const handleChange = (nextValue: string) => {
     onChange(coercePracticeBatchSize(nextValue));
@@ -488,12 +238,12 @@ function BatchSizeControl({ value, onChange }: { value: number; onChange: (value
   return (
     <div className="field-block batch-size-control">
       <div className="batch-size-header">
-        <FieldLabel label="Cantidad del lote" />
+        <FieldLabel label={uiText.batchSize} />
         <span className="batch-size-count">{safeValue}</span>
       </div>
       <div className="batch-size-row">
         <input
-          aria-label="Cantidad del lote"
+          aria-label={uiText.batchSize}
           max={MAX_PRACTICE_BATCH_SIZE}
           min={MIN_PRACTICE_BATCH_SIZE}
           step={1}
@@ -502,7 +252,7 @@ function BatchSizeControl({ value, onChange }: { value: number; onChange: (value
           onChange={(event) => handleChange(event.target.value)}
         />
         <input
-          aria-label="Cantidad exacta del lote"
+          aria-label={uiText.exactBatchSize}
           className="batch-size-number"
           max={MAX_PRACTICE_BATCH_SIZE}
           min={MIN_PRACTICE_BATCH_SIZE}
@@ -514,7 +264,7 @@ function BatchSizeControl({ value, onChange }: { value: number; onChange: (value
       </div>
       <div className="range-meta">
         <span>{MIN_PRACTICE_BATCH_SIZE}</span>
-        <span>Max. {MAX_PRACTICE_BATCH_SIZE}</span>
+        <span>{uiText.max} {MAX_PRACTICE_BATCH_SIZE}</span>
       </div>
     </div>
   );
@@ -564,8 +314,9 @@ function DataTable({
   headers: string[];
   rows: Array<Array<string | number>>;
 }) {
+  const uiText = useUiText();
   if (rows.length === 0) {
-    return <p>Sin datos todavia.</p>;
+    return <p>{uiText.noDataYet}</p>;
   }
   return (
     <div className="table-shell">
@@ -711,6 +462,7 @@ function ManualBankPanel({
   placeholder: string;
   title: string;
 }) {
+  const uiText = useUiText();
   const [draft, setDraft] = useState("");
   const [message, setMessage] = useState("");
   const [tone, setTone] = useState<"info" | "warn">("info");
@@ -718,10 +470,10 @@ function ManualBankPanel({
   const importText = (rawText: string) => {
     try {
       const result = onImportText(rawText);
-      setMessage(`Guardados ${result.saved} validos. Ignorados ${result.rejected} de ${result.total}.`);
+      setMessage(uiText.importResult(result.saved, result.rejected, result.total));
       setTone(result.saved > 0 ? "info" : "warn");
     } catch (error) {
-      setMessage(error instanceof Error ? error.message : "JSON no valido.");
+      setMessage(error instanceof Error ? error.message : uiText.invalidJson);
       setTone("warn");
     }
   };
@@ -730,11 +482,11 @@ function ManualBankPanel({
     <details className="details-panel manual-bank-panel" open={defaultOpen}>
       <summary>
         <span>{title}</span>
-        <span>{count} guardados</span>
+        <span>{uiText.savedCount(count)}</span>
       </summary>
       <div className="details-content">
         <div className="field-block">
-          <FieldLabel label="Importar JSON" />
+          <FieldLabel label={uiText.importJson} />
           <textarea
             className="mono-input"
             placeholder={placeholder}
@@ -745,10 +497,10 @@ function ManualBankPanel({
         </div>
         <div className="button-row">
           <button className="ghost-btn" disabled={!draft.trim()} type="button" onClick={() => importText(draft)}>
-            Importar pegado
+            {uiText.importPasted}
           </button>
           <label className="ghost-btn file-upload-btn">
-            Subir JSON
+            {uiText.uploadJson}
             <input
               accept="application/json,.json"
               type="file"
@@ -770,11 +522,11 @@ function ManualBankPanel({
             type="button"
             onClick={() => {
               onClear();
-              setMessage("Banco vaciado.");
+              setMessage(uiText.bankCleared);
               setTone("info");
             }}
           >
-            Vaciar banco
+            {uiText.clearBank}
           </button>
         </div>
         {message ? <div className={cx("inline-banner", tone === "warn" && "warn")}>{message}</div> : null}
@@ -814,6 +566,7 @@ function QuestionBankStoragePage({
   onSintaxisQuestionBankChange: (items: StoredSintaxisItem[]) => void;
   onDerivativeQuestionBankChange: (items: StoredDerivativeItem[]) => void;
 }) {
+  const uiText = useUiText();
   const availableSeValues = useMemo(() => mergeLabelGroups(SE_VALUES, seSettings.customValues), [seSettings.customValues]);
   const availablePeriphrasisTypes = useMemo(
     () => mergeLabelGroups(PERIPHRASIS_TYPES, periphrasisSettings.customPeriphrasisTypes),
@@ -909,7 +662,7 @@ function QuestionBankStoragePage({
           count={seQuestionBank.length}
           defaultOpen
           placeholder={SE_IMPORT_PLACEHOLDER}
-          title="Valores del se"
+          title={sectionLabel("se", uiText)}
           onClear={() => onSeQuestionBankChange([])}
           onImportText={importSeQuestionBank}
         />
@@ -917,7 +670,7 @@ function QuestionBankStoragePage({
           count={periphrasisQuestionBank.length}
           defaultOpen
           placeholder={PERIPHRASIS_IMPORT_PLACEHOLDER}
-          title="Perifrasis"
+          title={sectionLabel("perifrasis", uiText)}
           onClear={() => onPeriphrasisQuestionBankChange([])}
           onImportText={importPeriphrasisQuestionBank}
         />
@@ -925,7 +678,7 @@ function QuestionBankStoragePage({
           count={morfoQuestionBank.length}
           defaultOpen
           placeholder={MORFO_IMPORT_PLACEHOLDER}
-          title="Morfologia"
+          title={sectionLabel("morfologia", uiText)}
           onClear={() => onMorfoQuestionBankChange([])}
           onImportText={importMorfoQuestionBank}
         />
@@ -933,7 +686,7 @@ function QuestionBankStoragePage({
           count={sintaxisQuestionBank.length}
           defaultOpen
           placeholder={SINTAXIS_IMPORT_PLACEHOLDER}
-          title="Sintaxis"
+          title={sectionLabel("sintaxis", uiText)}
           onClear={() => onSintaxisQuestionBankChange([])}
           onImportText={importSintaxisQuestionBank}
         />
@@ -941,7 +694,7 @@ function QuestionBankStoragePage({
           count={derivativeQuestionBank.length}
           defaultOpen
           placeholder={DERIVATIVE_IMPORT_PLACEHOLDER}
-          title="Derivative"
+          title={sectionLabel("derivative", uiText)}
           onClear={() => onDerivativeQuestionBankChange([])}
           onImportText={importDerivativeQuestionBank}
         />
@@ -957,13 +710,14 @@ function GeminiKeyPanel({
   apiKey: string;
   onApiKeyChange: (value: string) => void;
 }) {
+  const uiText = useUiText();
   const [showKey, setShowKey] = useState(false);
   const hasSavedKey = apiKey.trim().length > 0;
 
   return (
     <div className="info-block">
       <div className="field-block">
-        <FieldLabel label="Clave local del navegador" />
+        <FieldLabel label={uiText.browserKey} />
         <input
           autoComplete="off"
           className="mono-input"
@@ -977,10 +731,10 @@ function GeminiKeyPanel({
 
       <div className="button-row">
         <button className="ghost-btn" type="button" onClick={() => setShowKey((current) => !current)}>
-          {showKey ? "Ocultar clave" : "Mostrar clave"}
+          {showKey ? uiText.hideKey : uiText.showKey}
         </button>
         <button className="ghost-btn" disabled={!hasSavedKey} type="button" onClick={() => onApiKeyChange("")}>
-          Borrar clave
+          {uiText.clearKey}
         </button>
       </div>
 
@@ -1038,18 +792,54 @@ type GlobalPageName = "daily" | "records" | "storage" | "settings";
 
 const GLOBAL_PAGE_ORDER: GlobalPageName[] = ["daily", "records", "storage", "settings"];
 
-const DAILY_SECTION_LABELS: Record<DailyChallengeSection, string> = {
-  se: "Valores del se",
-  perifrasis: "Perifrasis",
-  morfologia: "Morfologia",
-  catalan: "Catalan",
-  sintaxis: "Sintaxis",
-  derivative: "Derivative",
-};
+function pageLabel(page: PageName, uiText: UiText): string {
+  if (page === "practice") {
+    return uiText.practice;
+  }
+  if (page === "history") {
+    return uiText.history;
+  }
+  if (page === "settings") {
+    return uiText.settings;
+  }
+  return uiText.banks;
+}
 
-type ProfileSection = Exclude<DailyChallengeSection, "catalan">;
+function globalPageLabel(page: GlobalPageName, uiText: UiText): string {
+  if (page === "daily") {
+    return uiText.dailyChallenge;
+  }
+  if (page === "records") {
+    return uiText.personalTimes;
+  }
+  if (page === "settings") {
+    return uiText.settings;
+  }
+  return uiText.banks;
+}
 
-const PROFILE_SECTIONS: ProfileSection[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative"];
+function sectionLabel(section: SectionName | DailyChallengeSection, uiText: UiText): string {
+  if (section === "presentations") return "Catalan presentations";
+  if (section === "se") {
+    return uiText.sectionSe;
+  }
+  if (section === "perifrasis") {
+    return uiText.sectionPeriphrasis;
+  }
+  if (section === "morfologia") {
+    return uiText.sectionMorfo;
+  }
+  if (section === "sintaxis") {
+    return uiText.sectionSintaxis;
+  }
+  if (section === "derivative") {
+    return uiText.sectionDerivative;
+  }
+  if (section === "philosophy") {
+    return uiText.sectionPhilosophy;
+  }
+  return uiText.sectionCatalan;
+}
 
 type DailyChallengePlan = {
   se: SeItem[];
@@ -1057,6 +847,7 @@ type DailyChallengePlan = {
   morfologia: MorfoItem[];
   catalan: CatalanCard[];
   sintaxis: SintaxisItem[];
+  philosophy: PhilosophyCard[];
   derivative: DerivativeItem[];
 };
 
@@ -1087,6 +878,7 @@ function emptyDailyPlan(): DailyChallengePlan {
     morfologia: [],
     catalan: [],
     sintaxis: [],
+    philosophy: [],
     derivative: [],
   };
 }
@@ -1105,12 +897,12 @@ function formatDuration(durationMs: number): string {
   return `${String(minutes).padStart(2, "0")}:${String(seconds).padStart(2, "0")}`;
 }
 
-function formatDateLabel(dateKey: string): string {
+function formatDateLabel(dateKey: string, locale = "es-ES"): string {
   const [year, month, day] = dateKey.split("-").map(Number);
   if (!year || !month || !day) {
     return dateKey;
   }
-  return new Date(year, month - 1, day).toLocaleDateString("es-ES", {
+  return new Date(year, month - 1, day).toLocaleDateString(locale, {
     day: "2-digit",
     month: "short",
   });
@@ -1146,6 +938,10 @@ function dailyKeyForCatalan(item: CatalanCard): string {
 
 function dailyKeyForSintaxis(item: Pick<SintaxisItem, "phrase"> | StoredSintaxisItem): string {
   return normalizeTextToken(item.phrase);
+}
+
+function dailyKeyForPhilosophy(item: PhilosophyCard): string {
+  return normalizeTextToken(item.id);
 }
 
 function dailyKeyForDerivative(item: Pick<DerivativeItem, "functionText"> | StoredDerivativeItem): string {
@@ -1190,48 +986,75 @@ function selectedDailyCatalanCards(decks: CatalanDeck[], settings: DailyChalleng
     .filter((card) => selectedSections.size === 0 || selectedSections.has(card.section));
 }
 
-function buildDailyChallengePlan(storageState: StorageState, catalanDecks: CatalanDeck[]): { plan: DailyChallengePlan; warning: string } {
+function buildDailyChallengePlan(
+  storageState: StorageState,
+  catalanDecks: CatalanDeck[],
+  uiText: UiText,
+): { plan: DailyChallengePlan; warning: string } {
   const counts = storageState.dailyChallengeSettings.counts;
   const records = storageState.dailyChallengeRecords;
   const plan = emptyDailyPlan();
   const catalanCards = selectedDailyCatalanCards(catalanDecks, storageState.dailyChallengeSettings);
+  const includedSections = new Set(storageState.dailyChallengeSettings.includedSections);
 
-  plan.se = selectDailyItems(storageState.seQuestionBank, counts.se, usedDailyKeys(records, "se"), dailyKeyForSe)
-    .map((item) => ({ ...item, id: createId("daily_se"), mode: "normal" as const }));
-  plan.perifrasis = selectDailyItems(
-    storageState.periphrasisQuestionBank,
-    counts.perifrasis,
-    usedDailyKeys(records, "perifrasis"),
-    dailyKeyForPeriphrasis,
-  ).map((item) => ({ ...item, id: createId("daily_perifrasis"), mode: "normal" as const }));
-  plan.morfologia = selectDailyItems(
-    storageState.morfoQuestionBank,
-    counts.morfologia,
-    usedDailyKeys(records, "morfologia"),
-    dailyKeyForMorfo,
-  ).map((item) => ({ ...item, id: createId("daily_morfo"), mode: "normal" as const }));
-  plan.catalan = selectDailyItems(
-    catalanCards,
-    counts.catalan,
-    usedDailyKeys(records, "catalan"),
-    dailyKeyForCatalan,
-  );
-  plan.sintaxis = selectDailyItems(
-    storageState.sintaxisQuestionBank,
-    counts.sintaxis,
-    usedDailyKeys(records, "sintaxis"),
-    dailyKeyForSintaxis,
-  ).map((item) => ({ ...item, id: createId("daily_sintaxis"), mode: "normal" as const }));
-  plan.derivative = selectDailyItems(
-    storageState.derivativeQuestionBank,
-    counts.derivative,
-    usedDailyKeys(records, "derivative"),
-    dailyKeyForDerivative,
-  ).map((item) => ({ ...item, id: createId("daily_derivative"), mode: "normal" as const }));
+  if (includedSections.has("se")) {
+    plan.se = selectDailyItems(storageState.seQuestionBank, counts.se, usedDailyKeys(records, "se"), dailyKeyForSe)
+      .map((item) => ({ ...item, id: createId("daily_se"), mode: "normal" as const }));
+  }
+  if (includedSections.has("perifrasis")) {
+    plan.perifrasis = selectDailyItems(
+      storageState.periphrasisQuestionBank,
+      counts.perifrasis,
+      usedDailyKeys(records, "perifrasis"),
+      dailyKeyForPeriphrasis,
+    ).map((item) => ({ ...item, id: createId("daily_perifrasis"), mode: "normal" as const }));
+  }
+  if (includedSections.has("morfologia")) {
+    plan.morfologia = selectDailyItems(
+      storageState.morfoQuestionBank,
+      counts.morfologia,
+      usedDailyKeys(records, "morfologia"),
+      dailyKeyForMorfo,
+    ).map((item) => ({ ...item, id: createId("daily_morfo"), mode: "normal" as const }));
+  }
+  if (includedSections.has("catalan")) {
+    plan.catalan = selectDailyItems(
+      catalanCards,
+      counts.catalan,
+      usedDailyKeys(records, "catalan"),
+      dailyKeyForCatalan,
+    );
+  }
+  if (includedSections.has("sintaxis")) {
+    plan.sintaxis = selectDailyItems(
+      storageState.sintaxisQuestionBank,
+      counts.sintaxis,
+      usedDailyKeys(records, "sintaxis"),
+      dailyKeyForSintaxis,
+    ).map((item) => ({ ...item, id: createId("daily_sintaxis"), mode: "normal" as const }));
+  }
+  if (includedSections.has("philosophy")) {
+    plan.philosophy = selectDailyItems(
+      PHILOSOPHY_CARDS,
+      counts.philosophy,
+      usedDailyKeys(records, "philosophy"),
+      dailyKeyForPhilosophy,
+    );
+  }
+  if (includedSections.has("derivative")) {
+    plan.derivative = selectDailyItems(
+      storageState.derivativeQuestionBank,
+      counts.derivative,
+      usedDailyKeys(records, "derivative"),
+      dailyKeyForDerivative,
+    ).map((item) => ({ ...item, id: createId("daily_derivative"), mode: "normal" as const }));
+  }
 
-  const incompleteSections = DAILY_CHALLENGE_SECTIONS.filter((section) => plan[section].length < counts[section]);
+  const incompleteSections = storageState.dailyChallengeSettings.includedSections
+    .filter((section) => plan[section].length < counts[section]);
+  const incompleteSectionLabels = incompleteSections.map((section) => sectionLabel(section, uiText)).join(", ");
   const warning = incompleteSections.length > 0
-    ? `Algunas secciones no tienen suficientes preguntas nuevas: ${incompleteSections.map((section) => DAILY_SECTION_LABELS[section]).join(", ")}.`
+    ? uiText.notEnoughDailyQuestions(incompleteSectionLabels)
     : "";
 
   return { plan, warning };
@@ -1244,6 +1067,7 @@ function dailyPlanItemKeys(plan: DailyChallengePlan): Record<DailyChallengeSecti
     morfologia: plan.morfologia.map(dailyKeyForMorfo),
     catalan: plan.catalan.map(dailyKeyForCatalan),
     sintaxis: plan.sintaxis.map(dailyKeyForSintaxis),
+    philosophy: plan.philosophy.map(dailyKeyForPhilosophy),
     derivative: plan.derivative.map(dailyKeyForDerivative),
   };
 }
@@ -1274,6 +1098,47 @@ function DailyTimerOverlay({ startedAt }: { startedAt: number }) {
   return <div className="daily-timer-overlay">{formatDuration(now - startedAt)}</div>;
 }
 
+function SettingsChecklistDropdown({
+  emptyText,
+  label,
+  options,
+  selectedValues,
+  onToggle,
+}: {
+  emptyText: string;
+  label: string;
+  options: Array<{ label: string; value: string }>;
+  selectedValues: Set<string>;
+  onToggle: (value: string) => void;
+}) {
+  const uiText = useUiText();
+
+  return (
+    <details className="settings-checklist">
+      <summary>
+        <span>{label}</span>
+        <small>{uiText.selectedCount(selectedValues.size)}</small>
+      </summary>
+      <div className="settings-checklist__menu" aria-label={label} role="group">
+        {options.length ? (
+          options.map((option) => (
+            <label className="settings-checklist__option" key={option.value}>
+              <input
+                checked={selectedValues.has(option.value)}
+                type="checkbox"
+                onChange={() => onToggle(option.value)}
+              />
+              <span>{option.label}</span>
+            </label>
+          ))
+        ) : (
+          <p className="muted-line">{emptyText}</p>
+        )}
+      </div>
+    </details>
+  );
+}
+
 function DailyChallengeSettingsPanel({
   catalanDecks,
   settings,
@@ -1283,6 +1148,7 @@ function DailyChallengeSettingsPanel({
   settings: DailyChallengeSettings;
   onSettingsChange: (settings: DailyChallengeSettings) => void;
 }) {
+  const uiText = useUiText();
   const updateCount = (section: DailyChallengeSection, value: string) => {
     onSettingsChange({
       ...settings,
@@ -1290,6 +1156,18 @@ function DailyChallengeSettingsPanel({
         ...settings.counts,
         [section]: coercePracticeBatchSize(value),
       },
+    });
+  };
+  const toggleDailySection = (section: DailyChallengeSection) => {
+    const next = new Set(settings.includedSections);
+    if (next.has(section)) {
+      next.delete(section);
+    } else {
+      next.add(section);
+    }
+    onSettingsChange({
+      ...settings,
+      includedSections: DAILY_CHALLENGE_SECTIONS.filter((candidate) => next.has(candidate)),
     });
   };
   const catalanDeckNames = catalanDecks.map((deck) => deck.name);
@@ -1332,64 +1210,68 @@ function DailyChallengeSettingsPanel({
 
   return (
     <div className="panel daily-settings-panel">
-      <p className="muted-line">Cantidad de ejercicios que saldran en cada seccion del reto diario.</p>
-      <div className="daily-settings-grid">
-        {DAILY_CHALLENGE_SECTIONS.map((section) => (
-          <div key={section}>
-            <FieldLabel label={DAILY_SECTION_LABELS[section]} />
-            <input
-              max={MAX_PRACTICE_BATCH_SIZE}
-              min={MIN_PRACTICE_BATCH_SIZE}
-              step={1}
-              type="number"
-              value={settings.counts[section]}
-              onChange={(event) => updateCount(section, event.target.value)}
-            />
-          </div>
-        ))}
-      </div>
-      <div className="field-block daily-catalan-settings">
-        <h3 className="section-heading">Catalan en el reto diario</h3>
-        <p className="muted-line">Sin filtros guardados, Catalan usa todas las cartas disponibles de todos los decks.</p>
-        <div className="field-block">
-          <FieldLabel label="Decks" />
-          <div className="chip-cloud">
-            {catalanDeckNames.length ? (
-              catalanDeckNames.map((deckName) => (
-                <button
-                  key={deckName}
-                  className={cx("choice-pill", effectiveCatalanDeckNames.includes(deckName) && "active")}
-                  type="button"
-                  onClick={() => updateCatalanDecks(deckName)}
+      <h3>{uiText.dailyChallenge}</h3>
+
+      <SettingsChecklistDropdown
+        emptyText={uiText.noDailySections}
+        label={uiText.includedSections}
+        options={DAILY_CHALLENGE_SECTIONS.map((section) => ({
+          label: sectionLabel(section, uiText),
+          value: section,
+        }))}
+        selectedValues={new Set(settings.includedSections)}
+        onToggle={(section) => toggleDailySection(section as DailyChallengeSection)}
+      />
+
+      {settings.includedSections.length ? (
+        <>
+          <h4 className="section-heading daily-count-heading">{uiText.questionsPerSection}</h4>
+          <div className="daily-settings-grid">
+            {settings.includedSections.map((section) => (
+              <label className="daily-count-control" key={section}>
+                <span>{sectionLabel(section, uiText)}</span>
+                <select
+                  aria-label={`${uiText.questionsPerSection}: ${sectionLabel(section, uiText)}`}
+                  value={settings.counts[section]}
+                  onChange={(event) => updateCount(section, event.target.value)}
                 >
-                  {deckName}
-                </button>
-              ))
-            ) : (
-              <p className="muted-line">No hay decks de Catalan cargados.</p>
-            )}
+                  {Array.from({ length: MAX_PRACTICE_BATCH_SIZE }, (_, index) => index + 1).map((count) => (
+                    <option key={count} value={count}>
+                      {count}
+                    </option>
+                  ))}
+                </select>
+              </label>
+            ))}
           </div>
+        </>
+      ) : (
+        <div className="inline-banner warn">{uiText.chooseDailySection}</div>
+      )}
+
+      <details className="daily-catalan-settings">
+        <summary>
+          <span>{uiText.catalanDailyTitle}</span>
+          <small>{uiText.optionalFilters}</small>
+        </summary>
+        <div className="daily-catalan-settings__content">
+          <p className="muted-line">{uiText.catalanDailyHelp}</p>
+          <SettingsChecklistDropdown
+            emptyText={uiText.noCatalanDecks}
+            label={uiText.decks}
+            options={catalanDeckNames.map((deckName) => ({ label: deckName, value: deckName }))}
+            selectedValues={new Set(effectiveCatalanDeckNames)}
+            onToggle={updateCatalanDecks}
+          />
+          <SettingsChecklistDropdown
+            emptyText={uiText.noCatalanSections}
+            label={uiText.sections}
+            options={catalanSectionNames.map((sectionName) => ({ label: sectionName, value: sectionName }))}
+            selectedValues={new Set(effectiveCatalanSectionNames)}
+            onToggle={updateCatalanSections}
+          />
         </div>
-        <div className="field-block">
-          <FieldLabel label="Secciones" />
-          <div className="chip-cloud catalan-section-cloud">
-            {catalanSectionNames.length ? (
-              catalanSectionNames.map((sectionName) => (
-                <button
-                  key={sectionName}
-                  className={cx("choice-pill", effectiveCatalanSectionNames.includes(sectionName) && "active")}
-                  type="button"
-                  onClick={() => updateCatalanSections(sectionName)}
-                >
-                  {sectionName}
-                </button>
-              ))
-            ) : (
-              <p className="muted-line">No hay secciones para los decks seleccionados.</p>
-            )}
-          </div>
-        </div>
-      </div>
+      </details>
     </div>
   );
 }
@@ -1407,6 +1289,7 @@ function DailySeQuestion({
   onAttempt: (attempt: SeAttempt) => void;
   onChecked: () => void;
 }) {
+  const uiText = useUiText();
   const [guessValue, setGuessValue] = useState(availableSeValues[0] ?? SE_VALUES[0]);
   const [guessFunction, setGuessFunction] = useState<string>(SE_FUNCTIONS[0]);
   const [evaluation, setEvaluation] = useState<SeEvaluation | null>(null);
@@ -1455,7 +1338,7 @@ function DailySeQuestion({
         </div>
       </div>
       <button className="primary-btn" type="button" onClick={handleCheck}>
-        Comprobar respuesta
+        {uiText.checkResponse}
       </button>
       {evaluation ? (
         <>
@@ -1493,6 +1376,7 @@ function DailyPeriphrasisQuestion({
   onAttempt: (attempt: PeriphrasisAttempt) => void;
   onChecked: () => void;
 }) {
+  const uiText = useUiText();
   const noAplica = availablePeriphrasisTypes.find((value) => normalizeTextToken(value) === normalizeTextToken("No aplica")) ?? "No aplica";
   const [guessStructure, setGuessStructure] = useState<string>(PERIPHRASIS_STRUCTURES[0]);
   const [guessPeriphrasisType, setGuessPeriphrasisType] = useState(noAplica);
@@ -1555,7 +1439,7 @@ function DailyPeriphrasisQuestion({
         </div>
       </div>
       <button className="primary-btn" type="button" onClick={handleCheck}>
-        Comprobar respuesta
+        {uiText.checkResponse}
       </button>
       {evaluation ? (
         <div className="result-panel">
@@ -1589,6 +1473,7 @@ function DailyMorfoQuestion({
   onAttempt: (attempt: MorfoAttempt) => void;
   onChecked: () => void;
 }) {
+  const uiText = useUiText();
   const [guessWordType, setGuessWordType] = useState<string>(MORFO_WORD_TYPES[0]);
   const [guessLexeme, setGuessLexeme] = useState("");
   const [guessMorphemesText, setGuessMorphemesText] = useState("");
@@ -1654,7 +1539,7 @@ function DailyMorfoQuestion({
         </div>
       </div>
       <button className="primary-btn" type="button" onClick={handleCheck}>
-        Comprobar respuesta
+        {uiText.checkResponse}
       </button>
       {evaluation ? (
         <div className="result-panel">
@@ -1696,6 +1581,7 @@ function DailyCatalanQuestion({
   item: CatalanCard;
   onChecked: () => void;
 }) {
+  const uiText = useUiText();
   const [answerDraft, setAnswerDraft] = useState("");
   const [accentSelection, setAccentSelection] = useState<number[]>([]);
   const [feedback, setFeedback] = useState<{
@@ -1774,7 +1660,7 @@ function DailyCatalanQuestion({
         }}
       >
         <input
-          aria-label="Answer"
+          aria-label={uiText.yourAnswer}
           autoComplete="off"
           disabled={Boolean(feedback)}
           spellCheck={false}
@@ -1782,30 +1668,30 @@ function DailyCatalanQuestion({
           onChange={(event) => setAnswerDraft(event.target.value)}
         />
         <button className="primary-btn catalan-check-btn" disabled={Boolean(feedback)} type="submit">
-          Check
+          {uiText.checkResponse}
         </button>
       </form>
 
       {feedback ? (
         <section className={cx("catalan-feedback", feedback.correct ? "success" : "danger")}>
-          <strong>{feedback.correct ? "Correct" : "Incorrect"}</strong>
+          <strong>{feedback.correct ? uiText.correct : uiText.incorrect}</strong>
           <div>{item.answer}</div>
-          {isCatalanAccentCard(item) ? null : <div>Gap: {item.missing || "-"}</div>}
+          {isCatalanAccentCard(item) ? null : <div>{uiText.gap}: {item.missing || "-"}</div>}
           <div>
-            Expected:{" "}
+            {uiText.expectedLabel}:{" "}
             {isCatalanAccentCard(item)
-              ? expectedCatalanAccentInput(item) || "no accent"
+              ? expectedCatalanAccentInput(item) || uiText.noAccent
               : item.missing || item.answer}
           </div>
           {isCatalanAccentCard(item) ? (
             <div>
-              Clicked:{" "}
+              {uiText.clicked}:{" "}
               {feedback.selectedIndices.length
                 ? feedback.selectedIndices.map((index) => Array.from(catalanAccentBaseWord(item))[index]).join(", ")
-                : "none"}
+                : uiText.none}
             </div>
           ) : null}
-          <div>You typed: {feedback.userText || "-"}</div>
+          <div>{uiText.youTyped}: {feedback.userText || "-"}</div>
         </section>
       ) : null}
     </div>
@@ -1823,6 +1709,7 @@ function DailySintaxisQuestion({
   onAttempt: (attempt: SintaxisAttempt) => void;
   onChecked: () => void;
 }) {
+  const uiText = useUiText();
   const [visible, setVisible] = useState(false);
   const [attemptSaved, setAttemptSaved] = useState(false);
 
@@ -1844,7 +1731,7 @@ function DailySintaxisQuestion({
     <div className="sintaxis-practice-column daily-sintaxis-column">
       <h3 className="prompt-text sintaxis-prompt-text">{item.phrase}</h3>
       <button className="primary-btn sintaxis-correction-btn" type="button" onClick={handleReveal}>
-        Mostrar correccion
+        {uiText.showCorrection}
       </button>
       {visible ? (
         <div className="info-block markdown-correction sintaxis-correction-box">
@@ -1866,6 +1753,7 @@ function DailyDerivativeQuestion({
   onAttempt: (attempt: DerivativeAttempt) => void;
   onChecked: () => void;
 }) {
+  const uiText = useUiText();
   const [visible, setVisible] = useState(false);
   const [attemptSaved, setAttemptSaved] = useState(false);
 
@@ -1887,13 +1775,56 @@ function DailyDerivativeQuestion({
     <div className="derivative-practice-column">
       <MathDisplay value={item.functionText} className="derivative-function-display" />
       <button className="primary-btn derivative-answer-btn" type="button" onClick={handleReveal}>
-        Mostrar respuesta
+        {uiText.showAnswer}
       </button>
       {visible ? (
         <div className="info-block derivative-answer-box">
           <MathDisplay value={item.derivative} className="derivative-answer-display" />
         </div>
       ) : null}
+    </div>
+  );
+}
+
+function DailyPhilosophyQuestion({
+  item,
+  onChecked,
+}: {
+  item: PhilosophyCard;
+  onChecked: () => void;
+}) {
+  const uiText = useUiText();
+  const [visible, setVisible] = useState(false);
+
+  return (
+    <div className="daily-philosophy-question">
+      <div className="philosophy-card-meta">
+        <span className="philosophy-topic-badge">{item.chapterTitle}</span>
+        <span className={`philosophy-source-badge philosophy-source-badge--${item.source}`}>
+          {item.source === "anki" ? "Anki" : uiText.book}
+        </span>
+      </div>
+      <p className="philosophy-section-label">{item.section}</p>
+      <h2 className="daily-philosophy-question__prompt">{item.question}</h2>
+      {!visible ? (
+        <button
+          className="primary-btn"
+          type="button"
+          onClick={() => {
+            setVisible(true);
+            onChecked();
+          }}
+        >
+          {uiText.showAnswer}
+        </button>
+      ) : (
+        <div className="philosophy-answer-shell">
+          <div className="philosophy-answer-label">{uiText.answer}</div>
+          <div className="philosophy-answer">
+            <ReactMarkdown>{item.answer}</ReactMarkdown>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -1910,7 +1841,7 @@ function DailyChallengeQuestion({
   onAppendDerivativeAttempt,
 }: {
   section: DailyChallengeSection;
-  item: SeItem | PeriphrasisItem | MorfoItem | CatalanCard | SintaxisItem | DerivativeItem;
+  item: SeItem | PeriphrasisItem | MorfoItem | CatalanCard | SintaxisItem | PhilosophyCard | DerivativeItem;
   storageState: StorageState;
   onChecked: () => void;
   onAppendSeAttempt: (attempt: SeAttempt) => void;
@@ -1973,6 +1904,9 @@ function DailyChallengeQuestion({
       />
     );
   }
+  if (section === "philosophy") {
+    return <DailyPhilosophyQuestion item={item as PhilosophyCard} onChecked={onChecked} />;
+  }
   return (
     <DailyDerivativeQuestion
       item={item as DerivativeItem}
@@ -2004,6 +1938,7 @@ function DailyChallengePage({
   onAppendDerivativeAttempt: (attempt: DerivativeAttempt) => void;
   onCompleteRecord: (record: DailyChallengeRecord) => void;
 }) {
+  const uiText = useUiText();
   const [session, setSession] = useState<DailyChallengeSession | null>(null);
   const [completedRecord, setCompletedRecord] = useState<DailyChallengeRecord | null>(null);
   const todayKey = localDateKey();
@@ -2012,7 +1947,7 @@ function DailyChallengePage({
     .sort((left, right) => right.completedAt.localeCompare(left.completedAt))[0];
 
   const startChallenge = () => {
-    const { plan, warning } = buildDailyChallengePlan(storageState, catalanDecks);
+    const { plan, warning } = buildDailyChallengePlan(storageState, catalanDecks, uiText);
     if (dailyPlanTotal(plan) === 0) {
       setCompletedRecord(null);
       return;
@@ -2105,7 +2040,8 @@ function DailyChallengePage({
   };
 
   if (!session) {
-    const plannedTotal = DAILY_CHALLENGE_SECTIONS.reduce(
+    const includedSections = storageState.dailyChallengeSettings.includedSections;
+    const plannedTotal = includedSections.reduce(
       (total, section) => total + storageState.dailyChallengeSettings.counts[section],
       0,
     );
@@ -2115,40 +2051,44 @@ function DailyChallengePage({
       morfologia: storageState.morfoQuestionBank.length,
       catalan: selectedDailyCatalanCards(catalanDecks, storageState.dailyChallengeSettings).length,
       sintaxis: storageState.sintaxisQuestionBank.length,
+      philosophy: PHILOSOPHY_CARDS.length,
       derivative: storageState.derivativeQuestionBank.length,
     };
-    const hasAnyBankItems = Object.values(bankCounts).some((count) => count > 0);
+    const hasAnyBankItems = includedSections.some((section) => bankCounts[section] > 0);
 
     return (
       <section className="workspace daily-challenge-page">
         <div className="panel daily-start-panel">
           <p className="muted-line">
-            Empieza en Valores del se y avanza automaticamente por Perifrasis, Morfologia, Catalan, Sintaxis y Derivative.
+            {uiText.dailyStartHelp}
           </p>
           <div className="daily-target-grid">
-            {DAILY_CHALLENGE_SECTIONS.map((section) => (
+            {includedSections.map((section) => (
               <article className="daily-target-card" key={section}>
-                <span>{DAILY_SECTION_LABELS[section]}</span>
+                <span>{sectionLabel(section, uiText)}</span>
                 <strong>{storageState.dailyChallengeSettings.counts[section]}</strong>
-                <small>{bankCounts[section]} en banco</small>
+                <small>{uiText.inBank(bankCounts[section])}</small>
               </article>
             ))}
           </div>
+          {!includedSections.length ? (
+            <div className="inline-banner warn">{uiText.chooseDailySection}</div>
+          ) : null}
           {todaysRecord ? (
             <div className="inline-banner">
-              Hoy ya hay un tiempo guardado: {formatDuration(todaysRecord.totalMs)}.
+              {uiText.todaySavedTime(formatDuration(todaysRecord.totalMs))}
             </div>
           ) : null}
           {completedRecord ? (
             <div className="inline-banner">
-              Ultimo reto terminado: {formatDuration(completedRecord.totalMs)} total.
+              {uiText.lastChallengeFinished(formatDuration(completedRecord.totalMs))}
             </div>
           ) : null}
           {!hasAnyBankItems ? (
-            <div className="inline-banner warn">No hay preguntas en los bancos todavia.</div>
+            <div className="inline-banner warn">{uiText.noQuestionsInBanks}</div>
           ) : null}
           <button className="primary-btn daily-start-btn" disabled={!hasAnyBankItems || plannedTotal === 0} type="button" onClick={startChallenge}>
-            Empezar
+            {uiText.start}
           </button>
         </div>
       </section>
@@ -2161,15 +2101,15 @@ function DailyChallengePage({
     (section, index) => index > session.currentSectionIndex && session.plan[section].length > 0,
   );
   const isLastItemInSection = session.currentItemIndex + 1 >= sectionTotal;
-  const nextLabel = isLastSection && isLastItemInSection ? "Finalizar" : "Siguiente";
+  const nextLabel = isLastSection && isLastItemInSection ? uiText.finish : uiText.next;
 
   return (
     <section className="workspace daily-challenge-page">
       <DailyTimerOverlay startedAt={session.startedAt} />
       <div className="daily-session-header">
         <div>
-          <p className="section-heading">Reto diario</p>
-          <h3>{currentSection ? DAILY_SECTION_LABELS[currentSection] : ""}</h3>
+          <p className="section-heading">{uiText.dailyChallenge}</p>
+          <h3>{currentSection ? sectionLabel(currentSection, uiText) : ""}</h3>
         </div>
         <div className="daily-session-meta">
           {itemNumber}/{sectionTotal}
@@ -2193,7 +2133,7 @@ function DailyChallengePage({
             />
           ) : (
             <div className="empty-state">
-              <h3>No hay pregunta disponible para esta seccion.</h3>
+              <h3>{uiText.noQuestionAvailable}</h3>
             </div>
           )}
           {session.checked ? (
@@ -2208,6 +2148,7 @@ function DailyChallengePage({
 }
 
 function PersonalTimesPage({ records }: { records: DailyChallengeRecord[] }) {
+  const uiText = useUiText();
   const sortedRecords = [...records].sort((left, right) => left.dateKey.localeCompare(right.dateKey));
   const recentRecords = sortedRecords.slice(-14);
   const maxTime = Math.max(1, ...recentRecords.map((record) => record.totalMs));
@@ -2221,7 +2162,7 @@ function PersonalTimesPage({ records }: { records: DailyChallengeRecord[] }) {
     const y = chartPadding.top + plotHeight - (record.totalMs / maxTime) * plotHeight;
     return {
       id: record.id,
-      date: formatDateLabel(record.dateKey),
+      date: formatDateLabel(record.dateKey, uiText.locale),
       duration: formatDuration(record.totalMs),
       title: `${record.dateKey}: ${formatDuration(record.totalMs)}`,
       x,
@@ -2244,6 +2185,8 @@ function PersonalTimesPage({ records }: { records: DailyChallengeRecord[] }) {
     ? records.reduce((best, record) => record.totalMs < best.totalMs ? record : best, records[0])
     : null;
   const latestRecord = [...records].sort((left, right) => right.completedAt.localeCompare(left.completedAt))[0] ?? null;
+  const tableSections = DAILY_CHALLENGE_SECTIONS.filter((section) =>
+    records.some((record) => record.sectionCounts[section] > 0 || record.sectionTimes[section] > 0));
 
   return (
     <section className="workspace personal-times-page">
@@ -2280,7 +2223,7 @@ function PersonalTimesPage({ records }: { records: DailyChallengeRecord[] }) {
               <h2>Tiempos por dia</h2>
               <span>ultimos {recentRecords.length}</span>
             </div>
-            <div className="daily-line-chart" aria-label="Grafica de tiempos por dia" role="img">
+            <div className="daily-line-chart" aria-label={uiText.timeChartAria} role="img">
               <svg className="daily-line-chart__svg" viewBox={`0 0 ${chartWidth} ${chartHeight}`}>
                 <defs>
                   <linearGradient id="daily-time-fill" x1="0" x2="0" y1="0" y2="1">
@@ -2328,18 +2271,17 @@ function PersonalTimesPage({ records }: { records: DailyChallengeRecord[] }) {
           </div>
 
           <DataTable
-            headers={["Fecha", "Total", "Valores del se", "Perifrasis", "Morfologia", "Catalan", "Sintaxis", "Derivative"]}
+            headers={[
+              uiText.date,
+              uiText.total,
+              ...tableSections.map((section) => sectionLabel(section, uiText)),
+            ]}
             rows={[...records]
               .sort((left, right) => right.completedAt.localeCompare(left.completedAt))
               .map((record) => [
                 record.dateKey,
                 formatDuration(record.totalMs),
-                formatDuration(record.sectionTimes.se),
-                formatDuration(record.sectionTimes.perifrasis),
-                formatDuration(record.sectionTimes.morfologia),
-                formatDuration(record.sectionTimes.catalan),
-                formatDuration(record.sectionTimes.sintaxis),
-                formatDuration(record.sectionTimes.derivative),
+                ...tableSections.map((section) => formatDuration(record.sectionTimes[section])),
               ])}
           />
         </>
@@ -2349,7 +2291,6 @@ function PersonalTimesPage({ records }: { records: DailyChallengeRecord[] }) {
 }
 
 interface CompactSettingsProps {
-  interfaceLanguage: InterfaceLanguage;
   storageState: StorageState;
   onSeSettingsChange: (settings: SeSettings) => void;
   onPeriphrasisSettingsChange: (settings: PeriphrasisSettings) => void;
@@ -2373,7 +2314,6 @@ function modelDraftFor(modelName: string): AiModelDraft {
 }
 
 function CompactProfileSettingsPanel({
-  interfaceLanguage,
   storageState,
   onSeSettingsChange,
   onPeriphrasisSettingsChange,
@@ -2381,76 +2321,51 @@ function CompactProfileSettingsPanel({
   onSintaxisSettingsChange,
   onDerivativeSettingsChange,
 }: CompactSettingsProps) {
-  const seProfileId = storageState.seSettings.profileId;
-  const periphrasisProfileId = storageState.periphrasisSettings.profileId;
-  const morfoProfileId = storageState.morfoSettings.profileId;
-  const sintaxisProfileId = storageState.sintaxisSettings.profileId;
-  const derivativeProfileId = storageState.derivativeSettings.profileId;
-  const [profiles, setProfiles] = useState<Record<ProfileSection, string>>({
-    se: seProfileId,
-    perifrasis: periphrasisProfileId,
-    morfologia: morfoProfileId,
-    sintaxis: sintaxisProfileId,
-    derivative: derivativeProfileId,
-  });
+  const uiText = useUiText();
+  const savedProfileId = storageState.seSettings.profileId;
+  const [profileId, setProfileId] = useState(savedProfileId);
 
   useEffect(() => {
-    setProfiles({
-      se: seProfileId,
-      perifrasis: periphrasisProfileId,
-      morfologia: morfoProfileId,
-      sintaxis: sintaxisProfileId,
-      derivative: derivativeProfileId,
-    });
-  }, [derivativeProfileId, morfoProfileId, periphrasisProfileId, seProfileId, sintaxisProfileId]);
+    setProfileId(savedProfileId);
+  }, [savedProfileId]);
 
-  const updateProfileDraft = (section: ProfileSection, value: string) => {
-    setProfiles((current) => ({ ...current, [section]: value }));
-  };
-
-  const profileFor = (section: ProfileSection) => profiles[section].trim() || "alumno";
-
-  const saveProfiles = () => {
-    onSeSettingsChange({ ...storageState.seSettings, profileId: profileFor("se") });
-    onPeriphrasisSettingsChange({ ...storageState.periphrasisSettings, profileId: profileFor("perifrasis") });
-    onMorfoSettingsChange({ ...storageState.morfoSettings, profileId: profileFor("morfologia") });
-    onSintaxisSettingsChange({ ...storageState.sintaxisSettings, profileId: profileFor("sintaxis") });
-    onDerivativeSettingsChange({ ...storageState.derivativeSettings, profileId: profileFor("derivative") });
+  const saveProfile = () => {
+    const normalizedProfileId = profileId.trim() || "alumno";
+    onSeSettingsChange({ ...storageState.seSettings, profileId: normalizedProfileId });
+    onPeriphrasisSettingsChange({ ...storageState.periphrasisSettings, profileId: normalizedProfileId });
+    onMorfoSettingsChange({ ...storageState.morfoSettings, profileId: normalizedProfileId });
+    onSintaxisSettingsChange({ ...storageState.sintaxisSettings, profileId: normalizedProfileId });
+    onDerivativeSettingsChange({ ...storageState.derivativeSettings, profileId: normalizedProfileId });
   };
 
   return (
     <section className="panel compact-settings-panel">
-      <h3>{tUi(interfaceLanguage, "profiles")}</h3>
-      <div className="compact-settings-grid">
-        {PROFILE_SECTIONS.map((section) => (
-          <div key={section}>
-            <FieldLabel label={DAILY_SECTION_LABELS[section]} />
-            <input value={profiles[section]} onChange={(event) => updateProfileDraft(section, event.target.value)} />
-          </div>
-        ))}
+      <h3>{uiText.profileForAll}</h3>
+      <div className="field-block compact-profile-field">
+        <FieldLabel label={uiText.profile} />
+        <input value={profileId} onChange={(event) => setProfileId(event.target.value)} />
       </div>
-      <button className="primary-btn" type="button" onClick={saveProfiles}>
-        {tUi(interfaceLanguage, "saveProfiles")}
+      <button className="primary-btn" type="button" onClick={saveProfile}>
+        {uiText.saveProfile}
       </button>
     </section>
   );
 }
 
 function CompactAiSettingsPanel({
-  interfaceLanguage,
   storageState,
   onGeminiApiKeyChange,
   onSeSettingsChange,
   onPeriphrasisSettingsChange,
   onMorfoSettingsChange,
 }: {
-  interfaceLanguage: InterfaceLanguage;
   storageState: StorageState;
   onGeminiApiKeyChange: (value: string) => void;
   onSeSettingsChange: (settings: SeSettings) => void;
   onPeriphrasisSettingsChange: (settings: PeriphrasisSettings) => void;
   onMorfoSettingsChange: (settings: MorfoSettings) => void;
 }) {
+  const uiText = useUiText();
   const seModelName = storageState.seSettings.modelName;
   const periphrasisModelName = storageState.periphrasisSettings.modelName;
   const morfoModelName = storageState.morfoSettings.modelName;
@@ -2510,11 +2425,11 @@ function CompactAiSettingsPanel({
               {option.label}
             </option>
           ))}
-          <option value="custom">{tUi(interfaceLanguage, "manualCustom")}</option>
+          <option value="custom">{uiText.customManual}</option>
         </select>
         <input
           disabled={drafts[section].selectedModel !== "custom"}
-          placeholder={tUi(interfaceLanguage, "customModel")}
+          placeholder={uiText.customModel}
           value={drafts[section].customModel}
           onChange={(event) => updateModelDraft(section, { customModel: event.target.value })}
         />
@@ -2524,27 +2439,27 @@ function CompactAiSettingsPanel({
 
   return (
     <section className="panel compact-settings-panel">
-      <h3>{tUi(interfaceLanguage, "aiAndApi")}</h3>
+      <h3>{uiText.aiAndApi}</h3>
       <div className="compact-model-list">
-        {renderModelRow("se", DAILY_SECTION_LABELS.se)}
-        {renderModelRow("perifrasis", DAILY_SECTION_LABELS.perifrasis)}
-        {renderModelRow("morfologia", DAILY_SECTION_LABELS.morfologia)}
+        {renderModelRow("se", sectionLabel("se", uiText))}
+        {renderModelRow("perifrasis", sectionLabel("perifrasis", uiText))}
+        {renderModelRow("morfologia", sectionLabel("morfologia", uiText))}
       </div>
 
       <div className="field-block">
         <FieldLabel
-          label={tUi(interfaceLanguage, "customPeriphrasisTypes")}
-          hint={tUi(interfaceLanguage, "customPeriphrasisTypesHint")}
+          label={uiText.customPeriphrasisTypes}
+          hint={uiText.customPeriphrasisHint}
         />
         <input
-          placeholder="Ej. Obligacion atenuada, enfatica"
+          placeholder={uiText.customPeriphrasisPlaceholder}
           value={customTypesDraft}
           onChange={(event) => setCustomTypesDraft(event.target.value)}
         />
       </div>
 
       <button className="primary-btn" type="button" onClick={saveAiSettings}>
-        {tUi(interfaceLanguage, "saveAi")}
+        {uiText.saveAi}
       </button>
 
       <GeminiKeyPanel apiKey={storageState.geminiApiKey} onApiKeyChange={onGeminiApiKeyChange} />
@@ -2553,14 +2468,13 @@ function CompactAiSettingsPanel({
 }
 
 function PersonalTimesSettingsPanel({
-  interfaceLanguage,
   recordCount,
   onClearRecords,
 }: {
-  interfaceLanguage: InterfaceLanguage;
   recordCount: number;
   onClearRecords: () => void;
 }) {
+  const uiText = useUiText();
   const [clearConfirmed, setClearConfirmed] = useState(false);
 
   useEffect(() => {
@@ -2571,8 +2485,8 @@ function PersonalTimesSettingsPanel({
 
   return (
     <section className="panel compact-settings-panel">
-      <h3>{tUi(interfaceLanguage, "personalTimes")}</h3>
-      <p className="muted-line">Borra los tiempos guardados del reto diario.</p>
+      <h3>{uiText.personalTimes}</h3>
+      <p className="muted-line">{uiText.personalTimesHelp}</p>
       <div className="danger-zone">
         <label className="checkbox-line">
           <input
@@ -2581,7 +2495,7 @@ function PersonalTimesSettingsPanel({
             type="checkbox"
             onChange={(event) => setClearConfirmed(event.target.checked)}
           />
-          <span>Confirmo que quiero borrar {recordCount} registro{recordCount === 1 ? "" : "s"} de tiempos</span>
+          <span>{uiText.clearTimesConfirm(recordCount)}</span>
         </label>
         <button
           className="danger-btn"
@@ -2592,143 +2506,34 @@ function PersonalTimesSettingsPanel({
             setClearConfirmed(false);
           }}
         >
-          Borrar tiempos personales
+          {uiText.clearPersonalTimes}
         </button>
       </div>
     </section>
   );
 }
 
-function collectBrowserStorage(storage: Storage): Record<string, string> {
-  const entries: Record<string, string> = {};
-  for (let index = 0; index < storage.length; index += 1) {
-    const key = storage.key(index);
-    if (key) {
-      entries[key] = storage.getItem(key) ?? "";
-    }
-  }
-  return entries;
-}
-
-function restoreBrowserStorage(storage: Storage, values: unknown): void {
-  if (!values || typeof values !== "object" || Array.isArray(values)) {
-    return;
-  }
-
-  Object.entries(values as Record<string, unknown>).forEach(([key, value]) => {
-    if (typeof value === "string") {
-      storage.setItem(key, value);
-    }
-  });
-}
-
-function StorageBackupSettingsPanel({
-  interfaceLanguage,
-  onBackupImported,
-}: {
-  interfaceLanguage: InterfaceLanguage;
-  onBackupImported: () => void;
-}) {
-  const fileInputRef = useRef<HTMLInputElement | null>(null);
-  const [importStatus, setImportStatus] = useState("");
-
-  const downloadBackup = () => {
-    if (typeof window === "undefined") {
-      return;
-    }
-
-    const backup = {
-      app: "Habitro",
-      version: 1,
-      exportedAt: new Date().toISOString(),
-      origin: window.location.origin,
-      localStorage: collectBrowserStorage(window.localStorage),
-      sessionStorage: collectBrowserStorage(window.sessionStorage),
-    };
-    const blob = new Blob([JSON.stringify(backup, null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const link = document.createElement("a");
-    const dateStamp = new Date().toISOString().slice(0, 10);
-    link.href = url;
-    link.download = `habitro-data-${dateStamp}.json`;
-    document.body.append(link);
-    link.click();
-    link.remove();
-    URL.revokeObjectURL(url);
-    setImportStatus(tUi(interfaceLanguage, "backupDownloaded"));
-  };
-
-  const importBackup = async (file: File) => {
-    try {
-      const parsed = JSON.parse(await file.text()) as Record<string, unknown>;
-      restoreBrowserStorage(window.localStorage, parsed.localStorage);
-      restoreBrowserStorage(window.sessionStorage, parsed.sessionStorage);
-      onBackupImported();
-      setImportStatus(tUi(interfaceLanguage, "backupImported"));
-    } catch {
-      setImportStatus(tUi(interfaceLanguage, "backupImportFailed"));
-    }
-  };
-
-  return (
-    <section className="panel compact-settings-panel">
-      <h3>{tUi(interfaceLanguage, "dataBackup")}</h3>
-      <p className="muted-line">{tUi(interfaceLanguage, "backupIntro")}</p>
-      <div className="backup-actions">
-        <button className="primary-btn" type="button" onClick={downloadBackup}>
-          {tUi(interfaceLanguage, "downloadData")}
-        </button>
-        <button className="ghost-btn" type="button" onClick={() => fileInputRef.current?.click()}>
-          {tUi(interfaceLanguage, "importData")}
-        </button>
-      </div>
-      <input
-        ref={fileInputRef}
-        accept="application/json,.json"
-        className="hidden-file-input"
-        type="file"
-        onChange={(event) => {
-          const file = event.currentTarget.files?.[0];
-          event.currentTarget.value = "";
-          if (file) {
-            void importBackup(file);
-          }
-        }}
-      />
-      {importStatus ? <p className="muted-line">{importStatus}</p> : null}
-    </section>
-  );
-}
-
-function LanguageSettingsPanel({
+function UiLanguageSettingsPanel({
   language,
   onLanguageChange,
 }: {
-  language: InterfaceLanguage;
-  onLanguageChange: (language: InterfaceLanguage) => void;
+  language: UiLanguage;
+  onLanguageChange: (language: UiLanguage) => void;
 }) {
+  const uiText = useUiText();
+
   return (
     <section className="panel compact-settings-panel">
-      <h3>{tUi(language, "language")}</h3>
-      <div className="compact-settings-grid">
-        <div>
-          <FieldLabel label={tUi(language, "interfaceLanguage")} />
-          <select
-            value={language}
-            onChange={(event) => {
-              const nextLanguage = event.target.value;
-              if (isInterfaceLanguage(nextLanguage)) {
-                onLanguageChange(nextLanguage);
-              }
-            }}
-          >
-            {INTERFACE_LANGUAGE_OPTIONS.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
-          </select>
-        </div>
+      <h3>{uiText.languageSettingsTitle}</h3>
+      <div className="field-block">
+        <FieldLabel label={uiText.languageFieldLabel} />
+        <select value={language} onChange={(event) => onLanguageChange(event.target.value as UiLanguage)}>
+          {UI_LANGUAGE_OPTIONS.map((option) => (
+            <option key={option.value} value={option.value}>
+              {option.label}
+            </option>
+          ))}
+        </select>
       </div>
     </section>
   );
@@ -2737,12 +2542,11 @@ function LanguageSettingsPanel({
 function GlobalSettingsPage({
   catalanDecks,
   storageState,
-  interfaceLanguage,
+  onUiLanguageChange,
   onDailyChallengeSettingsChange,
   onDailyChallengeRecordsClear,
-  onGeminiApiKeyChange,
   onBackupImported,
-  onInterfaceLanguageChange,
+  onGeminiApiKeyChange,
   onSeSettingsChange,
   onPeriphrasisSettingsChange,
   onMorfoSettingsChange,
@@ -2751,12 +2555,11 @@ function GlobalSettingsPage({
 }: {
   catalanDecks: CatalanDeck[];
   storageState: StorageState;
-  interfaceLanguage: InterfaceLanguage;
+  onUiLanguageChange: (language: UiLanguage) => void;
   onDailyChallengeSettingsChange: (settings: DailyChallengeSettings) => void;
   onDailyChallengeRecordsClear: () => void;
-  onGeminiApiKeyChange: (value: string) => void;
   onBackupImported: () => void;
-  onInterfaceLanguageChange: (language: InterfaceLanguage) => void;
+  onGeminiApiKeyChange: (value: string) => void;
   onSeSettingsChange: (settings: SeSettings) => void;
   onPeriphrasisSettingsChange: (settings: PeriphrasisSettings) => void;
   onMorfoSettingsChange: (settings: MorfoSettings) => void;
@@ -2765,9 +2568,8 @@ function GlobalSettingsPage({
 }) {
   return (
     <section className="workspace global-settings-page">
-      <StorageBackupSettingsPanel interfaceLanguage={interfaceLanguage} onBackupImported={onBackupImported} />
-
-      <LanguageSettingsPanel language={interfaceLanguage} onLanguageChange={onInterfaceLanguageChange} />
+      <StorageBackupSettingsPanel interfaceLanguage={storageState.uiLanguage} onBackupImported={onBackupImported} />
+      <UiLanguageSettingsPanel language={storageState.uiLanguage} onLanguageChange={onUiLanguageChange} />
 
       <DailyChallengeSettingsPanel
         catalanDecks={catalanDecks}
@@ -2776,7 +2578,6 @@ function GlobalSettingsPage({
       />
 
       <CompactProfileSettingsPanel
-        interfaceLanguage={interfaceLanguage}
         storageState={storageState}
         onDerivativeSettingsChange={onDerivativeSettingsChange}
         onMorfoSettingsChange={onMorfoSettingsChange}
@@ -2786,7 +2587,6 @@ function GlobalSettingsPage({
       />
 
       <CompactAiSettingsPanel
-        interfaceLanguage={interfaceLanguage}
         storageState={storageState}
         onGeminiApiKeyChange={onGeminiApiKeyChange}
         onMorfoSettingsChange={onMorfoSettingsChange}
@@ -2795,7 +2595,6 @@ function GlobalSettingsPage({
       />
 
       <PersonalTimesSettingsPanel
-        interfaceLanguage={interfaceLanguage}
         recordCount={storageState.dailyChallengeRecords.length}
         onClearRecords={onDailyChallengeRecordsClear}
       />
@@ -2807,8 +2606,11 @@ export function NetlifyPracticeApp() {
   const [storageState, setStorageState] = useState<StorageState>(() => loadStorageState());
   const [builtInCatalanDecks, setBuiltInCatalanDecks] = useState<CatalanDeck[]>([]);
   const [importedCatalanDecks, setImportedCatalanDecks] = useState<CatalanDeck[]>(() => loadImportedCatalanDecks());
-  const [interfaceLanguage, setInterfaceLanguage] = useState<InterfaceLanguage>(() => loadInterfaceLanguage());
-  const [activeSection, setActiveSection] = useState<SectionName>("se");
+  const refreshImportedBackup = () => {
+    setStorageState(loadStorageState());
+    setImportedCatalanDecks(loadImportedCatalanDecks());
+  };
+  const [activeSection, setActiveSection] = useState<SectionName>(() => window.location.hash === "#catalan-presentations" ? "presentations" : "se");
   const [globalPage, setGlobalPage] = useState<GlobalPageName | null>(null);
   const [exerciseMenuOpen, setExerciseMenuOpen] = useState(false);
   const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
@@ -2817,15 +2619,15 @@ export function NetlifyPracticeApp() {
   const [morfoPage, setMorfoPage] = useState<PageName>("practice");
   const [sintaxisPage, setSintaxisPage] = useState<PageName>("practice");
   const [derivativePage, setDerivativePage] = useState<PageName>("practice");
+  const uiText = getUiText(storageState.uiLanguage);
 
   useEffect(() => {
     saveStorageState(storageState);
   }, [storageState]);
 
   useEffect(() => {
-    document.documentElement.lang = interfaceLanguage;
-    window.localStorage.setItem(INTERFACE_LANGUAGE_STORAGE_KEY, interfaceLanguage);
-  }, [interfaceLanguage]);
+    document.documentElement.lang = storageState.uiLanguage;
+  }, [storageState.uiLanguage]);
 
   useEffect(() => {
     let cancelled = false;
@@ -2941,6 +2743,10 @@ export function NetlifyPracticeApp() {
     setStorageState((current) => ({ ...current, geminiApiKey: next }));
   };
 
+  const updateUiLanguage = (next: UiLanguage) => {
+    setStorageState((current) => ({ ...current, uiLanguage: next }));
+  };
+
   const updateDailyChallengeSettings = (next: DailyChallengeSettings) => {
     setStorageState((current) => ({ ...current, dailyChallengeSettings: next }));
   };
@@ -2951,13 +2757,6 @@ export function NetlifyPracticeApp() {
 
   const clearDailyRecords = () => {
     setStorageState((current) => ({ ...current, dailyChallengeRecords: [] }));
-  };
-
-  const refreshImportedBackup = () => {
-    setStorageState(loadStorageState());
-    setImportedCatalanDecks(loadImportedCatalanDecks());
-    setInterfaceLanguage(loadInterfaceLanguage());
-    window.dispatchEvent(new CustomEvent(CATALAN_DECKS_UPDATED_EVENT));
   };
 
   const appendDailySeAttempt = (attempt: SeAttempt) => {
@@ -2995,8 +2794,8 @@ export function NetlifyPracticeApp() {
   const activeSectionMeta = SECTION_META[activeSection];
   const catalanDecks = useMemo(() => [...builtInCatalanDecks, ...importedCatalanDecks], [builtInCatalanDecks, importedCatalanDecks]);
   const pageTitle = globalPage
-    ? globalPageLabel(interfaceLanguage, globalPage)
-    : activeSectionMeta.title;
+    ? globalPageLabel(globalPage, uiText)
+    : sectionLabel(activeSection, uiText);
 
   const setPageForSection = (section: SectionName, page: PageName) => {
     setGlobalPage(null);
@@ -3020,6 +2819,7 @@ export function NetlifyPracticeApp() {
   };
 
   return (
+    <UiTextProvider language={storageState.uiLanguage}>
     <div className="app-shell">
       <header className="globalnav">
         <div className="globalnav__inner">
@@ -3036,7 +2836,7 @@ export function NetlifyPracticeApp() {
             <span>Habitro</span>
           </button>
 
-          <nav className="globalnav__menu" aria-label={tUi(interfaceLanguage, "exercises")}>
+          <nav className="globalnav__menu" aria-label={uiText.sectionsAria}>
             <div className="globalnav__group" ref={exerciseMenuRef}>
               <button
                 aria-expanded={exerciseMenuOpen}
@@ -3046,10 +2846,10 @@ export function NetlifyPracticeApp() {
                 type="button"
                 onClick={() => setExerciseMenuOpen((current) => !current)}
               >
-                {tUi(interfaceLanguage, "exercises")}
+                {uiText.exercises}
               </button>
               {exerciseMenuOpen ? (
-                <div className="globalnav__dropdown" role="menu" aria-label={tUi(interfaceLanguage, "exercises")}>
+                <div className="globalnav__dropdown" role="menu" aria-label={uiText.exercises}>
                   {SECTION_ORDER.map((section) => (
                     <button
                       key={section}
@@ -3065,7 +2865,7 @@ export function NetlifyPracticeApp() {
                         setActiveSection(section);
                       }}
                     >
-                      {SECTION_META[section].navLabel}
+                      {sectionLabel(section, uiText)}
                     </button>
                   ))}
                 </div>
@@ -3082,7 +2882,7 @@ export function NetlifyPracticeApp() {
                   setGlobalPage(pageKey);
                 }}
               >
-                {globalPageLabel(interfaceLanguage, pageKey)}
+                {globalPageLabel(pageKey, uiText)}
               </button>
             ))}
           </nav>
@@ -3095,13 +2895,13 @@ export function NetlifyPracticeApp() {
           <section className={cx("hero-banner", !globalPage && activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
             <div className="hero-banner__copy">
               <h1>{pageTitle}</h1>
-              {!globalPage && activeSection !== "catalan" && activeSection !== "presentations" ? (
+              {!globalPage && activeSection !== "catalan" && activeSection !== "philosophy" && activeSection !== "presentations" ? (
                 <div className="cta-links">
                   {SECTION_PAGE_ORDER.map((pageKey) => (
                     <PageAction
                       key={pageKey}
                       active={currentPage === pageKey}
-                      label={pageLabel(interfaceLanguage, pageKey)}
+                      label={pageLabel(pageKey, uiText)}
                       onClick={() => setPageForSection(activeSection, pageKey)}
                     />
                   ))}
@@ -3145,18 +2945,17 @@ export function NetlifyPracticeApp() {
             ) : globalPage === "settings" ? (
               <GlobalSettingsPage
                 catalanDecks={catalanDecks}
-                interfaceLanguage={interfaceLanguage}
                 storageState={storageState}
-                onBackupImported={refreshImportedBackup}
                 onDailyChallengeRecordsClear={clearDailyRecords}
+                onBackupImported={refreshImportedBackup}
                 onDailyChallengeSettingsChange={updateDailyChallengeSettings}
                 onDerivativeSettingsChange={updateDerivativeSettings}
                 onGeminiApiKeyChange={updateGeminiApiKey}
-                onInterfaceLanguageChange={setInterfaceLanguage}
                 onMorfoSettingsChange={updateMorfoSettings}
                 onPeriphrasisSettingsChange={updatePeriphrasisSettings}
                 onSeSettingsChange={updateSeSettings}
                 onSintaxisSettingsChange={updateSintaxisSettings}
+                onUiLanguageChange={updateUiLanguage}
               />
             ) : (
               <>
@@ -3212,6 +3011,7 @@ export function NetlifyPracticeApp() {
                   onAttemptsChange={updateDerivativeAttempts}
                 />
                 <CatalanPracticeApp active={activeSection === "catalan"} />
+                <PhilosophyPracticeApp active={activeSection === "philosophy"} />
               </>
             )}
             <CatalanPresentations active={!globalPage && activeSection === "presentations"} />
@@ -3219,6 +3019,7 @@ export function NetlifyPracticeApp() {
         </section>
       </div>
     </div>
+    </UiTextProvider>
   );
 }
 
@@ -3243,6 +3044,7 @@ function SeWorkspace({
   onSettingsChange: (settings: SeSettings) => void;
   onAttemptsChange: (attempts: SeAttempt[]) => void;
 }) {
+  const uiText = useUiText();
   const profile = useMemo(() => seLearningProfile(attempts, settings.profileId), [attempts, settings.profileId]);
   const profileAttempts = useMemo(
     () => attempts.filter((attempt) => attempt.profileId === settings.profileId),
@@ -3397,10 +3199,10 @@ function SeWorkspace({
 
         const finalized = prepared.filter((item): item is SeItem => item !== null);
         if (finalized.length === 0) {
-          setStatusNote("Banco manual sin items validos para esta seccion.");
+          setStatusNote(uiText.manualBankEmpty);
           setStatusTone("warn");
         } else if (finalized.length < batchSize) {
-          setStatusNote("Lote incompleto.");
+          setStatusNote(uiText.incompleteBatch);
           setStatusTone("warn");
         } else {
           setStatusNote("");
@@ -3508,9 +3310,7 @@ function SeWorkspace({
           model: "modo local",
           answer:
             `Modo local: ${currentItem.explanation}\n\nTipo de oracion: ${currentItem.phraseType}.\n\n` +
-            (error instanceof Error
-              ? `${error.message} Pega una GEMINI_API_KEY valida en Ajustes si quieres respuestas desarrolladas.`
-              : "Pega una GEMINI_API_KEY valida en Ajustes si quieres respuestas desarrolladas."),
+            (error instanceof Error ? `${error.message} ${uiText.apiKeyNeeded}` : uiText.apiKeyNeeded),
         },
       }));
     } finally {
@@ -3537,14 +3337,14 @@ function SeWorkspace({
         <div className="page-grid">
           <div className="panel control-panel">
             <div className="field-block">
-              <FieldLabel label="Modo" hint="Usa refuerzo de debilidades cuando hay historial." />
+              <FieldLabel label={uiText.mode} hint="Usa refuerzo de debilidades cuando hay historial." />
               <label className="checkbox-line">
                 <input
                   checked={settings.personalized}
                   onChange={(event) => onSettingsChange({ ...settings, personalized: event.target.checked })}
                   type="checkbox"
                 />
-                <span>Personalizado</span>
+                <span>{uiText.personalized}</span>
               </label>
             </div>
 
@@ -3554,14 +3354,14 @@ function SeWorkspace({
             />
 
             <div className="field-block">
-              <FieldLabel label="Valores" />
+              <FieldLabel label={uiText.values} />
               <MultiToggleList options={availableSeValues} selected={settings.focusValues} onToggle={toggleFocusValue} />
 
               <div className="custom-value-editor">
                 <div className="custom-value-form">
                   <input
-                    aria-label="Valor personalizado"
-                    placeholder="Nuevo valor"
+                    aria-label={uiText.customValue}
+                    placeholder={uiText.newValue}
                     value={customValueInput}
                     onChange={(event) => setCustomValueInput(event.target.value)}
                     onKeyDown={(event) => {
@@ -3572,7 +3372,7 @@ function SeWorkspace({
                     }}
                   />
                   <button className="ghost-btn" disabled={!customValueInput.trim()} type="button" onClick={addCustomValue}>
-                    Anadir
+                    {uiText.add}
                   </button>
                 </div>
                 {settings.customValues.length > 0 ? (
@@ -3592,7 +3392,7 @@ function SeWorkspace({
 
             <div className="field-grid compact-grid">
               <div>
-                <FieldLabel label="Peso debilidades" />
+                <FieldLabel label={uiText.weaknessWeight} />
                 <input
                   max={100}
                   min={0}
@@ -3603,7 +3403,7 @@ function SeWorkspace({
                 />
               </div>
               <div>
-                <FieldLabel label="Peso normal" />
+                <FieldLabel label={uiText.normalWeight} />
                 <input
                   max={100}
                   min={0}
@@ -3618,14 +3418,14 @@ function SeWorkspace({
             {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
             <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
-              {isGenerating ? "Preparando lote..." : queue.length > 0 ? "Siguiente frase" : "Generar lote"}
+              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextPhrase : uiText.generateBatch}
             </button>
           </div>
 
           <div className="panel practice-panel">
             {!currentItem ? (
               <div className="empty-state">
-                <h3>Genera una frase para empezar.</h3>
+                <h3>{uiText.generatePhraseStart}</h3>
               </div>
             ) : (
               <>
@@ -3654,7 +3454,7 @@ function SeWorkspace({
                 </div>
 
                 <button className="primary-btn" type="button" onClick={handleCheck}>
-                  Comprobar respuesta
+                  {uiText.checkResponse}
                 </button>
 
                 {evaluation ? (
@@ -3687,7 +3487,7 @@ function SeWorkspace({
 
                     <div className="button-row">
                       <button className="ghost-btn" disabled={isRechecking} type="button" onClick={handleRecheck}>
-                        {isRechecking ? "Revisando..." : "Revisar"}
+                        {isRechecking ? uiText.reviewing : uiText.review}
                       </button>
                     </div>
 
@@ -3696,7 +3496,7 @@ function SeWorkspace({
                         {recheck.success ? (
                           <>
                             <p className={recheck.isCorrect ? "result-ok" : "result-bad"}>
-                              {recheck.isCorrect ? `OK (${recheck.model})` : `Revisar (${recheck.model})`}
+                              {recheck.isCorrect ? `OK (${recheck.model})` : `${uiText.review} (${recheck.model})`}
                             </p>
                             {!recheck.isCorrect ? (
                               <p>
@@ -3726,7 +3526,7 @@ function SeWorkspace({
                         onChange={(event) => setQuestionInput(event.target.value)}
                       />
                       <button className="ghost-btn" disabled={isAsking || !questionInput.trim()} type="button" onClick={handleAsk}>
-                        {isAsking ? "Consultando..." : "Preguntar"}
+                        {isAsking ? uiText.asking : uiText.ask}
                       </button>
                       {answer ? (
                         <div className="info-block">
@@ -3747,7 +3547,7 @@ function SeWorkspace({
           <div className="panel">
             <div className="row-between">
               <div>
-                <h3>Aprendizaje local por perfil</h3>
+                <h3>{uiText.localLearningByProfile}</h3>
               </div>
               <label className="checkbox-line">
                 <input
@@ -3755,48 +3555,48 @@ function SeWorkspace({
                   onChange={(event) => onSettingsChange({ ...settings, hideHistory: event.target.checked })}
                   type="checkbox"
                 />
-                <span>Ocultar historial</span>
+                <span>{uiText.hideHistory}</span>
               </label>
             </div>
 
             {settings.hideHistory ? (
-              <p>Historial oculto para esta seccion.</p>
+              <p>{uiText.historyHidden}</p>
             ) : (
               <>
                 <div className="row-between">
                   <p>
-                    Intentos totales: {profile.totalAttempts} | Acierto completo: {seAccuracy(profileAttempts).toFixed(1)}%
+                    {uiText.totalAttempts}: {profile.totalAttempts} | {uiText.fullAccuracy}: {seAccuracy(profileAttempts).toFixed(1)}%
                   </p>
                   <label className="checkbox-line">
                     <input checked={historyOnlyErrors} onChange={(event) => setHistoryOnlyErrors(event.target.checked)} type="checkbox" />
-                    <span>Mostrar solo fallos</span>
+                    <span>{uiText.showOnlyFailures}</span>
                   </label>
                 </div>
 
                 <div className="stats-grid">
                   <div className="info-block">
-                    <h4 className="section-heading">Mas dificiles (valor)</h4>
+                    <h4 className="section-heading">{uiText.hardestValue}</h4>
                     <SummaryList rows={profile.weakValues} />
                   </div>
                   <div className="info-block">
-                    <h4 className="section-heading">Mas dificiles (funcion)</h4>
+                    <h4 className="section-heading">{uiText.hardestFunction}</h4>
                     <SummaryList rows={profile.weakFunctions} />
                   </div>
                   <div className="info-block">
-                    <h4 className="section-heading">Mejores (valor)</h4>
+                    <h4 className="section-heading">{uiText.bestValue}</h4>
                     <SummaryList rows={profile.strongValues} />
                   </div>
                   <div className="info-block">
-                    <h4 className="section-heading">Mejores (funcion)</h4>
+                    <h4 className="section-heading">{uiText.bestFunction}</h4>
                     <SummaryList rows={profile.strongFunctions} />
                   </div>
                 </div>
 
                 <div className="stack-lg">
                   <div>
-                    <h4 className="section-heading">Rendimiento exacto por valor y funcion</h4>
+                    <h4 className="section-heading">{uiText.exactPerformanceValueFunction}</h4>
                     <DataTable
-                      headers={["Eje", "Item", "OK", "Fallos", "Intentos", "Tasa fallo"]}
+                      headers={[uiText.axis, uiText.item, uiText.ok, uiText.failures, uiText.attempts, uiText.failRate]}
                       rows={[
                         ...profile.valueOverview.map((row) => ["valor", row.label, row.ok, row.fail, row.attempts, `${(row.failRate * 100).toFixed(1)}%`]),
                         ...profile.functionOverview.map((row) => [
@@ -3812,17 +3612,17 @@ function SeWorkspace({
                   </div>
 
                   <div>
-                    <h4 className="section-heading">Combinaciones donde mas fallas</h4>
+                    <h4 className="section-heading">{uiText.mostMissedCombinations}</h4>
                     <DataTable
-                      headers={["Par", "OK", "Fallos", "Intentos", "Tasa fallo"]}
+                      headers={[uiText.pair, uiText.ok, uiText.failures, uiText.attempts, uiText.failRate]}
                       rows={profile.weakPairs.map((row) => [row.pair, row.ok, row.fail, row.attempts, `${(row.failRate * 100).toFixed(1)}%`])}
                     />
                   </div>
 
                   <div>
-                    <h4 className="section-heading">Intentos guardados</h4>
+                    <h4 className="section-heading">{uiText.savedAttempts}</h4>
                     <DataTable
-                      headers={["Fecha", "Frase", "Esperado", "Tu respuesta", "Estado", "Modo"]}
+                      headers={[uiText.date, uiText.phrase, uiText.expected, uiText.yourAnswer, uiText.status, uiText.exerciseMode]}
                       rows={visibleAttempts.map((attempt) => [
                         new Date(attempt.createdAt).toLocaleString(),
                         attempt.sentence,
@@ -3838,7 +3638,7 @@ function SeWorkspace({
                 <div className="danger-zone">
                   <label className="checkbox-line">
                     <input checked={resetConfirmed} onChange={(event) => setResetConfirmed(event.target.checked)} type="checkbox" />
-                    <span>Confirmo que quiero borrar todo el historial de este perfil</span>
+                    <span>{uiText.clearProfileHistoryConfirm}</span>
                   </label>
                   <button
                     className="danger-btn"
@@ -3849,7 +3649,7 @@ function SeWorkspace({
                       setResetConfirmed(false);
                     }}
                   >
-                    Resetear historial
+                    {uiText.resetHistory}
                   </button>
                 </div>
               </>
@@ -3861,28 +3661,28 @@ function SeWorkspace({
       {page === "settings" ? (
         <div className="page-grid single-column">
           <div className="panel">
-            <h3>Perfil y modelo</h3>
+            <h3>{uiText.profileAndModel}</h3>
 
             <div className="field-grid">
               <div>
-                <FieldLabel label="Perfil" hint="Afecta el historial local y el refuerzo personalizado." />
+                <FieldLabel label={uiText.profile} hint="Afecta el historial local y el refuerzo personalizado." />
                 <input value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} />
               </div>
               <div>
-                <FieldLabel label="Modelo Gemini" hint="Si no hay clave valida, se usara el banco local." />
+                <FieldLabel label={uiText.geminiModel} hint="Si no hay clave valida, se usara el banco local." />
                 <select value={selectedModelDraft} onChange={(event) => setSelectedModelDraft(event.target.value)}>
                   {MODEL_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
-                  <option value="custom">Personalizado (manual)</option>
+                  <option value="custom">{uiText.customManual}</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <FieldLabel label="Modelo personalizado" hint="Solo se usa si eliges la opcion manual." />
+              <FieldLabel label={uiText.customModel} hint="Solo se usa si eliges la opcion manual." />
               <input
                 disabled={selectedModelDraft !== "custom"}
                 placeholder="ej. gemini-2.5-flash-lite"
@@ -3892,14 +3692,14 @@ function SeWorkspace({
             </div>
 
             <button className="primary-btn" type="button" onClick={saveSettingsDraft}>
-              Guardar ajustes
+              {uiText.saveSettings}
             </button>
 
             <GeminiKeyPanel apiKey={apiKey} onApiKeyChange={onApiKeyChange} />
 
             {settings.modelName.toLowerCase().startsWith("gemma") ? (
               <div className="info-block">
-                <p>Gemma activa.</p>
+                <p>{uiText.gemmaActive}</p>
               </div>
             ) : null}
           </div>
@@ -3930,6 +3730,7 @@ function PeriphrasisWorkspace({
   onSettingsChange: (settings: PeriphrasisSettings) => void;
   onAttemptsChange: (attempts: PeriphrasisAttempt[]) => void;
 }) {
+  const uiText = useUiText();
   const profile = useMemo(() => periphrasisLearningProfile(attempts, settings.profileId), [attempts, settings.profileId]);
   const profileAttempts = useMemo(
     () => attempts.filter((attempt) => attempt.profileId === settings.profileId),
@@ -4057,9 +3858,9 @@ function PeriphrasisWorkspace({
 
         const finalized = prepared.filter((item): item is PeriphrasisItem => item !== null);
         if (finalized.length === 0) {
-          setStatusNote("Banco manual sin items validos para esta seccion.");
+          setStatusNote(uiText.manualBankEmpty);
         } else if (finalized.length < batchSize) {
-          setStatusNote("Lote incompleto.");
+          setStatusNote(uiText.incompleteBatch);
         } else {
           setStatusNote("");
         }
@@ -4107,14 +3908,14 @@ function PeriphrasisWorkspace({
         <div className="page-grid">
           <div className="panel control-panel">
             <div className="field-block">
-              <FieldLabel label="Modo" hint="Usa refuerzo de debilidades cuando hay historial." />
+              <FieldLabel label={uiText.mode} hint="Usa refuerzo de debilidades cuando hay historial." />
               <label className="checkbox-line">
                 <input
                   checked={settings.personalized}
                   onChange={(event) => onSettingsChange({ ...settings, personalized: event.target.checked })}
                   type="checkbox"
                 />
-                <span>Personalizado</span>
+                <span>{uiText.personalized}</span>
               </label>
             </div>
 
@@ -4124,12 +3925,12 @@ function PeriphrasisWorkspace({
             />
 
             <div className="field-block">
-              <FieldLabel label="Estructuras" />
+              <FieldLabel label={uiText.structures} />
               <MultiToggleList options={PERIPHRASIS_STRUCTURES} selected={settings.focusStructures} onToggle={toggleFocusStructure} />
             </div>
 
             <div className="field-block">
-              <FieldLabel label="Anadir tipo personalizado" hint="Ej. Obligacion atenuada. Se guarda en esta seccion." />
+              <FieldLabel label={uiText.addCustomType} hint="Ej. Obligacion atenuada. Se guarda en esta seccion." />
               <div className="field-grid compact-grid">
                 <input
                   placeholder="Ej. Obligacion atenuada"
@@ -4137,14 +3938,14 @@ function PeriphrasisWorkspace({
                   onChange={(event) => setCustomTypeInput(event.target.value)}
                 />
                 <button className="ghost-btn" type="button" onClick={addCustomPeriphrasisType}>
-                  Anadir tipo
+                  {uiText.addType}
                 </button>
               </div>
             </div>
 
             <div className="field-grid compact-grid">
               <div>
-                <FieldLabel label="Peso debilidades" />
+                <FieldLabel label={uiText.weaknessWeight} />
                 <input
                   max={100}
                   min={0}
@@ -4155,7 +3956,7 @@ function PeriphrasisWorkspace({
                 />
               </div>
               <div>
-                <FieldLabel label="Peso normal" />
+                <FieldLabel label={uiText.normalWeight} />
                 <input
                   max={100}
                   min={0}
@@ -4170,7 +3971,7 @@ function PeriphrasisWorkspace({
             {statusNote ? <div className="inline-banner">{statusNote}</div> : null}
 
             <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
-              {isGenerating ? "Preparando lote..." : queue.length > 0 ? "Siguiente frase" : "Generar lote"}
+              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextPhrase : uiText.generateBatch}
             </button>
 
             {settings.personalized && (weakStructureLabels.length > 0 || weakPeriphrasisTypeLabels.length > 0) ? (
@@ -4187,7 +3988,7 @@ function PeriphrasisWorkspace({
           <div className="panel practice-panel">
             {!currentItem ? (
               <div className="empty-state">
-                <h3>Genera una frase para empezar.</h3>
+                <h3>{uiText.generatePhraseStart}</h3>
               </div>
             ) : (
               <>
@@ -4229,7 +4030,7 @@ function PeriphrasisWorkspace({
                 </div>
 
                 <button className="primary-btn" type="button" onClick={handleCheck}>
-                  Comprobar respuesta
+                  {uiText.checkResponse}
                 </button>
 
                 {evaluation ? (
@@ -4272,7 +4073,7 @@ function PeriphrasisWorkspace({
           <div className="panel">
             <div className="row-between">
               <div>
-                <h3>Aprendizaje local por perfil</h3>
+                <h3>{uiText.localLearningByProfile}</h3>
               </div>
               <label className="checkbox-line">
                 <input
@@ -4280,48 +4081,48 @@ function PeriphrasisWorkspace({
                   onChange={(event) => onSettingsChange({ ...settings, hideHistory: event.target.checked })}
                   type="checkbox"
                 />
-                <span>Ocultar historial</span>
+                <span>{uiText.hideHistory}</span>
               </label>
             </div>
 
             {settings.hideHistory ? (
-              <p>Historial oculto para esta seccion.</p>
+              <p>{uiText.historyHidden}</p>
             ) : (
               <>
                 <div className="row-between">
                   <p>
-                    Intentos totales: {profile.totalAttempts} | Acierto completo: {periphrasisAccuracy(profileAttempts).toFixed(1)}%
+                    {uiText.totalAttempts}: {profile.totalAttempts} | {uiText.fullAccuracy}: {periphrasisAccuracy(profileAttempts).toFixed(1)}%
                   </p>
                   <label className="checkbox-line">
                     <input checked={historyOnlyErrors} onChange={(event) => setHistoryOnlyErrors(event.target.checked)} type="checkbox" />
-                    <span>Mostrar solo fallos</span>
+                    <span>{uiText.showOnlyFailures}</span>
                   </label>
                 </div>
 
                 <div className="stats-grid">
                   <div className="info-block">
-                    <h4 className="section-heading">Mas dificiles (estructura)</h4>
+                    <h4 className="section-heading">{uiText.hardestStructure}</h4>
                     <SummaryList rows={profile.weakStructures} />
                   </div>
                   <div className="info-block">
-                    <h4 className="section-heading">Mas dificiles (tipo)</h4>
+                    <h4 className="section-heading">{uiText.hardestType}</h4>
                     <SummaryList rows={profile.weakPeriphrasisTypes} />
                   </div>
                   <div className="info-block">
-                    <h4 className="section-heading">Mejores (estructura)</h4>
+                    <h4 className="section-heading">{uiText.bestStructure}</h4>
                     <SummaryList rows={profile.strongStructures} />
                   </div>
                   <div className="info-block">
-                    <h4 className="section-heading">Mejores (tipo)</h4>
+                    <h4 className="section-heading">{uiText.bestType}</h4>
                     <SummaryList rows={profile.strongPeriphrasisTypes} />
                   </div>
                 </div>
 
                 <div className="stack-lg">
                   <div>
-                    <h4 className="section-heading">Rendimiento exacto por eje</h4>
+                    <h4 className="section-heading">{uiText.exactPerformanceAxis}</h4>
                     <DataTable
-                      headers={["Eje", "Item", "OK", "Fallos", "Intentos", "Tasa fallo"]}
+                      headers={[uiText.axis, uiText.item, uiText.ok, uiText.failures, uiText.attempts, uiText.failRate]}
                       rows={[
                         ...profile.structureOverview.map((row) => [
                           "estructura",
@@ -4344,17 +4145,17 @@ function PeriphrasisWorkspace({
                   </div>
 
                   <div>
-                    <h4 className="section-heading">Combinaciones donde mas fallas</h4>
+                    <h4 className="section-heading">{uiText.mostMissedCombinations}</h4>
                     <DataTable
-                      headers={["Par", "OK", "Fallos", "Intentos", "Tasa fallo"]}
+                      headers={[uiText.pair, uiText.ok, uiText.failures, uiText.attempts, uiText.failRate]}
                       rows={profile.weakPairs.map((row) => [row.pair, row.ok, row.fail, row.attempts, `${(row.failRate * 100).toFixed(1)}%`])}
                     />
                   </div>
 
                   <div>
-                    <h4 className="section-heading">Intentos guardados</h4>
+                    <h4 className="section-heading">{uiText.savedAttempts}</h4>
                     <DataTable
-                      headers={["Fecha", "Frase", "Esperado", "Tu respuesta", "Estado", "Modo"]}
+                      headers={[uiText.date, uiText.phrase, uiText.expected, uiText.yourAnswer, uiText.status, uiText.exerciseMode]}
                       rows={visibleAttempts.map((attempt) => [
                         new Date(attempt.createdAt).toLocaleString(),
                         attempt.sentence,
@@ -4370,7 +4171,7 @@ function PeriphrasisWorkspace({
                 <div className="danger-zone">
                   <label className="checkbox-line">
                     <input checked={resetConfirmed} onChange={(event) => setResetConfirmed(event.target.checked)} type="checkbox" />
-                    <span>Confirmo que quiero borrar todo el historial de este perfil</span>
+                    <span>{uiText.clearProfileHistoryConfirm}</span>
                   </label>
                   <button
                     className="danger-btn"
@@ -4381,7 +4182,7 @@ function PeriphrasisWorkspace({
                       setResetConfirmed(false);
                     }}
                   >
-                    Resetear historial
+                    {uiText.resetHistory}
                   </button>
                 </div>
               </>
@@ -4393,28 +4194,28 @@ function PeriphrasisWorkspace({
       {page === "settings" ? (
         <div className="page-grid single-column">
           <div className="panel">
-            <h3>Perfil y modelo</h3>
+            <h3>{uiText.profileAndModel}</h3>
 
             <div className="field-grid">
               <div>
-                <FieldLabel label="Perfil" hint="Afecta el historial local y el refuerzo personalizado." />
+                <FieldLabel label={uiText.profile} hint="Afecta el historial local y el refuerzo personalizado." />
                 <input value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} />
               </div>
               <div>
-                <FieldLabel label="Modelo Gemini" hint="Si no hay clave valida, se usara el banco local." />
+                <FieldLabel label={uiText.geminiModel} hint="Si no hay clave valida, se usara el banco local." />
                 <select value={selectedModelDraft} onChange={(event) => setSelectedModelDraft(event.target.value)}>
                   {MODEL_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
-                  <option value="custom">Personalizado (manual)</option>
+                  <option value="custom">{uiText.customManual}</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <FieldLabel label="Modelo personalizado" hint="Solo se usa si eliges la opcion manual." />
+              <FieldLabel label={uiText.customModel} hint="Solo se usa si eliges la opcion manual." />
               <input
                 disabled={selectedModelDraft !== "custom"}
                 placeholder="ej. gemini-2.5-flash-lite"
@@ -4425,25 +4226,25 @@ function PeriphrasisWorkspace({
 
             <div>
               <FieldLabel
-                label="Tipos de perifrasis personalizados"
-                hint="Separados por comas. Se suman a la lista base y tambien aparecen en Practicar."
+                label={uiText.customPeriphrasisTypes}
+                hint={uiText.customPeriphrasisHint}
               />
               <input
-                placeholder="Ej. Obligacion atenuada, enfatica"
+                placeholder={uiText.customPeriphrasisPlaceholder}
                 value={customTypesDraft}
                 onChange={(event) => setCustomTypesDraft(event.target.value)}
               />
             </div>
 
             <button className="primary-btn" type="button" onClick={saveSettingsDraft}>
-              Guardar ajustes
+              {uiText.saveSettings}
             </button>
 
             <GeminiKeyPanel apiKey={apiKey} onApiKeyChange={onApiKeyChange} />
 
             {settings.modelName.toLowerCase().startsWith("gemma") ? (
               <div className="info-block">
-                <p>Gemma activa.</p>
+                <p>{uiText.gemmaActive}</p>
               </div>
             ) : null}
           </div>
@@ -4474,6 +4275,7 @@ function MorfoWorkspace({
   onSettingsChange: (settings: MorfoSettings) => void;
   onAttemptsChange: (attempts: MorfoAttempt[]) => void;
 }) {
+  const uiText = useUiText();
   const profile = useMemo(() => morfoLearningProfile(attempts, settings.profileId), [attempts, settings.profileId]);
   const profileAttempts = useMemo(
     () => attempts.filter((attempt) => attempt.profileId === settings.profileId),
@@ -4592,10 +4394,10 @@ function MorfoWorkspace({
           }
         });
         if (prepared.length === 0) {
-          setStatusNote("Banco manual sin items validos para esta seccion.");
+          setStatusNote(uiText.manualBankEmpty);
           setStatusTone("warn");
         } else if (prepared.length < batchSize) {
-          setStatusNote("Lote incompleto.");
+          setStatusNote(uiText.incompleteBatch);
           setStatusTone("warn");
         } else {
           setStatusNote("");
@@ -4698,9 +4500,7 @@ function MorfoWorkspace({
           model: "modo local",
           answer:
             `Modo local: ${currentItem.explanation}\n\nAnalisis: ${currentItem.analysisType}.\n\n` +
-            (error instanceof Error
-              ? `${error.message} Pega una GEMINI_API_KEY valida en Ajustes si quieres respuestas desarrolladas.`
-              : "Pega una GEMINI_API_KEY valida en Ajustes si quieres respuestas desarrolladas."),
+            (error instanceof Error ? `${error.message} ${uiText.apiKeyNeeded}` : uiText.apiKeyNeeded),
         },
       }));
     } finally {
@@ -4728,14 +4528,14 @@ function MorfoWorkspace({
         <div className="page-grid">
           <div className="panel control-panel">
             <div className="field-block">
-              <FieldLabel label="Modo" hint="Usa refuerzo de debilidades cuando hay historial." />
+              <FieldLabel label={uiText.mode} hint="Usa refuerzo de debilidades cuando hay historial." />
               <label className="checkbox-line">
                 <input
                   checked={settings.personalized}
                   onChange={(event) => onSettingsChange({ ...settings, personalized: event.target.checked })}
                   type="checkbox"
                 />
-                <span>Personalizado</span>
+                <span>{uiText.personalized}</span>
               </label>
             </div>
 
@@ -4745,13 +4545,13 @@ function MorfoWorkspace({
             />
 
             <div className="field-block">
-              <FieldLabel label="Tipos" />
+              <FieldLabel label={uiText.types} />
               <MultiToggleList options={MORFO_WORD_TYPES} selected={settings.focusWordTypes} onToggle={toggleFocusWordType} />
             </div>
 
             <div className="field-grid compact-grid">
               <div>
-                <FieldLabel label="Peso debilidades" />
+                <FieldLabel label={uiText.weaknessWeight} />
                 <input
                   max={100}
                   min={0}
@@ -4762,7 +4562,7 @@ function MorfoWorkspace({
                 />
               </div>
               <div>
-                <FieldLabel label="Peso normal" />
+                <FieldLabel label={uiText.normalWeight} />
                 <input
                   max={100}
                   min={0}
@@ -4777,7 +4577,7 @@ function MorfoWorkspace({
             {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
             <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
-              {isGenerating ? "Preparando lote..." : queue.length > 0 ? "Siguiente palabra" : "Generar lote"}
+              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextWord : uiText.generateBatch}
             </button>
 
             {settings.personalized && (weakWordTypeLabels.length > 0 || weakMorphemeTypeLabels.length > 0) ? (
@@ -4794,7 +4594,7 @@ function MorfoWorkspace({
           <div className="panel practice-panel">
             {!currentItem ? (
               <div className="empty-state">
-                <h3>Genera una palabra para empezar.</h3>
+                <h3>{uiText.generateWordStart}</h3>
               </div>
             ) : (
               <>
@@ -4840,7 +4640,7 @@ function MorfoWorkspace({
                 </div>
 
                 <button className="primary-btn" type="button" onClick={handleCheck}>
-                  Comprobar respuesta
+                  {uiText.checkResponse}
                 </button>
 
                 {evaluation ? (
@@ -4887,7 +4687,7 @@ function MorfoWorkspace({
 
                     <div className="button-row">
                       <button className="ghost-btn" disabled={isRechecking} type="button" onClick={handleRecheck}>
-                        {isRechecking ? "Revisando..." : "Revisar"}
+                        {isRechecking ? uiText.reviewing : uiText.review}
                       </button>
                     </div>
 
@@ -4896,7 +4696,7 @@ function MorfoWorkspace({
                         {recheck.success ? (
                           <>
                             <p className={recheck.isCorrect ? "result-ok" : "result-bad"}>
-                              {recheck.isCorrect ? `OK (${recheck.model})` : `Revisar (${recheck.model})`}
+                              {recheck.isCorrect ? `OK (${recheck.model})` : `${uiText.review} (${recheck.model})`}
                             </p>
                             {!recheck.isCorrect ? (
                               <p>
@@ -4932,7 +4732,7 @@ function MorfoWorkspace({
                         onChange={(event) => setQuestionInput(event.target.value)}
                       />
                       <button className="ghost-btn" disabled={isAsking || !questionInput.trim()} type="button" onClick={handleAsk}>
-                        {isAsking ? "Consultando..." : "Preguntar"}
+                        {isAsking ? uiText.asking : uiText.ask}
                       </button>
                       {answer ? (
                         <div className="info-block">
@@ -4953,7 +4753,7 @@ function MorfoWorkspace({
           <div className="panel">
             <div className="row-between">
               <div>
-                <h3>Aprendizaje local por perfil</h3>
+                <h3>{uiText.localLearningByProfile}</h3>
               </div>
               <label className="checkbox-line">
                 <input
@@ -4961,46 +4761,46 @@ function MorfoWorkspace({
                   onChange={(event) => onSettingsChange({ ...settings, hideHistory: event.target.checked })}
                   type="checkbox"
                 />
-                <span>Ocultar historial</span>
+                <span>{uiText.hideHistory}</span>
               </label>
             </div>
 
             {settings.hideHistory ? (
-              <p>Historial oculto para esta seccion.</p>
+              <p>{uiText.historyHidden}</p>
             ) : (
               <>
                 <div className="row-between">
-                  <p>Intentos totales: {profile.totalAttempts}</p>
+                  <p>{uiText.totalAttempts}: {profile.totalAttempts}</p>
                   <label className="checkbox-line">
                     <input checked={historyOnlyErrors} onChange={(event) => setHistoryOnlyErrors(event.target.checked)} type="checkbox" />
-                    <span>Mostrar solo fallos</span>
+                    <span>{uiText.showOnlyFailures}</span>
                   </label>
                 </div>
 
                 <div className="stats-grid">
                   <div className="info-block">
-                    <h4 className="section-heading">Mas dificiles (tipo)</h4>
+                    <h4 className="section-heading">{uiText.hardestType}</h4>
                     <SummaryList rows={profile.weakWordTypes} />
                   </div>
                   <div className="info-block">
-                    <h4 className="section-heading">Mas dificiles (morfema)</h4>
+                    <h4 className="section-heading">{uiText.hardestMorpheme}</h4>
                     <SummaryList rows={profile.weakMorphemeTypes} />
                   </div>
                   <div className="info-block">
-                    <h4 className="section-heading">Mejores (tipo)</h4>
+                    <h4 className="section-heading">{uiText.bestType}</h4>
                     <SummaryList rows={profile.strongWordTypes} />
                   </div>
                   <div className="info-block">
-                    <h4 className="section-heading">Mejores (morfema)</h4>
+                    <h4 className="section-heading">{uiText.bestMorpheme}</h4>
                     <SummaryList rows={profile.strongMorphemeTypes} />
                   </div>
                 </div>
 
                 <div className="stack-lg">
                   <div>
-                    <h4 className="section-heading">Rendimiento exacto por tipo y morfema</h4>
+                    <h4 className="section-heading">{uiText.exactPerformanceTypeMorpheme}</h4>
                     <DataTable
-                      headers={["Eje", "Item", "OK", "Fallos", "Intentos", "Tasa fallo"]}
+                      headers={[uiText.axis, uiText.item, uiText.ok, uiText.failures, uiText.attempts, uiText.failRate]}
                       rows={[
                         ...profile.wordTypeOverview.map((row) => ["tipo", row.label, row.ok, row.fail, row.attempts, `${(row.failRate * 100).toFixed(1)}%`]),
                         ...profile.morphemeTypeOverview.map((row) => [
@@ -5016,17 +4816,17 @@ function MorfoWorkspace({
                   </div>
 
                   <div>
-                    <h4 className="section-heading">Combinaciones donde mas fallas</h4>
+                    <h4 className="section-heading">{uiText.mostMissedCombinations}</h4>
                     <DataTable
-                      headers={["Par", "OK", "Fallos", "Intentos", "Tasa fallo"]}
+                      headers={[uiText.pair, uiText.ok, uiText.failures, uiText.attempts, uiText.failRate]}
                       rows={profile.weakPairs.map((row) => [row.pair, row.ok, row.fail, row.attempts, `${(row.failRate * 100).toFixed(1)}%`])}
                     />
                   </div>
 
                   <div>
-                    <h4 className="section-heading">Intentos guardados</h4>
+                    <h4 className="section-heading">{uiText.savedAttempts}</h4>
                     <DataTable
-                      headers={["Fecha", "Palabra", "Esperado", "Tu respuesta", "Estado", "Modo"]}
+                      headers={[uiText.date, uiText.word, uiText.expected, uiText.yourAnswer, uiText.status, uiText.exerciseMode]}
                       rows={visibleAttempts.map((attempt) => [
                         new Date(attempt.createdAt).toLocaleString(),
                         attempt.word,
@@ -5042,7 +4842,7 @@ function MorfoWorkspace({
                 <div className="danger-zone">
                   <label className="checkbox-line">
                     <input checked={resetConfirmed} onChange={(event) => setResetConfirmed(event.target.checked)} type="checkbox" />
-                    <span>Confirmo que quiero borrar todo el historial de este perfil</span>
+                    <span>{uiText.clearProfileHistoryConfirm}</span>
                   </label>
                   <button
                     className="danger-btn"
@@ -5053,7 +4853,7 @@ function MorfoWorkspace({
                       setResetConfirmed(false);
                     }}
                   >
-                    Resetear historial
+                    {uiText.resetHistory}
                   </button>
                 </div>
               </>
@@ -5065,28 +4865,28 @@ function MorfoWorkspace({
       {page === "settings" ? (
         <div className="page-grid single-column">
           <div className="panel">
-            <h3>Perfil y modelo</h3>
+            <h3>{uiText.profileAndModel}</h3>
 
             <div className="field-grid">
               <div>
-                <FieldLabel label="Perfil" hint="Afecta el historial local y el refuerzo personalizado." />
+                <FieldLabel label={uiText.profile} hint="Afecta el historial local y el refuerzo personalizado." />
                 <input value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} />
               </div>
               <div>
-                <FieldLabel label="Modelo Gemini" hint="Si no hay clave valida, se usara el banco local." />
+                <FieldLabel label={uiText.geminiModel} hint="Si no hay clave valida, se usara el banco local." />
                 <select value={selectedModelDraft} onChange={(event) => setSelectedModelDraft(event.target.value)}>
                   {MODEL_OPTIONS.map((option) => (
                     <option key={option.value} value={option.value}>
                       {option.label}
                     </option>
                   ))}
-                  <option value="custom">Personalizado (manual)</option>
+                  <option value="custom">{uiText.customManual}</option>
                 </select>
               </div>
             </div>
 
             <div>
-              <FieldLabel label="Modelo personalizado" hint="Solo se usa si eliges la opcion manual." />
+              <FieldLabel label={uiText.customModel} hint="Solo se usa si eliges la opcion manual." />
               <input
                 disabled={selectedModelDraft !== "custom"}
                 placeholder="ej. gemini-2.5-flash-lite"
@@ -5096,14 +4896,14 @@ function MorfoWorkspace({
             </div>
 
             <button className="primary-btn" type="button" onClick={saveSettingsDraft}>
-              Guardar ajustes
+              {uiText.saveSettings}
             </button>
 
             <GeminiKeyPanel apiKey={apiKey} onApiKeyChange={onApiKeyChange} />
 
             {settings.modelName.toLowerCase().startsWith("gemma") ? (
               <div className="info-block">
-                <p>Gemma activa.</p>
+                <p>{uiText.gemmaActive}</p>
               </div>
             ) : null}
           </div>
@@ -5130,6 +4930,7 @@ function SintaxisWorkspace({
   onSettingsChange: (settings: SintaxisSettings) => void;
   onAttemptsChange: (attempts: SintaxisAttempt[]) => void;
 }) {
+  const uiText = useUiText();
   const profileAttempts = useMemo(
     () => attempts.filter((attempt) => attempt.profileId === settings.profileId),
     [attempts, settings.profileId],
@@ -5168,10 +4969,10 @@ function SintaxisWorkspace({
         const finalized = manualItems.filter((item): item is SintaxisItem => item !== null);
 
         if (finalized.length === 0) {
-          setStatusNote("Banco manual sin items validos para esta seccion.");
+          setStatusNote(uiText.manualBankEmpty);
           setStatusTone("warn");
         } else if (finalized.length < batchSize) {
-          setStatusNote("Lote incompleto.");
+          setStatusNote(uiText.incompleteBatch);
           setStatusTone("warn");
         } else {
           setStatusNote("");
@@ -5233,7 +5034,7 @@ function SintaxisWorkspace({
                   }}
                   type="checkbox"
                 />
-                <span>Orden aleatorio</span>
+                <span>{uiText.randomOrder}</span>
               </label>
               <div className="button-row">
                 <button
@@ -5242,7 +5043,7 @@ function SintaxisWorkspace({
                   type="button"
                   onClick={() => setQueue((current) => shuffleList(current))}
                 >
-                  Barajar pendientes
+                  {uiText.shufflePending}
                 </button>
               </div>
             </div>
@@ -5250,21 +5051,21 @@ function SintaxisWorkspace({
             {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
             <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
-              {isGenerating ? "Preparando lote..." : queue.length > 0 ? "Siguiente frase" : "Generar lote"}
+              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextPhrase : uiText.generateBatch}
             </button>
           </div>
 
           <div className="panel practice-panel">
             {!currentItem ? (
               <div className="empty-state">
-                <h3>Genera una frase para empezar.</h3>
+                <h3>{uiText.generatePhraseStart}</h3>
               </div>
             ) : (
               <div className="sintaxis-practice-column">
                 <h3 className="prompt-text sintaxis-prompt-text">{currentItem.phrase}</h3>
 
                 <button className="primary-btn sintaxis-correction-btn" type="button" onClick={handleRevealCorrection}>
-                  Mostrar correccion
+                  {uiText.showCorrection}
                 </button>
 
                 {correctionVisible ? (
@@ -5283,7 +5084,7 @@ function SintaxisWorkspace({
           <div className="panel">
             <div className="row-between">
               <div>
-                <h3>Historial local por perfil</h3>
+                <h3>{uiText.localHistoryByProfile}</h3>
               </div>
               <label className="checkbox-line">
                 <input
@@ -5291,23 +5092,23 @@ function SintaxisWorkspace({
                   onChange={(event) => onSettingsChange({ ...settings, hideHistory: event.target.checked, itemSource: "manual" })}
                   type="checkbox"
                 />
-                <span>Ocultar historial</span>
+                <span>{uiText.hideHistory}</span>
               </label>
             </div>
 
             {settings.hideHistory ? (
-              <p>Historial oculto para esta seccion.</p>
+              <p>{uiText.historyHidden}</p>
             ) : (
               <>
                 <div className="row-between">
-                  <p>Intentos totales: {profileAttempts.length}</p>
+                  <p>{uiText.totalAttempts}: {profileAttempts.length}</p>
                 </div>
 
                 <div className="stack-lg">
                   <div>
-                    <h4 className="section-heading">Intentos guardados</h4>
+                    <h4 className="section-heading">{uiText.savedAttempts}</h4>
                     <DataTable
-                      headers={["Fecha", "Frase", "Modo"]}
+                      headers={[uiText.date, uiText.phrase, uiText.exerciseMode]}
                       rows={profileAttempts.map((attempt) => [
                         new Date(attempt.createdAt).toLocaleString(),
                         attempt.phrase,
@@ -5320,7 +5121,7 @@ function SintaxisWorkspace({
                 <div className="danger-zone">
                   <label className="checkbox-line">
                     <input checked={resetConfirmed} onChange={(event) => setResetConfirmed(event.target.checked)} type="checkbox" />
-                    <span>Confirmo que quiero borrar todo el historial de este perfil</span>
+                    <span>{uiText.clearProfileHistoryConfirm}</span>
                   </label>
                   <button
                     className="danger-btn"
@@ -5331,7 +5132,7 @@ function SintaxisWorkspace({
                       setResetConfirmed(false);
                     }}
                   >
-                    Resetear historial
+                    {uiText.resetHistory}
                   </button>
                 </div>
               </>
@@ -5343,17 +5144,17 @@ function SintaxisWorkspace({
       {page === "settings" ? (
         <div className="page-grid single-column">
           <div className="panel">
-            <h3>Perfil</h3>
+            <h3>{uiText.profile}</h3>
 
             <div className="field-grid">
               <div>
-                <FieldLabel label="Perfil" hint="Afecta el historial local." />
+                <FieldLabel label={uiText.profile} hint="Afecta el historial local." />
                 <input value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} />
               </div>
             </div>
 
             <button className="primary-btn" type="button" onClick={saveSettingsDraft}>
-              Guardar ajustes
+              {uiText.saveSettings}
             </button>
           </div>
         </div>
@@ -5379,6 +5180,7 @@ function DerivativeWorkspace({
   onSettingsChange: (settings: DerivativeSettings) => void;
   onAttemptsChange: (attempts: DerivativeAttempt[]) => void;
 }) {
+  const uiText = useUiText();
   const profileAttempts = useMemo(
     () => attempts.filter((attempt) => attempt.profileId === settings.profileId),
     [attempts, settings.profileId],
@@ -5417,10 +5219,10 @@ function DerivativeWorkspace({
         const finalized = manualItems.filter((item): item is DerivativeItem => item !== null);
 
         if (finalized.length === 0) {
-          setStatusNote("Banco manual sin items validos para esta seccion.");
+          setStatusNote(uiText.manualBankEmpty);
           setStatusTone("warn");
         } else if (finalized.length < batchSize) {
-          setStatusNote("Lote incompleto.");
+          setStatusNote(uiText.incompleteBatch);
           setStatusTone("warn");
         } else {
           setStatusNote("");
@@ -5482,7 +5284,7 @@ function DerivativeWorkspace({
                   }}
                   type="checkbox"
                 />
-                <span>Orden aleatorio</span>
+                <span>{uiText.randomOrder}</span>
               </label>
               <div className="button-row">
                 <button
@@ -5491,7 +5293,7 @@ function DerivativeWorkspace({
                   type="button"
                   onClick={() => setQueue((current) => shuffleList(current))}
                 >
-                  Barajar pendientes
+                  {uiText.shufflePending}
                 </button>
               </div>
             </div>
@@ -5499,21 +5301,21 @@ function DerivativeWorkspace({
             {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
             <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
-              {isGenerating ? "Preparando lote..." : queue.length > 0 ? "Siguiente funcion" : "Generar lote"}
+              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextFunction : uiText.generateBatch}
             </button>
           </div>
 
           <div className="panel practice-panel">
             {!currentItem ? (
               <div className="empty-state">
-                <h3>Genera una funcion para empezar.</h3>
+                <h3>{uiText.generateFunctionStart}</h3>
               </div>
             ) : (
               <div className="derivative-practice-column">
                 <MathDisplay value={currentItem.functionText} className="derivative-function-display" />
 
                 <button className="primary-btn derivative-answer-btn" type="button" onClick={handleRevealAnswer}>
-                  Mostrar respuesta
+                  {uiText.showAnswer}
                 </button>
 
                 {answerVisible ? (
@@ -5532,7 +5334,7 @@ function DerivativeWorkspace({
           <div className="panel">
             <div className="row-between">
               <div>
-                <h3>Historial local por perfil</h3>
+                <h3>{uiText.localHistoryByProfile}</h3>
               </div>
               <label className="checkbox-line">
                 <input
@@ -5540,23 +5342,23 @@ function DerivativeWorkspace({
                   onChange={(event) => onSettingsChange({ ...settings, hideHistory: event.target.checked, itemSource: "manual" })}
                   type="checkbox"
                 />
-                <span>Ocultar historial</span>
+                <span>{uiText.hideHistory}</span>
               </label>
             </div>
 
             {settings.hideHistory ? (
-              <p>Historial oculto para esta seccion.</p>
+              <p>{uiText.historyHidden}</p>
             ) : (
               <>
                 <div className="row-between">
-                  <p>Intentos totales: {profileAttempts.length}</p>
+                  <p>{uiText.totalAttempts}: {profileAttempts.length}</p>
                 </div>
 
                 <div className="stack-lg">
                   <div>
-                    <h4 className="section-heading">Intentos guardados</h4>
+                    <h4 className="section-heading">{uiText.savedAttempts}</h4>
                     <DataTable
-                      headers={["Fecha", "Funcion", "Derivada", "Modo"]}
+                      headers={[uiText.date, uiText.function, uiText.derivative, uiText.exerciseMode]}
                       rows={profileAttempts.map((attempt) => [
                         new Date(attempt.createdAt).toLocaleString(),
                         attempt.functionText,
@@ -5570,7 +5372,7 @@ function DerivativeWorkspace({
                 <div className="danger-zone">
                   <label className="checkbox-line">
                     <input checked={resetConfirmed} onChange={(event) => setResetConfirmed(event.target.checked)} type="checkbox" />
-                    <span>Confirmo que quiero borrar todo el historial de este perfil</span>
+                    <span>{uiText.clearProfileHistoryConfirm}</span>
                   </label>
                   <button
                     className="danger-btn"
@@ -5581,7 +5383,7 @@ function DerivativeWorkspace({
                       setResetConfirmed(false);
                     }}
                   >
-                    Resetear historial
+                    {uiText.resetHistory}
                   </button>
                 </div>
               </>
@@ -5593,17 +5395,17 @@ function DerivativeWorkspace({
       {page === "settings" ? (
         <div className="page-grid single-column">
           <div className="panel">
-            <h3>Perfil</h3>
+            <h3>{uiText.profile}</h3>
 
             <div className="field-grid">
               <div>
-                <FieldLabel label="Perfil" hint="Afecta el historial local." />
+                <FieldLabel label={uiText.profile} hint="Afecta el historial local." />
                 <input value={profileDraft} onChange={(event) => setProfileDraft(event.target.value)} />
               </div>
             </div>
 
             <button className="primary-btn" type="button" onClick={saveSettingsDraft}>
-              Guardar ajustes
+              {uiText.saveSettings}
             </button>
           </div>
         </div>
