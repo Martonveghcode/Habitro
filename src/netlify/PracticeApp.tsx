@@ -23,6 +23,7 @@ import {
 } from "./CatalanPracticeApp";
 import type { CatalanCard, CatalanDeck } from "./CatalanPracticeApp";
 import { PhilosophyPracticeApp } from "./PhilosophyPracticeApp";
+import { PhysicsRevisionApp } from "./PhysicsRevisionApp";
 import { PHILOSOPHY_CARDS, type PhilosophyCard } from "./philosophyData";
 import {
   MODEL_OPTIONS,
@@ -135,7 +136,7 @@ import type {
   SummaryRow,
 } from "./types";
 
-type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative" | "catalan" | "philosophy" | "presentations";
+type SectionName = "se" | "perifrasis" | "morfologia" | "sintaxis" | "derivative" | "catalan" | "philosophy" | "presentations" | "physics";
 type PageName = "practice" | "history" | "settings" | "storage";
 type SectionPageName = Exclude<PageName, "settings" | "storage">;
 
@@ -143,7 +144,7 @@ interface SectionMeta {
   theme?: "light" | "dark";
 }
 
-const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative", "catalan", "philosophy", "presentations"];
+const SECTION_ORDER: SectionName[] = ["se", "perifrasis", "morfologia", "sintaxis", "derivative", "catalan", "philosophy", "presentations", "physics"];
 
 const SECTION_PAGE_ORDER: SectionPageName[] = ["practice", "history"];
 
@@ -158,6 +159,7 @@ const SECTION_META: Record<SectionName, SectionMeta> = {
   derivative: {},
   catalan: {},
   philosophy: {},
+  physics: {},
 };
 
 const SE_IMPORT_PLACEHOLDER = `{"items":[{"sentence":"Se venden pisos en este barrio.","difficulty":2,"se_value":"Pasiva refleja","se_function":"Marca de pasiva","accepted_functions":["Marca de pasiva","Sin funcion sintactica propia"],"verbal_structure":"Verbo simple","periphrasis_type":"No aplica","phrase_type":"Oracion simple pasiva refleja","explanation":"El verbo concuerda con el sujeto paciente 'pisos'."}]}`;
@@ -820,6 +822,7 @@ function globalPageLabel(page: GlobalPageName, uiText: UiText): string {
 
 function sectionLabel(section: SectionName | DailyChallengeSection, uiText: UiText): string {
   if (section === "presentations") return "Catalan presentations";
+  if (section === "physics") return "Physics revision";
   if (section === "se") {
     return uiText.sectionSe;
   }
@@ -2610,7 +2613,11 @@ export function NetlifyPracticeApp() {
     setStorageState(loadStorageState());
     setImportedCatalanDecks(loadImportedCatalanDecks());
   };
-  const [activeSection, setActiveSection] = useState<SectionName>(() => window.location.hash === "#catalan-presentations" ? "presentations" : "se");
+  const [activeSection, setActiveSection] = useState<SectionName>(() => {
+    if (window.location.hash === "#catalan-presentations") return "presentations";
+    if (window.location.hash === "#physics-revision") return "physics";
+    return "se";
+  });
   const [globalPage, setGlobalPage] = useState<GlobalPageName | null>(null);
   const [exerciseMenuOpen, setExerciseMenuOpen] = useState(false);
   const exerciseMenuRef = useRef<HTMLDivElement | null>(null);
@@ -2895,7 +2902,7 @@ export function NetlifyPracticeApp() {
           <section className={cx("hero-banner", !globalPage && activeSectionMeta.theme === "dark" && "hero-banner--dark")}>
             <div className="hero-banner__copy">
               <h1>{pageTitle}</h1>
-              {!globalPage && activeSection !== "catalan" && activeSection !== "philosophy" && activeSection !== "presentations" ? (
+              {!globalPage && activeSection !== "catalan" && activeSection !== "philosophy" && activeSection !== "presentations" && activeSection !== "physics" ? (
                 <div className="cta-links">
                   {SECTION_PAGE_ORDER.map((pageKey) => (
                     <PageAction
@@ -3015,6 +3022,7 @@ export function NetlifyPracticeApp() {
               </>
             )}
             <CatalanPresentations active={!globalPage && activeSection === "presentations"} />
+            <PhysicsRevisionApp active={!globalPage && activeSection === "physics"} />
           </main>
         </section>
       </div>

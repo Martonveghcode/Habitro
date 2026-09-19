@@ -1,0 +1,95 @@
+<!doctype html>
+<html lang="en">
+  <head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1">
+    <title>F&Q Revision</title>
+    <link rel="stylesheet" href="styles.css">
+  </head>
+  <body>
+    <header class="topbar">
+      <div>
+        <h1>F&Q Revision</h1>
+        <p id="sessionSummary">Loading exercises...</p>
+      </div>
+      <div class="topActions">
+        <button id="reshuffleBtn" type="button">Reshuffle</button>
+        <button id="clearBtn" type="button">Clear progress</button>
+      </div>
+    </header>
+
+    <main class="layout">
+      <aside class="controls" aria-label="Study controls">
+        <section class="controlGroup">
+          <div class="groupHeader">
+            <h2>Chapters</h2>
+            <button id="allChaptersBtn" type="button">All</button>
+          </div>
+          <div id="chapterFilters" class="checkList"></div>
+        </section>
+
+        <section class="controlGroup">
+          <div class="groupHeader">
+            <h2>Sections</h2>
+            <button id="allSectionsBtn" type="button">All</button>
+          </div>
+          <div id="sectionFilters" class="checkList compact"></div>
+        </section>
+
+        <section class="controlGroup">
+          <h2>Order</h2>
+          <div class="segmented" id="orderControls">
+            <button type="button" data-order="random">Random</button>
+            <button type="button" data-order="balanced">Tema mix</button>
+            <button type="button" data-order="ordered">Ordered</button>
+          </div>
+        </section>
+
+        <section class="controlGroup">
+          <h2>Difficulty</h2>
+          <div class="segmented wrap" id="difficultyFilter">
+            <button type="button" data-filter="all">All</button>
+            <button type="button" data-filter="hard">Hard</button>
+            <button type="button" data-filter="normal">Normal</button>
+            <button type="button" data-filter="easy">Easy</button>
+            <button type="button" data-filter="unrated">Unrated</button>
+          </div>
+        </section>
+      </aside>
+
+      <section class="study" aria-live="polite">
+        <div class="studyHeader">
+          <div>
+            <h2 id="exerciseTitle">Loading</h2>
+            <p id="exerciseMeta"></p>
+          </div>
+          <p id="queueCounter"></p>
+        </div>
+
+        <div id="emptyState" class="emptyState" hidden>
+          No exercises match the current filters.
+        </div>
+
+        <div class="imageStage">
+          <img id="exerciseImage" alt="Exercise screenshot">
+        </div>
+
+        <div id="answerPanel" class="answerPanel" hidden></div>
+
+        <div class="studyActions">
+          <button id="prevBtn" type="button" title="Previous exercise">&larr;</button>
+          <button id="answerBtn" type="button">Show answer</button>
+          <button id="nextBtn" type="button" title="Next exercise">&rarr;</button>
+
+          <div class="rating" aria-label="Rate difficulty">
+            <button type="button" data-rate="easy">Easy</button>
+            <button type="button" data-rate="normal">Normal</button>
+            <button type="button" data-rate="hard">Hard</button>
+          </div>
+        </div>
+      </section>
+    </main>
+
+    <script src="app.js?v=2026-05-17-3"></script>
+  </body>
+</html>
