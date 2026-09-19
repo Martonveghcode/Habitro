@@ -1,0 +1,704 @@
+{
+  "classes": [
+    {
+      "id": 2,
+      "title": "Els orígens lingüístics i literaris",
+      "pdf": "/catalan/presentations/classe-2.pdf",
+      "source": "/catalan/presentations/Classe-2-activitats.txt",
+      "sha256": "ea4a27206d6775c86e6c9d92098bc15a3460ae52c6d8b769d22bd35353efb28a"
+    },
+    {
+      "id": 3,
+      "title": "El naixement de la llengua catalana",
+      "pdf": "/catalan/presentations/classe-3.pdf",
+      "source": "/catalan/presentations/Classe-3-activitats.txt",
+      "sha256": "8b43a49c1f9f67f4379e178c931860b82f2260a950a7b307150933b1636057e4"
+    },
+    {
+      "id": 4,
+      "title": "Els trobadors i els joglars",
+      "pdf": "/catalan/presentations/classe-4.pdf",
+      "source": "/catalan/presentations/Classe-4-activitats.txt",
+      "sha256": "6d44119d468b9f8af5e8168adba991910e8dd1d04c8f89997ff55ba31f808b83"
+    }
+  ],
+  "cards": [
+    {
+      "id": "c2-a1",
+      "classId": 2,
+      "activity": 1,
+      "question": "En què es diferenciaven un trobador i un poeta?",
+      "answer": "b) El trobador escrivia en llengua «vulgar» i el poeta, en llatí.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "b) El trobador escrivia en llengua «vulgar» i el poeta, en llatí."
+        }
+      ],
+      "words": 12,
+      "characters": 65,
+      "length": "short",
+      "page": 7
+    },
+    {
+      "id": "c2-a2",
+      "classId": 2,
+      "activity": 2,
+      "question": "Què era un joglar?",
+      "answer": "c) L’intèrpret de les cançons que componien els trobadors.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "c) L’intèrpret de les cançons que componien els trobadors."
+        }
+      ],
+      "words": 9,
+      "characters": 58,
+      "length": "short",
+      "page": 7
+    },
+    {
+      "id": "c2-a3",
+      "classId": 2,
+      "activity": 3,
+      "question": "Què vol dir «poesia culta en llengua vulgar»?",
+      "answer": "b) Poesia escrita en una llengua evolucionada del llatí.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "b) Poesia escrita en una llengua evolucionada del llatí."
+        }
+      ],
+      "words": 9,
+      "characters": 56,
+      "length": "short",
+      "page": 7
+    },
+    {
+      "id": "c2-a4",
+      "classId": 2,
+      "activity": 4,
+      "question": "Què són les llengües romàniques?",
+      "answer": "a) Llengües producte de l’evolució i fragmentació del llatí parlat, com el català, el\nprovençal, el castellà, el francès, l’italià...",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "a) Llengües producte de l’evolució i fragmentació del llatí parlat, com el català, el provençal, el castellà, el francès, l’italià..."
+        }
+      ],
+      "words": 20,
+      "characters": 133,
+      "length": "short",
+      "page": 7
+    },
+    {
+      "id": "c2-a5",
+      "classId": 2,
+      "activity": 5,
+      "question": "De què tractaven els primers textos escrits en el nostre idioma?",
+      "answer": "b) Textos jurídics i de temàtica religiosa.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "b) Textos jurídics i de temàtica religiosa."
+        }
+      ],
+      "words": 7,
+      "characters": 43,
+      "length": "short",
+      "page": 12
+    },
+    {
+      "id": "c2-a6",
+      "classId": 2,
+      "activity": 6,
+      "question": "Quins elements són necessaris perquè es produeixi la comunicació?",
+      "answer": "a) Emissor, receptor, canal, missatge, codi i context.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "a) Emissor, receptor, canal, missatge, codi i context."
+        }
+      ],
+      "words": 8,
+      "characters": 54,
+      "length": "short",
+      "page": 12
+    },
+    {
+      "id": "c2-a7",
+      "classId": 2,
+      "activity": 7,
+      "question": "Resumir és:",
+      "answer": "c) Reduir un text original a les idees principals i secundàries.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "c) Reduir un text original a les idees principals i secundàries."
+        }
+      ],
+      "words": 11,
+      "characters": 64,
+      "length": "short",
+      "page": 12
+    },
+    {
+      "id": "c2-a8",
+      "classId": 2,
+      "activity": 8,
+      "question": "Què vol dir que un fonema és sord?",
+      "answer": "b) Que en pronunciar-lo, les cordes vocals vibren molt poc.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "b) Que en pronunciar-lo, les cordes vocals vibren molt poc."
+        }
+      ],
+      "words": 10,
+      "characters": 59,
+      "length": "short",
+      "page": 12
+    },
+    {
+      "id": "c2-a9",
+      "classId": 2,
+      "activity": 9,
+      "question": "Què entenem per Romània?",
+      "answer": "designa les terres que van formar part de l'antic imperi Romà, on el llatí es va convertir en\nllengua pròpia de la població.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "designa les terres que van formar part de l'antic imperi Romà, on el llatí es va convertir en llengua pròpia de la població."
+        }
+      ],
+      "words": 23,
+      "characters": 124,
+      "length": "short",
+      "page": 27
+    },
+    {
+      "id": "c2-a10",
+      "classId": 2,
+      "activity": 10,
+      "question": "En què consisteix la romanització?",
+      "answer": "un període de set segles de domini en els quals els pobles que habitaven la Península\n(celtes, ibers, grecs, fenicis, indoeuropeus, etc.) s'assimilaren a la nova civilització romana.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "un període de set segles de domini en els quals els pobles que habitaven la Península (celtes, ibers, grecs, fenicis, indoeuropeus, etc.) s'assimilaren a la nova civilització romana."
+        }
+      ],
+      "words": 28,
+      "characters": 182,
+      "length": "short",
+      "page": 28
+    },
+    {
+      "id": "c2-a11",
+      "classId": 2,
+      "activity": 11,
+      "question": "Com s'anomenen les llengües que van evolucionar del llatí?, explica les seves particularitats i indica alguns exemples.",
+      "answer": "Llengües romàniques\nA poc a poc, el llatí va evolucionar de forma diversa en cada territori fins a convertir-se en\nllengües diferents.\nEn un principi eren conegudes com a vulgars a causa del seu ús oral i popular.\nVan rebre el nom dels diferents territoris on s'havien format: gallec (portuguès), lleonès,\ncastellà, aragonès, català, provençal, francès, sard, rètic, italià, romanès i dàlmata",
+      "blocks": [
+        {
+          "kind": "heading",
+          "text": "Llengües romàniques"
+        },
+        {
+          "kind": "p",
+          "text": "A poc a poc, el llatí va evolucionar de forma diversa en cada territori fins a convertir-se en llengües diferents."
+        },
+        {
+          "kind": "p",
+          "text": "En un principi eren conegudes com a vulgars a causa del seu ús oral i popular."
+        },
+        {
+          "kind": "p",
+          "text": "Van rebre el nom dels diferents territoris on s'havien format: gallec (portuguès), lleonès, castellà, aragonès, català, provençal, francès, sard, rètic, italià, romanès i dàlmata"
+        }
+      ],
+      "words": 62,
+      "characters": 392,
+      "length": "medium",
+      "page": 29
+    },
+    {
+      "id": "c2-a12",
+      "classId": 2,
+      "activity": 12,
+      "question": "Quins fets històrics varen ser clau per la creació de Catalunya i van impulsar el desenvolupament del català?",
+      "answer": "El territori de Catalunya, que es trobava dividit en comtats, estava dominat pels francs.\nAmb Guifré el Pelós (875?-897) el títol de comte passà per primera vegada a ser hereditari\n(876).\nPosteriorment, el comte Borrell II (946-992) es negà a jurar fidelitat als monarques francs\n(986).\nAquest fet va significar la independència del poder dels francs i per tant, el naixement de\nCatalunya.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "El territori de Catalunya, que es trobava dividit en comtats, estava dominat pels francs."
+        },
+        {
+          "kind": "p",
+          "text": "Amb Guifré el Pelós (875?-897) el títol de comte passà per primera vegada a ser hereditari (876)."
+        },
+        {
+          "kind": "p",
+          "text": "Posteriorment, el comte Borrell II (946-992) es negà a jurar fidelitat als monarques francs (986)."
+        },
+        {
+          "kind": "p",
+          "text": "Aquest fet va significar la independència del poder dels francs i per tant, el naixement de Catalunya."
+        }
+      ],
+      "words": 63,
+      "characters": 389,
+      "length": "medium",
+      "page": 32
+    },
+    {
+      "id": "c2-a13",
+      "classId": 2,
+      "activity": 13,
+      "question": "Explica amb detall com va nèixer la llengua catalana. Indica els seus origens i quines influències va tenir.",
+      "answer": "A les terres que van formar part de l'antic imperi Romà on el llatí es va convertir en llengua\npròpia de la població.\nMalgrat les invasions germàniques i àrabs, el llatí vulgar va persistir i evolucionar.\nEl català, juntament amb altres llengües romàniques, va sorgir com a resultat de l'evolució\ndel llatí vulgar en diferents territoris, convertint-se en una llengua amb identitat pròpia.\nEncara que va tenir influències:\nde les Llengües pre-llatines, com ara el basc o l'iber. Amb paraules com pissarra o\nesquerra i topònims (Andorra, Aran).\nels germànics han deixat noms de persona (Elvira, Enric, Albert) i mots com blau, blanc,\nbandera o roba.\nels àrabs han deixat paraules com carxofa, albercoc o sucre i molts topònims començats\nper al-, beni- o bini-, com ara Algaida, Benidorm i Binissalem.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "A les terres que van formar part de l'antic imperi Romà on el llatí es va convertir en llengua pròpia de la població."
+        },
+        {
+          "kind": "p",
+          "text": "Malgrat les invasions germàniques i àrabs, el llatí vulgar va persistir i evolucionar."
+        },
+        {
+          "kind": "p",
+          "text": "El català, juntament amb altres llengües romàniques, va sorgir com a resultat de l'evolució del llatí vulgar en diferents territoris, convertint-se en una llengua amb identitat pròpia."
+        },
+        {
+          "kind": "p",
+          "text": "Encara que va tenir influències:"
+        },
+        {
+          "kind": "li",
+          "text": "de les Llengües pre-llatines, com ara el basc o l'iber. Amb paraules com pissarra o esquerra i topònims (Andorra, Aran)."
+        },
+        {
+          "kind": "li",
+          "text": "els germànics han deixat noms de persona (Elvira, Enric, Albert) i mots com blau, blanc, bandera o roba."
+        },
+        {
+          "kind": "li",
+          "text": "els àrabs han deixat paraules com carxofa, albercoc o sucre i molts topònims començats per al-, beni- o bini-, com ara Algaida, Benidorm i Binissalem."
+        }
+      ],
+      "words": 131,
+      "characters": 799,
+      "length": "long",
+      "page": 33
+    },
+    {
+      "id": "c3-a1",
+      "classId": 3,
+      "activity": 1,
+      "question": "Quan podem parlar de llengua catalana com una llengua plenament diferenciada de la resta?",
+      "answer": "Podem començar a parlar de llengua catalana com una llengua plenament diferenciada de la\nresta al segle IX.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "Podem començar a parlar de llengua catalana com una llengua plenament diferenciada de la resta al segle IX."
+        }
+      ],
+      "words": 18,
+      "characters": 107,
+      "length": "short",
+      "page": 11
+    },
+    {
+      "id": "c3-a2",
+      "classId": 3,
+      "activity": 2,
+      "question": "Quins són els seus antecedents?, quan es van produir?",
+      "answer": "Al segle VIII trobam textos escrits en un llatí molt catalanitzat, com per exemple:\nGlosses\nJuraments feudals\nTextos escrits en llatí que incloïen traduccions de paraules o expressions que el lector no\nentenia\nTextos escrits per escrivans que hi posaven en català paraules i expressions, bé per error, bé\nperquè no sabien com s'escrivien en llatí.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "Al segle VIII trobam textos escrits en un llatí molt catalanitzat, com per exemple:"
+        },
+        {
+          "kind": "li",
+          "text": "Glosses"
+        },
+        {
+          "kind": "li",
+          "text": "Juraments feudals"
+        },
+        {
+          "kind": "li",
+          "text": "Textos escrits en llatí que incloïen traduccions de paraules o expressions que el lector no entenia"
+        },
+        {
+          "kind": "li",
+          "text": "Textos escrits per escrivans que hi posaven en català paraules i expressions, bé per error, bé perquè no sabien com s'escrivien en llatí."
+        }
+      ],
+      "words": 56,
+      "characters": 347,
+      "length": "medium",
+      "page": 12
+    },
+    {
+      "id": "c3-a3",
+      "classId": 3,
+      "activity": 3,
+      "question": "A quin segle trobam els primers textos escrits íntegrament en català?, a quins àmbits pertanyen?, anomena alguns exemples de cada un d'aquests àmbits.",
+      "answer": "Al segle XII trobam els primers textos íntegres conservats en català. Aquests textos pertanyen a\nl'àmbit:\njurídic:\nForum Iudicum\nels Furs de València\nels Costums de Tortosa\nels Usatges de Barcelona\nreligiós:\nHomilies d'Organyà\nCant de la Sibil·la\nVides de sants rosselloneses",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "Al segle XII trobam els primers textos íntegres conservats en català. Aquests textos pertanyen a l'àmbit:"
+        },
+        {
+          "kind": "heading",
+          "text": "jurídic:"
+        },
+        {
+          "kind": "li",
+          "text": "Forum Iudicum"
+        },
+        {
+          "kind": "li",
+          "text": "els Furs de València"
+        },
+        {
+          "kind": "li",
+          "text": "els Costums de Tortosa"
+        },
+        {
+          "kind": "li",
+          "text": "els Usatges de Barcelona"
+        },
+        {
+          "kind": "heading",
+          "text": "religiós:"
+        },
+        {
+          "kind": "li",
+          "text": "Homilies d'Organyà"
+        },
+        {
+          "kind": "li",
+          "text": "Cant de la Sibil·la"
+        },
+        {
+          "kind": "li",
+          "text": "Vides de sants rosselloneses"
+        }
+      ],
+      "words": 42,
+      "characters": 275,
+      "length": "medium",
+      "page": 14
+    },
+    {
+      "id": "c3-a4",
+      "classId": 3,
+      "activity": 4,
+      "question": "Enumera i explica les llengües cultes del territori català",
+      "answer": "Llatí: al nostre territori el llatí es va mantenir per als usos religiosos, acadèmics i\ninternacionals durant molts segles.\nÀrab: en aquells territoris que fins al segle XIII estigueren sota domini musulmà (el sud de\nCatalunya, les Illes Balears i les comarques valencianes). La llengua àrab tenia gran prestigi i\nera considerada llengua culta i apta per a la ciència.\nProvençal\nParal·lelament, una nova llengua va començar a ser usada en aquells àmbits de prestigi\nabans reservats exclusivament al llatí o l'àrab.\nLlengua romànica que es parlava a Occitània (a la meitat sud de l'actual França)\nS'estengué en l'ús poètic pels territoris de la Corona d'Aragó i pel nord d'Itàlia.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "Llatí: al nostre territori el llatí es va mantenir per als usos religiosos, acadèmics i internacionals durant molts segles."
+        },
+        {
+          "kind": "p",
+          "text": "Àrab: en aquells territoris que fins al segle XIII estigueren sota domini musulmà (el sud de Catalunya, les Illes Balears i les comarques valencianes). La llengua àrab tenia gran prestigi i era considerada llengua culta i apta per a la ciència."
+        },
+        {
+          "kind": "heading",
+          "text": "Provençal"
+        },
+        {
+          "kind": "p",
+          "text": "Paral·lelament, una nova llengua va començar a ser usada en aquells àmbits de prestigi abans reservats exclusivament al llatí o l'àrab."
+        },
+        {
+          "kind": "p",
+          "text": "Llengua romànica que es parlava a Occitània (a la meitat sud de l'actual França)"
+        },
+        {
+          "kind": "p",
+          "text": "S'estengué en l'ús poètic pels territoris de la Corona d'Aragó i pel nord d'Itàlia."
+        }
+      ],
+      "words": 110,
+      "characters": 679,
+      "length": "long",
+      "page": 17
+    },
+    {
+      "id": "c3-a5",
+      "classId": 3,
+      "activity": 5,
+      "question": "Quins eren els centres de cultura durant l'edat mitjana?, quina era la llengua que utilitzaven?",
+      "answer": "Els monestirs, feien un ús literari del llatí.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "Els monestirs, feien un ús literari del llatí."
+        }
+      ],
+      "words": 8,
+      "characters": 46,
+      "length": "short",
+      "page": 19
+    },
+    {
+      "id": "c3-a6",
+      "classId": 3,
+      "activity": 6,
+      "question": "Què eren els trobadors?, explica la seva formació i a què es dedicaven.",
+      "answer": "Eren fills de famílies nobles que es formaven als convents però no professaven com a\nmonjos\nVivien a les corts reials i aristocràtiques\nComponien cançons en provençal",
+      "blocks": [
+        {
+          "kind": "li",
+          "text": "Eren fills de famílies nobles que es formaven als convents però no professaven com a monjos"
+        },
+        {
+          "kind": "li",
+          "text": "Vivien a les corts reials i aristocràtiques"
+        },
+        {
+          "kind": "li",
+          "text": "Componien cançons en provençal"
+        }
+      ],
+      "words": 27,
+      "characters": 166,
+      "length": "short",
+      "page": 20
+    },
+    {
+      "id": "c4-a1",
+      "classId": 4,
+      "activity": 1,
+      "question": "Per quins motius es va conrear la poesia provençal als territoris de la Corona d'Aragó?",
+      "answer": "La poesia provençal fou la més important a Europa des del segle XI al XIII.\n\nEls primers autors van fer servir com a llengua de poesia l'occità o provençal\nPel seu prestigi\nEls territoris del sud de França tenien els reis d'Aragó com a senyors naturals\nLa cort reial es convertí en un important focus de conreu trobadoresc.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "La poesia provençal fou la més important a Europa des del segle XI al XIII."
+        },
+        {
+          "kind": "p",
+          "text": "Els primers autors van fer servir com a llengua de poesia l'occità o provençal"
+        },
+        {
+          "kind": "li",
+          "text": "Pel seu prestigi"
+        },
+        {
+          "kind": "li",
+          "text": "Els territoris del sud de França tenien els reis d'Aragó com a senyors naturals"
+        },
+        {
+          "kind": "li",
+          "text": "La cort reial es convertí en un important focus de conreu trobadoresc."
+        }
+      ],
+      "words": 58,
+      "characters": 322,
+      "length": "medium",
+      "page": 21
+    },
+    {
+      "id": "c4-a2",
+      "classId": 4,
+      "activity": 2,
+      "question": "Explica les diferències entre els joglars i els trobadors",
+      "answer": "Els trobadors (nobles) eren autors de la lletra i la música de les seves composicions, les quals\nanaven destinades a ser escoltades per un públic específic, l'aristocràcia.\n\nEls joglars (classe baixa) eren els encarregats de difondre aquestes composicions, acompanyant-\nse d'instruments musicals, destinats normalment al poble.\n\nDe vegades els trobadors interpretaven les seves obres.\n\nDe la mateixa manera, també hi hagué joglars que componien cançons pròpies.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "Els trobadors (nobles) eren autors de la lletra i la música de les seves composicions, les quals anaven destinades a ser escoltades per un públic específic, l'aristocràcia."
+        },
+        {
+          "kind": "p",
+          "text": "Els joglars (classe baixa) eren els encarregats de difondre aquestes composicions, acompanyant- se d'instruments musicals, destinats normalment al poble."
+        },
+        {
+          "kind": "p",
+          "text": "De vegades els trobadors interpretaven les seves obres."
+        },
+        {
+          "kind": "p",
+          "text": "De la mateixa manera, també hi hagué joglars que componien cançons pròpies."
+        }
+      ],
+      "words": 66,
+      "characters": 458,
+      "length": "medium",
+      "page": 23
+    },
+    {
+      "id": "c4-a3",
+      "classId": 4,
+      "activity": 3,
+      "question": "Què eren les trobairitz?, enumera les seves característiques.",
+      "answer": "Les dones que feien poesia trobadoresca, entre les quals cal destacar:\nla comtessa de Dia i la Reina de Mallorques\nEl rang de superioritat de què la dona gaudia en les convencions trobadoresques podria\nexplicar-ne el to més carnal i sensual de les seves composicions.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "Les dones que feien poesia trobadoresca, entre les quals cal destacar:"
+        },
+        {
+          "kind": "p",
+          "text": "la comtessa de Dia i la Reina de Mallorques"
+        },
+        {
+          "kind": "p",
+          "text": "El rang de superioritat de què la dona gaudia en les convencions trobadoresques podria explicar-ne el to més carnal i sensual de les seves composicions."
+        }
+      ],
+      "words": 45,
+      "characters": 267,
+      "length": "medium",
+      "page": 24
+    },
+    {
+      "id": "c4-a4",
+      "classId": 4,
+      "activity": 4,
+      "question": "Què és l'amor cortès?, enumera les seves principals característiques.",
+      "answer": "Fou el gènere més important de la poesia trobadoresca\n\nGairebé tota la poesia dels trobadors té com a eix central el tema de l'amor cortès\n\nÉs un joc de convencions amoroses practicat pels aristòcrates en les corts dels grans senyors\nmedievals.\n\nCaracterístiques:\nReflectia els dos pilars bàsics de la societat medieval feudal:\nles relacions de vassallatge i la religiositat.\nLa importància de la dona:\nLa fidelitat amorosa a la dama\nla dona era principi de tota la bondat, per ser Maria, una dona, la mare de Jesucrist.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "Fou el gènere més important de la poesia trobadoresca"
+        },
+        {
+          "kind": "p",
+          "text": "Gairebé tota la poesia dels trobadors té com a eix central el tema de l'amor cortès"
+        },
+        {
+          "kind": "p",
+          "text": "És un joc de convencions amoroses practicat pels aristòcrates en les corts dels grans senyors medievals."
+        },
+        {
+          "kind": "heading",
+          "text": "Característiques:"
+        },
+        {
+          "kind": "li",
+          "text": "Reflectia els dos pilars bàsics de la societat medieval feudal:"
+        },
+        {
+          "kind": "subli",
+          "text": "les relacions de vassallatge i la religiositat."
+        },
+        {
+          "kind": "li",
+          "text": "La importància de la dona:"
+        },
+        {
+          "kind": "subli",
+          "text": "La fidelitat amorosa a la dama"
+        },
+        {
+          "kind": "subli",
+          "text": "la dona era principi de tota la bondat, per ser Maria, una dona, la mare de Jesucrist."
+        }
+      ],
+      "words": 87,
+      "characters": 517,
+      "length": "long",
+      "page": 26
+    },
+    {
+      "id": "c4-a5",
+      "classId": 4,
+      "activity": 5,
+      "question": "Enumera i descriu els altres gèneres de la poesia trobadoresca",
+      "answer": "Composicions amoroses\nLa cançó: poema de lloança i idealització de la dama.\nLa pastorel·la: explica l'encontre amb una pastora i la conversa que se'n segueix.\nL'escondit: excusació davant la dama per haver traït el secret amorós.\nL'alba: lamentació dels enamorats que s'han de separar després d'haver passat la nit junts.\n\nComposicions polítiques i satíriques\nEl sirventès: destinat a la moralització, a la propaganda política o a la sàtira.\nEl plany: lamentació per la pèrdua d'un gran personatge, les virtuts del qual s'hi lloaven.\n\nAltres gèneres\nLa tensó o joc partit (debat poètic), la dansa, la balada, etc.",
+      "blocks": [
+        {
+          "kind": "heading",
+          "text": "Composicions amoroses"
+        },
+        {
+          "kind": "li",
+          "text": "La cançó: poema de lloança i idealització de la dama."
+        },
+        {
+          "kind": "li",
+          "text": "La pastorel·la: explica l'encontre amb una pastora i la conversa que se'n segueix."
+        },
+        {
+          "kind": "li",
+          "text": "L'escondit: excusació davant la dama per haver traït el secret amorós."
+        },
+        {
+          "kind": "li",
+          "text": "L'alba: lamentació dels enamorats que s'han de separar després d'haver passat la nit junts."
+        },
+        {
+          "kind": "heading",
+          "text": "Composicions polítiques i satíriques"
+        },
+        {
+          "kind": "li",
+          "text": "El sirventès: destinat a la moralització, a la propaganda política o a la sàtira."
+        },
+        {
+          "kind": "li",
+          "text": "El plany: lamentació per la pèrdua d'un gran personatge, les virtuts del qual s'hi lloaven."
+        },
+        {
+          "kind": "heading",
+          "text": "Altres gèneres"
+        },
+        {
+          "kind": "p",
+          "text": "La tensó o joc partit (debat poètic), la dansa, la balada, etc."
+        }
+      ],
+      "words": 97,
+      "characters": 611,
+      "length": "long",
+      "page": 27
+    },
+    {
+      "id": "c4-a6",
+      "classId": 4,
+      "activity": 6,
+      "question": "Explica la decadència de la poesia trobadoresca.",
+      "answer": "Després que Jaume I (1213-1276) renunciàs a les terres del sud de França la poesia provençal va\nanar deixant de conrear-se\n\nDurant el segle XIV es va crear a Tolosa el Consistori de la Gaia Ciència (1323) en un intent de\nrevitalitzar la poesia de tradició trobadoresca.\n\nEs creà a Barcelona un altre consistori (1393) i els Jocs Florals.\n\nPerò les obres eren repetitives i gens originals.\n\nA més aquest tipus de poesia era totalment desconegut fora de la cort.\n\nA final del segle es va produir un procés de desprovençalització de la llengua poètica i una\ninfluència creixent dels temes de la poesia italiana.",
+      "blocks": [
+        {
+          "kind": "p",
+          "text": "Després que Jaume I (1213-1276) renunciàs a les terres del sud de França la poesia provençal va anar deixant de conrear-se"
+        },
+        {
+          "kind": "p",
+          "text": "Durant el segle XIV es va crear a Tolosa el Consistori de la Gaia Ciència (1323) en un intent de revitalitzar la poesia de tradició trobadoresca."
+        },
+        {
+          "kind": "p",
+          "text": "Es creà a Barcelona un altre consistori (1393) i els Jocs Florals."
+        },
+        {
+          "kind": "p",
+          "text": "Però les obres eren repetitives i gens originals."
+        },
+        {
+          "kind": "p",
+          "text": "A més aquest tipus de poesia era totalment desconegut fora de la cort."
+        },
+        {
+          "kind": "p",
+          "text": "A final del segle es va produir un procés de desprovençalització de la llengua poètica i una influència creixent dels temes de la poesia italiana."
+        }
+      ],
+      "words": 105,
+      "characters": 603,
+      "length": "long",
+      "page": 30
+    }
+  ]
+}

@@ -1,8 +1,17 @@
+import type { UiLanguage } from "./uiLanguage";
+
 export type Difficulty = 1 | 2 | 3;
 
 export type Mode = "normal" | "personalizado_mixto" | "personalizado_objetivo" | "foco_usuario";
 export type ItemSource = "ai" | "manual";
-export type DailyChallengeSection = "se" | "perifrasis" | "morfologia" | "catalan" | "sintaxis" | "derivative";
+export type DailyChallengeSection =
+  | "se"
+  | "perifrasis"
+  | "morfologia"
+  | "catalan"
+  | "sintaxis"
+  | "philosophy"
+  | "derivative";
 
 export interface ModelOption {
   label: string;
@@ -234,6 +243,7 @@ export interface DerivativeSettings {
 
 export interface DailyChallengeSettings {
   counts: Record<DailyChallengeSection, number>;
+  includedSections: DailyChallengeSection[];
   catalanDeckNames: string[];
   catalanSectionNames: string[];
 }
@@ -253,6 +263,7 @@ export interface DailyChallengeRecord {
 export interface StorageState {
   version: 1;
   geminiApiKey: string;
+  uiLanguage: UiLanguage;
   dailyChallengeSettings: DailyChallengeSettings;
   dailyChallengeRecords: DailyChallengeRecord[];
   seSettings: SeSettings;

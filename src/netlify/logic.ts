@@ -12,6 +12,7 @@ import {
   SE_VALUES,
   SE_VERBAL_STRUCTURES,
 } from "./data";
+import { DEFAULT_UI_LANGUAGE, isUiLanguage } from "./uiLanguage";
 import type {
   Difficulty,
   DailyChallengeRecord,
@@ -57,7 +58,23 @@ const DEFAULT_MODEL = MODEL_OPTIONS[0]?.value ?? "gemini-2.5-flash-lite";
 export const MIN_PRACTICE_BATCH_SIZE = 1;
 export const DEFAULT_PRACTICE_BATCH_SIZE = 5;
 export const MAX_PRACTICE_BATCH_SIZE = 10;
-export const DAILY_CHALLENGE_SECTIONS: DailyChallengeSection[] = ["se", "perifrasis", "morfologia", "catalan", "sintaxis", "derivative"];
+export const DAILY_CHALLENGE_SECTIONS: DailyChallengeSection[] = [
+  "se",
+  "perifrasis",
+  "morfologia",
+  "catalan",
+  "sintaxis",
+  "philosophy",
+  "derivative",
+];
+const DEFAULT_DAILY_CHALLENGE_SECTIONS: DailyChallengeSection[] = [
+  "se",
+  "perifrasis",
+  "morfologia",
+  "catalan",
+  "sintaxis",
+  "philosophy",
+];
 
 export function coercePracticeBatchSize(value: unknown): number {
   const numericValue = typeof value === "number" ? value : Number(value);
@@ -155,8 +172,10 @@ function defaultDailyChallengeSettings(): DailyChallengeSettings {
       morfologia: 1,
       catalan: 1,
       sintaxis: 1,
+      philosophy: 1,
       derivative: 1,
     },
+    includedSections: [...DEFAULT_DAILY_CHALLENGE_SECTIONS],
     catalanDeckNames: [],
     catalanSectionNames: [],
   };
@@ -184,10 +203,20 @@ function sanitizeDailyCounts(value: unknown): Record<DailyChallengeSection, numb
   }, {} as Record<DailyChallengeSection, number>);
 }
 
+function sanitizeIncludedDailySections(value: unknown): DailyChallengeSection[] {
+  if (!Array.isArray(value)) {
+    return [...DEFAULT_DAILY_CHALLENGE_SECTIONS];
+  }
+  const selected = new Set(value.filter((section): section is DailyChallengeSection =>
+    typeof section === "string" && DAILY_CHALLENGE_SECTIONS.includes(section as DailyChallengeSection)));
+  return DAILY_CHALLENGE_SECTIONS.filter((section) => selected.has(section));
+}
+
 function sanitizeDailyChallengeSettings(value: unknown): DailyChallengeSettings {
   const raw = value && typeof value === "object" ? value as Partial<DailyChallengeSettings> : {};
   return {
     counts: sanitizeDailyCounts(raw.counts),
+    includedSections: sanitizeIncludedDailySections(raw.includedSections),
     catalanDeckNames: sanitizeStringList(raw.catalanDeckNames),
     catalanSectionNames: sanitizeStringList(raw.catalanSectionNames),
   };
@@ -208,6 +237,15 @@ function sanitizeDailyItemKeys(value: unknown): Record<DailyChallengeSection, st
     keys[section] = sanitizeStringList(raw[section]);
     return keys;
   }, {} as Record<DailyChallengeSection, string[]>);
+}
+
+function sanitizeDailySectionCounts(value: unknown): Record<DailyChallengeSection, number> {
+  const raw = value && typeof value === "object" ? value as Partial<Record<DailyChallengeSection, unknown>> : {};
+  return DAILY_CHALLENGE_SECTIONS.reduce((counts, section) => {
+    const numericValue = Number(raw[section]);
+    counts[section] = Number.isFinite(numericValue) && numericValue > 0 ? Math.round(numericValue) : 0;
+    return counts;
+  }, {} as Record<DailyChallengeSection, number>);
 }
 
 function sanitizeDailyChallengeRecord(record: unknown): DailyChallengeRecord | null {
@@ -235,7 +273,7 @@ function sanitizeDailyChallengeRecord(record: unknown): DailyChallengeRecord | n
     completedAt,
     totalMs: Math.round(totalMs),
     sectionTimes: sanitizeDailySectionTimes(raw.sectionTimes),
-    sectionCounts: sanitizeDailyCounts(raw.sectionCounts),
+    sectionCounts: sanitizeDailySectionCounts(raw.sectionCounts),
     itemKeys: sanitizeDailyItemKeys(raw.itemKeys),
   };
 }
@@ -517,6 +555,7 @@ export function createDefaultStorageState(): StorageState {
   return {
     version: 1,
     geminiApiKey: "",
+    uiLanguage: DEFAULT_UI_LANGUAGE,
     dailyChallengeSettings: defaultDailyChallengeSettings(),
     dailyChallengeRecords: [],
     seSettings: defaultSeSettings(),
@@ -557,6 +596,7 @@ export function loadStorageState(): StorageState {
     return {
       version: 1,
       geminiApiKey: typeof parsed.geminiApiKey === "string" ? parsed.geminiApiKey : "",
+      uiLanguage: isUiLanguage(parsed.uiLanguage) ? parsed.uiLanguage : DEFAULT_UI_LANGUAGE,
       dailyChallengeSettings: sanitizeDailyChallengeSettings(parsed.dailyChallengeSettings),
       dailyChallengeRecords: Array.isArray(parsed.dailyChallengeRecords)
         ? parsed.dailyChallengeRecords
