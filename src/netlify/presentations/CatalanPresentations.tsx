@@ -54,7 +54,6 @@ export function CatalanPresentations({ active }: { active: boolean }) {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [locked, setLocked] = useState(false);
-  const [saving, setSaving] = useState(false);
   const [minutes, setMinutes] = useState("60");
   const [loadKey, setLoadKey] = useState(0);
   const fileInput = useRef<HTMLInputElement>(null);
@@ -63,7 +62,6 @@ export function CatalanPresentations({ active }: { active: boolean }) {
   activeRef.current = active;
   const writable = useRef(false);
   const writeTail = useRef(Promise.resolve());
-  const writeNumber = useRef(0);
   const alive = useRef(true);
   const answerFocus = useRef<HTMLHeadingElement>(null);
   const mainPanel = useRef<HTMLDivElement>(null);
@@ -71,13 +69,9 @@ export function CatalanPresentations({ active }: { active: boolean }) {
   function persist(next: Database) {
     if (!writable.current) return;
     currentData.current = next; setData(next);
-    const number = ++writeNumber.current;
-    setSaving(true);
-    writeTail.current = writeTail.current.catch(() => {}).then(() => saveDatabase(next)).then(() => {
-      if (alive.current && number === writeNumber.current) setSaving(false);
-    }).catch(() => {
+    writeTail.current = writeTail.current.catch(() => {}).then(() => saveDatabase(next)).catch(() => {
       if (!alive.current) return;
-      setSaving(false); setError("Your latest changes could not be saved. Download a backup, or retry saving.");
+      setError("Your latest changes could not be saved. Download a backup, or retry saving.");
       const latest = currentData.current;
       if (latest?.active) { const paused = { ...latest, active: { ...latest.active, paused: true } }; currentData.current = paused; setData(paused); }
     });
@@ -231,17 +225,22 @@ export function CatalanPresentations({ active }: { active: boolean }) {
     <div className="cp-layout">
       <aside className="cp-sidebar" aria-label="Study options">
         <fieldset disabled={Boolean(session) || Boolean(error)}><legend>Classes</legend>
-          <button className="cp-text-button" type="button" onClick={() => updatePreferences({ classes: data.preferences.classes.length === 3 ? [] : [2, 3, 4] })}>{data.preferences.classes.length === 3 ? "Deselect all" : "Select all"}</button>
-          {CLASSES.map(c => <div className="cp-class-row" key={c.id}>
-            <button type="button" className="cp-class-choice" aria-pressed={data.preferences.classes.includes(c.id)} onClick={() => updatePreferences({ classes: data.preferences.classes.includes(c.id) ? data.preferences.classes.filter(id => id !== c.id) : [...data.preferences.classes, c.id] })}>
-              <span className="cp-check" aria-hidden="true">{data.preferences.classes.includes(c.id) ? "✓" : ""}</span><span><strong>Class {c.id}<small>{CARDS.filter(card => card.classId === c.id).length} activities</small></strong><span lang="ca">{c.title}</span></span>
-            </button>
-          </div>)}
+          <details className="cp-class-picker">
+            <summary>{data.preferences.classes.length === 0 ? "No classes selected" : `${data.preferences.classes.length} ${data.preferences.classes.length === 1 ? "class" : "classes"} selected`}</summary>
+            <div className="cp-class-menu">
+              <button className="cp-text-button" type="button" onClick={() => updatePreferences({ classes: data.preferences.classes.length === 3 ? [] : [2, 3, 4] })}>{data.preferences.classes.length === 3 ? "Deselect all" : "Select all"}</button>
+              {CLASSES.map(c => <div className="cp-class-row" key={c.id}>
+                <button type="button" className="cp-class-choice" aria-pressed={data.preferences.classes.includes(c.id)} onClick={() => updatePreferences({ classes: data.preferences.classes.includes(c.id) ? data.preferences.classes.filter(id => id !== c.id) : [...data.preferences.classes, c.id] })}>
+                  <span className="cp-check" aria-hidden="true">{data.preferences.classes.includes(c.id) ? "✓" : ""}</span><span><strong>Class {c.id}<small>{CARDS.filter(card => card.classId === c.id).length} activities</small></strong><span lang="ca">{c.title}</span></span>
+                </button>
+              </div>)}
+            </div>
+          </details>
         </fieldset>
         <fieldset disabled={Boolean(session) || Boolean(error)}><legend>Answer length</legend><div className="cp-lengths">
           {LENGTHS.map(length => <button key={length} type="button" aria-pressed={data.preferences.lengths.includes(length)} onClick={() => updatePreferences({ lengths: data.preferences.lengths.includes(length) ? data.preferences.lengths.filter(l => l !== length) : [...data.preferences.lengths, length] })}><strong>{labels[length]}</strong><small>{ranges[length]}</small></button>)}
         </div></fieldset>
-        <fieldset disabled={Boolean(session) || Boolean(error)}><legend>Study time</legend><div className="cp-presets">{[30,45,60,90].map(n => <button key={n} aria-pressed={minutes === String(n)} onClick={() => { setMinutes(String(n)); updatePreferences({ minutes: n }); }}>{n === 60 ? "1 h" : n === 90 ? "1 h 30" : `${n} min`}</button>)}</div>
+        <fieldset disabled={Boolean(session) || Boolean(error)}><legend>Study time</legend>
           <label className="cp-time-input"><span>Minutes</span><input type="number" min="5" max="480" step="1" value={minutes} aria-invalid={!validMinutes} onChange={e => { setMinutes(e.target.value); const n = Number(e.target.value); if (Number.isInteger(n) && n >= 5 && n <= 480) updatePreferences({ minutes: n }); }} /></label>
           {!validMinutes && <p className="cp-error-text">Enter 5–480 minutes.</p>}
         </fieldset>
@@ -265,9 +264,8 @@ export function CatalanPresentations({ active }: { active: boolean }) {
           {currentReviews.length > 0 && <div className="cp-session-totals">{RATINGS.map(rating => <span key={rating}>{labels[rating]} <strong>{currentReviews.filter(r => r.rating === rating).length}</strong></span>)}</div>}
         </> : <div className="cp-ready">
           <h2>{selected.length ? `${selected.length} activities selected` : "Choose your activities"}</h2>
-          <p>Recall the answer, check it, and rate it. The next reviews adapt to your pace and study time.</p>
           <div className="cp-selection-summary">{LENGTHS.map(length => <div key={length}><strong>{selected.filter(c => c.length === length).length}</strong><span>{labels[length]}</span></div>)}</div>
-          {selected.length > 0 && validMinutes && <p className="cp-capacity">About {Math.max(1, Math.floor(Number(minutes) * 60000 / expectedCycle))} reviews in {minutes} minutes{data.reviews.length < 5 ? ". This estimate improves as you study." : ", based on your pace."}</p>}
+          {selected.length > 0 && validMinutes && <p className="cp-capacity">About {Math.max(1, Math.floor(Number(minutes) * 60000 / expectedCycle))} reviews in {minutes} minutes.</p>}
           {selected.length === 1 && <p className="cp-muted">With one activity, the session ends after one review. Select more to space out repeats.</p>}
           {!selected.length && <p className="cp-muted">Select a class and an answer length with matching activities.</p>}
           <button className="primary-btn cp-start" disabled={!selected.length || !validMinutes || Boolean(error)} onClick={() => {
@@ -276,11 +274,10 @@ export function CatalanPresentations({ active }: { active: boolean }) {
             persist({ ...latest, active: createSession(latest.preferences) });
             void navigator.storage?.persist?.().catch(() => {});
           }}>Start study session</button>
-          <div className="cp-session-rules"><span>Wrong: try again after one other activity.</span><span>Easy: done for this session.</span></div>
         </div>}
       </div>
     </div>
     <Statistics data={data} />
-    <footer className="cp-backup"><div><strong>Study data</strong><span role="status">{error ? "Not saved" : saving ? "Saving…" : "Saved in this browser"}</span></div><div><button className="ghost-btn" onClick={download}>Download database</button><button className="ghost-btn" disabled={Boolean(session) || Boolean(error)} onClick={() => fileInput.current?.click()}>Restore backup</button></div><p>Includes all reviews, timings, preferences and session progress. Download a backup to keep it or move to another browser.</p><input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void restore(file); }} /></footer>
+    <footer className="cp-backup"><div><button className="ghost-btn" onClick={download}>Download database</button><button className="ghost-btn" disabled={Boolean(session) || Boolean(error)} onClick={() => fileInput.current?.click()}>Restore backup</button></div><input ref={fileInput} type="file" accept=".json,application/json" hidden onChange={e => { const file = e.target.files?.[0]; e.target.value = ""; if (file) void restore(file); }} /></footer>
   </section>;
 }
