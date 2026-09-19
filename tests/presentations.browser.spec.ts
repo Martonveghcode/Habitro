@@ -72,8 +72,16 @@ test("complete study flow, separate timings, exact Wrong gap, persistence and ba
 
 test("filters, invalid duration, long answer formatting, PDF and mobile layout", async ({ page }) => {
   await openStudy(page); const cp = scope(page);
+  await expect(cp.locator(".cp-class-row").first()).toBeHidden();
+  await expect(cp.locator(".cp-presets")).toHaveCount(0);
+  await expect(cp.locator(".cp-session-rules")).toHaveCount(0);
+  await expect(cp.getByText(/Recall the answer, check it/)).toHaveCount(0);
+  await expect(cp.getByText(/This estimate improves as you study/)).toHaveCount(0);
+  await expect(cp.getByText("Study data", { exact: true })).toHaveCount(0);
+  await cp.locator(".cp-class-picker > summary").click();
   await cp.getByRole("button", { name: "Class 2", exact: false }).click();
   await cp.getByRole("button", { name: "Class 3", exact: false }).click();
+  await cp.locator(".cp-class-picker > summary").click();
   await cp.getByRole("button", { name: "Medium 31–75 words" }).click();
   await cp.getByRole("button", { name: "Long 76+ words" }).click();
   await expect(cp.getByRole("button", { name: "Start study session" })).toBeDisabled();
