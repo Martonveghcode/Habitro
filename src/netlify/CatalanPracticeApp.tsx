@@ -744,6 +744,7 @@ function ToggleChoice({
       type="button"
       onClick={onClick}
     >
+      <span className="choice-marker" aria-hidden="true">{active ? "✓" : ""}</span>
       {children}
     </button>
   );
@@ -1119,9 +1120,12 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
 
       {view === "study" ? (
         <div className="catalan-study">
-          <div className="panel control-panel catalan-controls">
+          <div className="panel control-panel exercise-sidebar catalan-controls">
             <div className="field-block">
-              <h3 className="section-heading">Decks</h3>
+              <div className="sidebar-section-heading">
+                <h3 className="section-heading">Decks</h3>
+                <span>{selectedDeckNames.length}/{allDecks.length}</span>
+              </div>
               <div className="chip-cloud">
                 {allDecks.map((deck) => (
                   <ToggleChoice
@@ -1171,7 +1175,10 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
             </div>
 
             <div className="field-block">
-              <h3 className="section-heading">Sections</h3>
+              <div className="sidebar-section-heading">
+                <h3 className="section-heading">Sections</h3>
+                <span>{selectedSections.length}/{availableSections.length}</span>
+              </div>
               <div className="chip-cloud catalan-section-cloud">
                 {availableSections.length ? (
                   availableSections.map((section) => (

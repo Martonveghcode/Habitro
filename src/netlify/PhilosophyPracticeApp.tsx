@@ -200,7 +200,7 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
   return (
     <section className={`workspace philosophy-workspace${active ? "" : " hidden-workspace"}`} aria-hidden={!active}>
       <div className="philosophy-layout">
-        <aside className="philosophy-sidebar" aria-label={uiText.philosophyChaptersAria}>
+        <aside className="exercise-sidebar philosophy-sidebar" aria-label={uiText.philosophyChaptersAria}>
           <div className="philosophy-sidebar__heading">
             <div>
               <span className="eyebrow">{uiText.syllabus}</span>
