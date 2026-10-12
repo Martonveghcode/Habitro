@@ -375,6 +375,199 @@ textarea:disabled {
   padding-right: var(--space-5);
 }
 
+.exercise-sidebar {
+  padding: var(--space-4);
+  border: 1px solid var(--border-muted);
+  border-radius: var(--radius-xl);
+  background: var(--bg-muted);
+  max-height: calc(100dvh - 88px);
+  overflow-y: auto;
+  scrollbar-width: thin;
+}
+
+.exercise-sidebar > .field-block {
+  margin-top: var(--space-4);
+  padding-top: var(--space-4);
+  border-top: 1px solid var(--border-muted);
+}
+
+.exercise-sidebar > .field-block:first-child {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+
+.exercise-sidebar .field-grid {
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: var(--space-2);
+}
+
+.exercise-sidebar .session-controls {
+  grid-template-columns: minmax(0, 1fr) 88px;
+  align-items: end;
+}
+
+.exercise-sidebar .field {
+  min-width: 0;
+  margin-bottom: 0;
+}
+
+.exercise-sidebar input,
+.exercise-sidebar select {
+  min-width: 0;
+  min-height: 36px;
+  padding-right: var(--space-2);
+  padding-left: var(--space-2);
+}
+
+.sidebar-section-heading {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: var(--space-2);
+  margin-bottom: var(--space-3);
+}
+
+.sidebar-section-heading .section-heading {
+  margin: 0;
+  font-size: 12px;
+}
+
+.sidebar-section-heading > span {
+  color: var(--fg-muted);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.exercise-sidebar .chip-cloud {
+  gap: 6px;
+}
+
+.exercise-sidebar .choice-pill {
+  min-width: 0;
+  min-height: 34px;
+  max-width: 100%;
+  padding: 6px 9px;
+  gap: 6px;
+  font-size: 12px;
+  line-height: 1.35;
+  text-align: left;
+  overflow-wrap: anywhere;
+  transition: border-color 120ms ease, background-color 120ms ease;
+}
+
+.exercise-sidebar .choice-marker {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 13px;
+  height: 13px;
+  flex: 0 0 13px;
+  border: 1px solid var(--border-strong);
+  border-radius: 3px;
+  background: var(--bg-default);
+  color: var(--fg-on-emphasis);
+  font-size: 10px;
+  font-weight: 700;
+}
+
+.exercise-sidebar .choice-pill.active {
+  border-color: var(--border-strong);
+  background: var(--bg-inset);
+}
+
+.exercise-sidebar .choice-pill.active .choice-marker {
+  border-color: var(--accent-emphasis);
+  background: var(--accent-emphasis);
+}
+
+.exercise-sidebar .choice-pill:disabled {
+  cursor: default;
+}
+
+.exercise-sidebar :is(button, summary):focus-visible {
+  outline: 2px solid var(--accent-emphasis);
+  outline-offset: 2px;
+}
+
+.exercise-sidebar .custom-value-form {
+  gap: 6px;
+  margin-top: var(--space-2);
+}
+
+.exercise-sidebar .custom-value-form .ghost-btn {
+  padding: 0 var(--space-2);
+  font-size: 12px;
+}
+
+.practice-mix-control {
+  margin-top: var(--space-4);
+  padding-top: var(--space-3);
+  border-top: 1px solid var(--border-muted);
+}
+
+.practice-mix-control summary {
+  display: flex;
+  align-items: center;
+  gap: var(--space-2);
+  color: var(--fg-muted);
+  font-size: 12px;
+  font-weight: 600;
+  list-style: none;
+  cursor: pointer;
+}
+
+.practice-mix-control summary::-webkit-details-marker {
+  display: none;
+}
+
+.practice-mix-ratio {
+  margin-left: auto;
+  font-weight: 400;
+  font-variant-numeric: tabular-nums;
+}
+
+.practice-mix-control summary::after {
+  content: "";
+  width: 6px;
+  height: 6px;
+  border-right: 1px solid currentColor;
+  border-bottom: 1px solid currentColor;
+  transform: rotate(45deg) translateY(-2px);
+}
+
+.practice-mix-control[open] summary::after {
+  transform: rotate(225deg) translate(-1px, -1px);
+}
+
+.practice-mix-control > .field-grid {
+  margin-top: var(--space-3);
+}
+
+.exercise-sidebar > .primary-btn {
+  min-height: 38px;
+  margin-top: var(--space-4);
+  font-size: 13px;
+  font-weight: 600;
+}
+
+.exercise-sidebar .button-row {
+  margin-top: 0;
+}
+
+.exercise-sidebar .button-row .ghost-btn {
+  width: 100%;
+  min-height: 36px;
+  font-size: 12px;
+  white-space: normal;
+  line-height: 1.4;
+}
+
+.exercise-sidebar .info-block {
+  color: var(--fg-muted);
+  font-size: 12px;
+}
+
 .practice-panel {
   min-width: 0;
   min-height: 640px;
@@ -403,57 +596,6 @@ textarea:disabled {
   font-size: 12px;
   font-weight: 600;
   line-height: 1.25;
-}
-
-.batch-size-header {
-  display: flex;
-  align-items: center;
-  justify-content: space-between;
-  gap: var(--space-3);
-}
-
-.batch-size-header .field {
-  margin-bottom: 0;
-}
-
-.batch-size-count {
-  color: var(--fg-default);
-  font-size: 13px;
-  font-weight: 600;
-  line-height: 1.5;
-}
-
-.batch-size-row {
-  display: grid;
-  grid-template-columns: minmax(0, 1fr) 72px;
-  align-items: center;
-  gap: var(--space-3);
-  margin-top: var(--space-2);
-}
-
-.batch-size-control input[type="range"] {
-  min-height: 32px;
-  padding: 0;
-  border: 0;
-  background: transparent;
-  accent-color: var(--accent-emphasis);
-}
-
-.batch-size-control input[type="range"]:focus {
-  box-shadow: none;
-}
-
-.batch-size-number {
-  text-align: center;
-}
-
-.range-meta {
-  display: flex;
-  justify-content: space-between;
-  margin-top: 2px;
-  color: var(--fg-muted);
-  font-size: 12px;
-  line-height: 1.5;
 }
 
 .section-heading {
@@ -586,6 +728,10 @@ textarea:disabled {
 .choice-pill {
   background: var(--bg-default);
   color: var(--fg-default);
+}
+
+.choice-marker {
+  display: none;
 }
 
 .choice-pill:hover,
@@ -1443,7 +1589,7 @@ tbody tr:last-child td {
 }
 
 .catalan-controls {
-  padding-right: var(--space-5);
+  padding: var(--space-4);
 }
 
 .catalan-section-cloud {
@@ -1836,6 +1982,13 @@ code {
     padding-bottom: var(--space-5);
   }
 
+  .exercise-sidebar.control-panel {
+    padding: var(--space-4);
+    border: 1px solid var(--border-muted);
+    max-height: none;
+    overflow: visible;
+  }
+
   .practice-panel {
     padding-left: 0;
     padding-top: var(--space-5);
@@ -1967,6 +2120,26 @@ code {
   gap: 10px;
   padding-right: 24px;
   border-right: 1px solid var(--border-muted);
+}
+
+.exercise-sidebar.philosophy-sidebar {
+  padding: var(--space-4);
+  border: 1px solid var(--border-muted);
+}
+
+.exercise-sidebar.philosophy-sidebar .philosophy-sidebar__heading h2 {
+  font-size: 18px;
+}
+
+.exercise-sidebar.philosophy-sidebar .philosophy-chapter--selected {
+  border-color: var(--border-strong);
+  background: var(--bg-inset);
+  color: var(--fg-default);
+}
+
+.exercise-sidebar.philosophy-sidebar .philosophy-chapter--selected .philosophy-chapter__marker {
+  border-color: var(--accent-emphasis);
+  background: var(--accent-emphasis);
 }
 
 .philosophy-sidebar__heading {
@@ -2406,6 +2579,8 @@ code {
 
   .philosophy-sidebar {
     position: static;
+    max-height: none;
+    overflow: visible;
     padding-right: 0;
     padding-bottom: 20px;
     border-right: 0;

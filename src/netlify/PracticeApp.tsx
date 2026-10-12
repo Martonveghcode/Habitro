@@ -230,45 +230,96 @@ function FieldLabel({ label, hint: _hint }: { label: string; hint?: string }) {
   );
 }
 
-function BatchSizeControl({ value, onChange }: { value: number; onChange: (value: number) => void }) {
+function SessionControls({
+  batchSize,
+  mode,
+  personalizedMode = false,
+  onBatchSizeChange,
+  onModeChange,
+}: {
+  batchSize: number;
+  mode: "random" | "personalized" | "ordered";
+  personalizedMode?: boolean;
+  onBatchSizeChange: (value: number) => void;
+  onModeChange: (value: "random" | "personalized" | "ordered") => void;
+}) {
   const uiText = useUiText();
-  const safeValue = coercePracticeBatchSize(value);
-  const handleChange = (nextValue: string) => {
-    onChange(coercePracticeBatchSize(nextValue));
-  };
 
   return (
-    <div className="field-block batch-size-control">
-      <div className="batch-size-header">
-        <FieldLabel label={uiText.batchSize} />
-        <span className="batch-size-count">{safeValue}</span>
-      </div>
-      <div className="batch-size-row">
-        <input
-          aria-label={uiText.batchSize}
-          max={MAX_PRACTICE_BATCH_SIZE}
-          min={MIN_PRACTICE_BATCH_SIZE}
-          step={1}
-          type="range"
-          value={safeValue}
-          onChange={(event) => handleChange(event.target.value)}
-        />
+    <div className="field-grid session-controls">
+      <label className="field">
+        <span>{uiText.mode}</span>
+        <select value={mode} onChange={(event) => onModeChange(event.target.value as typeof mode)}>
+          <option value="random">{uiText.randomMode}</option>
+          {personalizedMode ? (
+            <option value="personalized">{uiText.personalized}</option>
+          ) : (
+            <option value="ordered">{uiText.orderedMode}</option>
+          )}
+        </select>
+      </label>
+      <label className="field">
+        <span>{uiText.questions}</span>
         <input
           aria-label={uiText.exactBatchSize}
-          className="batch-size-number"
           max={MAX_PRACTICE_BATCH_SIZE}
           min={MIN_PRACTICE_BATCH_SIZE}
           step={1}
           type="number"
-          value={safeValue}
-          onChange={(event) => handleChange(event.target.value)}
+          value={coercePracticeBatchSize(batchSize)}
+          onChange={(event) => onBatchSizeChange(coercePracticeBatchSize(event.target.value))}
         />
-      </div>
-      <div className="range-meta">
-        <span>{MIN_PRACTICE_BATCH_SIZE}</span>
-        <span>{uiText.max} {MAX_PRACTICE_BATCH_SIZE}</span>
-      </div>
+      </label>
     </div>
+  );
+}
+
+function PracticeMixControl({
+  targetWeight,
+  normalWeight,
+  onTargetWeightChange,
+  onNormalWeightChange,
+}: {
+  targetWeight: number;
+  normalWeight: number;
+  onTargetWeightChange: (value: number) => void;
+  onNormalWeightChange: (value: number) => void;
+}) {
+  const uiText = useUiText();
+  const total = Math.max(0, targetWeight) + Math.max(0, normalWeight);
+  const weaknessPercent = total === 0 ? 40 : Math.round((Math.max(0, targetWeight) / total) * 100);
+
+  return (
+    <details className="practice-mix-control">
+      <summary>
+        <span>{uiText.practiceMix}</span>
+        <span className="practice-mix-ratio">{weaknessPercent} / {100 - weaknessPercent}</span>
+      </summary>
+      <div className="field-grid">
+        <label className="field">
+          <span>{uiText.weaknessWeight}</span>
+          <input
+            max={100}
+            min={0}
+            step={5}
+            type="number"
+            value={targetWeight}
+            onChange={(event) => onTargetWeightChange(Math.min(100, Math.max(0, Number(event.target.value) || 0)))}
+          />
+        </label>
+        <label className="field">
+          <span>{uiText.normalWeight}</span>
+          <input
+            max={100}
+            min={0}
+            step={5}
+            type="number"
+            value={normalWeight}
+            onChange={(event) => onNormalWeightChange(Math.min(100, Math.max(0, Number(event.target.value) || 0)))}
+          />
+        </label>
+      </div>
+    </details>
   );
 }
 
@@ -358,10 +409,12 @@ function MultiToggleList({
       {options.map((option) => (
         <button
           key={option}
+          aria-pressed={selected.includes(option)}
           className={cx("choice-pill", selected.includes(option) && "active")}
           type="button"
           onClick={() => onToggle(option)}
         >
+          <span className="choice-marker" aria-hidden="true">{selected.includes(option) ? "✓" : ""}</span>
           {option}
         </button>
       ))}
@@ -3343,26 +3396,20 @@ function SeWorkspace({
     <section className={cx("workspace", !active && "hidden-workspace")}>
       {page === "practice" ? (
         <div className="page-grid">
-          <div className="panel control-panel">
-            <div className="field-block">
-              <FieldLabel label={uiText.mode} hint="Usa refuerzo de debilidades cuando hay historial." />
-              <label className="checkbox-line">
-                <input
-                  checked={settings.personalized}
-                  onChange={(event) => onSettingsChange({ ...settings, personalized: event.target.checked })}
-                  type="checkbox"
-                />
-                <span>{uiText.personalized}</span>
-              </label>
-            </div>
-
-            <BatchSizeControl
-              value={settings.batchSize}
-              onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+          <div className="panel control-panel exercise-sidebar">
+            <SessionControls
+              batchSize={settings.batchSize}
+              mode={settings.personalized ? "personalized" : "random"}
+              personalizedMode
+              onBatchSizeChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+              onModeChange={(mode) => onSettingsChange({ ...settings, personalized: mode === "personalized" })}
             />
 
             <div className="field-block">
-              <FieldLabel label={uiText.values} />
+              <div className="sidebar-section-heading">
+                <h3 className="section-heading">{uiText.values}</h3>
+                <span aria-label={uiText.selectedCount(settings.focusValues.length)}>{settings.focusValues.length}/{availableSeValues.length}</span>
+              </div>
               <MultiToggleList options={availableSeValues} selected={settings.focusValues} onToggle={toggleFocusValue} />
 
               <div className="custom-value-editor">
@@ -3398,30 +3445,12 @@ function SeWorkspace({
               </div>
             </div>
 
-            <div className="field-grid compact-grid">
-              <div>
-                <FieldLabel label={uiText.weaknessWeight} />
-                <input
-                  max={100}
-                  min={0}
-                  step={5}
-                  type="number"
-                  value={settings.targetWeight}
-                  onChange={(event) => onSettingsChange({ ...settings, targetWeight: Number(event.target.value) || 0 })}
-                />
-              </div>
-              <div>
-                <FieldLabel label={uiText.normalWeight} />
-                <input
-                  max={100}
-                  min={0}
-                  step={5}
-                  type="number"
-                  value={settings.normalWeight}
-                  onChange={(event) => onSettingsChange({ ...settings, normalWeight: Number(event.target.value) || 0 })}
-                />
-              </div>
-            </div>
+            <PracticeMixControl
+              targetWeight={settings.targetWeight}
+              normalWeight={settings.normalWeight}
+              onTargetWeightChange={(targetWeight) => onSettingsChange({ ...settings, targetWeight })}
+              onNormalWeightChange={(normalWeight) => onSettingsChange({ ...settings, normalWeight })}
+            />
 
             {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
@@ -3914,67 +3943,50 @@ function PeriphrasisWorkspace({
     <section className={cx("workspace", !active && "hidden-workspace")}>
       {page === "practice" ? (
         <div className="page-grid">
-          <div className="panel control-panel">
-            <div className="field-block">
-              <FieldLabel label={uiText.mode} hint="Usa refuerzo de debilidades cuando hay historial." />
-              <label className="checkbox-line">
-                <input
-                  checked={settings.personalized}
-                  onChange={(event) => onSettingsChange({ ...settings, personalized: event.target.checked })}
-                  type="checkbox"
-                />
-                <span>{uiText.personalized}</span>
-              </label>
-            </div>
-
-            <BatchSizeControl
-              value={settings.batchSize}
-              onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+          <div className="panel control-panel exercise-sidebar">
+            <SessionControls
+              batchSize={settings.batchSize}
+              mode={settings.personalized ? "personalized" : "random"}
+              personalizedMode
+              onBatchSizeChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+              onModeChange={(mode) => onSettingsChange({ ...settings, personalized: mode === "personalized" })}
             />
 
             <div className="field-block">
-              <FieldLabel label={uiText.structures} />
+              <div className="sidebar-section-heading">
+                <h3 className="section-heading">{uiText.structures}</h3>
+                <span aria-label={uiText.selectedCount(settings.focusStructures.length)}>{settings.focusStructures.length}/{PERIPHRASIS_STRUCTURES.length}</span>
+              </div>
               <MultiToggleList options={PERIPHRASIS_STRUCTURES} selected={settings.focusStructures} onToggle={toggleFocusStructure} />
             </div>
 
             <div className="field-block">
               <FieldLabel label={uiText.addCustomType} hint="Ej. Obligacion atenuada. Se guarda en esta seccion." />
-              <div className="field-grid compact-grid">
+              <div className="custom-value-form">
                 <input
+                  aria-label={uiText.addCustomType}
                   placeholder="Ej. Obligacion atenuada"
                   value={customTypeInput}
                   onChange={(event) => setCustomTypeInput(event.target.value)}
+                  onKeyDown={(event) => {
+                    if (event.key === "Enter") {
+                      event.preventDefault();
+                      addCustomPeriphrasisType();
+                    }
+                  }}
                 />
-                <button className="ghost-btn" type="button" onClick={addCustomPeriphrasisType}>
+                <button className="ghost-btn" disabled={!customTypeInput.trim()} type="button" onClick={addCustomPeriphrasisType}>
                   {uiText.addType}
                 </button>
               </div>
             </div>
 
-            <div className="field-grid compact-grid">
-              <div>
-                <FieldLabel label={uiText.weaknessWeight} />
-                <input
-                  max={100}
-                  min={0}
-                  step={5}
-                  type="number"
-                  value={settings.targetWeight}
-                  onChange={(event) => onSettingsChange({ ...settings, targetWeight: Number(event.target.value) || 0 })}
-                />
-              </div>
-              <div>
-                <FieldLabel label={uiText.normalWeight} />
-                <input
-                  max={100}
-                  min={0}
-                  step={5}
-                  type="number"
-                  value={settings.normalWeight}
-                  onChange={(event) => onSettingsChange({ ...settings, normalWeight: Number(event.target.value) || 0 })}
-                />
-              </div>
-            </div>
+            <PracticeMixControl
+              targetWeight={settings.targetWeight}
+              normalWeight={settings.normalWeight}
+              onTargetWeightChange={(targetWeight) => onSettingsChange({ ...settings, targetWeight })}
+              onNormalWeightChange={(normalWeight) => onSettingsChange({ ...settings, normalWeight })}
+            />
 
             {statusNote ? <div className="inline-banner">{statusNote}</div> : null}
 
@@ -4534,53 +4546,29 @@ function MorfoWorkspace({
     <section className={cx("workspace", !active && "hidden-workspace")}>
       {page === "practice" ? (
         <div className="page-grid">
-          <div className="panel control-panel">
-            <div className="field-block">
-              <FieldLabel label={uiText.mode} hint="Usa refuerzo de debilidades cuando hay historial." />
-              <label className="checkbox-line">
-                <input
-                  checked={settings.personalized}
-                  onChange={(event) => onSettingsChange({ ...settings, personalized: event.target.checked })}
-                  type="checkbox"
-                />
-                <span>{uiText.personalized}</span>
-              </label>
-            </div>
-
-            <BatchSizeControl
-              value={settings.batchSize}
-              onChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+          <div className="panel control-panel exercise-sidebar">
+            <SessionControls
+              batchSize={settings.batchSize}
+              mode={settings.personalized ? "personalized" : "random"}
+              personalizedMode
+              onBatchSizeChange={(batchSize) => onSettingsChange({ ...settings, batchSize })}
+              onModeChange={(mode) => onSettingsChange({ ...settings, personalized: mode === "personalized" })}
             />
 
             <div className="field-block">
-              <FieldLabel label={uiText.types} />
+              <div className="sidebar-section-heading">
+                <h3 className="section-heading">{uiText.types}</h3>
+                <span aria-label={uiText.selectedCount(settings.focusWordTypes.length)}>{settings.focusWordTypes.length}/{MORFO_WORD_TYPES.length}</span>
+              </div>
               <MultiToggleList options={MORFO_WORD_TYPES} selected={settings.focusWordTypes} onToggle={toggleFocusWordType} />
             </div>
 
-            <div className="field-grid compact-grid">
-              <div>
-                <FieldLabel label={uiText.weaknessWeight} />
-                <input
-                  max={100}
-                  min={0}
-                  step={5}
-                  type="number"
-                  value={settings.targetWeight}
-                  onChange={(event) => onSettingsChange({ ...settings, targetWeight: Number(event.target.value) || 0 })}
-                />
-              </div>
-              <div>
-                <FieldLabel label={uiText.normalWeight} />
-                <input
-                  max={100}
-                  min={0}
-                  step={5}
-                  type="number"
-                  value={settings.normalWeight}
-                  onChange={(event) => onSettingsChange({ ...settings, normalWeight: Number(event.target.value) || 0 })}
-                />
-              </div>
-            </div>
+            <PracticeMixControl
+              targetWeight={settings.targetWeight}
+              normalWeight={settings.normalWeight}
+              onTargetWeightChange={(targetWeight) => onSettingsChange({ ...settings, targetWeight })}
+              onNormalWeightChange={(normalWeight) => onSettingsChange({ ...settings, normalWeight })}
+            />
 
             {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
@@ -5023,27 +5011,21 @@ function SintaxisWorkspace({
     <section className={cx("workspace", !active && "hidden-workspace")}>
       {page === "practice" ? (
         <div className="page-grid">
-          <div className="panel control-panel">
-            <BatchSizeControl
-              value={settings.batchSize}
-              onChange={(batchSize) => {
+          <div className="panel control-panel exercise-sidebar">
+            <SessionControls
+              batchSize={settings.batchSize}
+              mode={settings.randomizeOrder ? "random" : "ordered"}
+              onBatchSizeChange={(batchSize) => {
                 onSettingsChange({ ...settings, batchSize, itemSource: "manual" });
+                setQueue([]);
+              }}
+              onModeChange={(mode) => {
+                onSettingsChange({ ...settings, randomizeOrder: mode === "random", itemSource: "manual" });
                 setQueue([]);
               }}
             />
 
             <div className="field-block">
-              <label className="checkbox-line">
-                <input
-                  checked={settings.randomizeOrder}
-                  onChange={(event) => {
-                    onSettingsChange({ ...settings, randomizeOrder: event.target.checked, itemSource: "manual" });
-                    setQueue([]);
-                  }}
-                  type="checkbox"
-                />
-                <span>{uiText.randomOrder}</span>
-              </label>
               <div className="button-row">
                 <button
                   className="ghost-btn"
@@ -5273,27 +5255,21 @@ function DerivativeWorkspace({
     <section className={cx("workspace", !active && "hidden-workspace")}>
       {page === "practice" ? (
         <div className="page-grid">
-          <div className="panel control-panel">
-            <BatchSizeControl
-              value={settings.batchSize}
-              onChange={(batchSize) => {
+          <div className="panel control-panel exercise-sidebar">
+            <SessionControls
+              batchSize={settings.batchSize}
+              mode={settings.randomizeOrder ? "random" : "ordered"}
+              onBatchSizeChange={(batchSize) => {
                 onSettingsChange({ ...settings, batchSize, itemSource: "manual" });
+                setQueue([]);
+              }}
+              onModeChange={(mode) => {
+                onSettingsChange({ ...settings, randomizeOrder: mode === "random", itemSource: "manual" });
                 setQueue([]);
               }}
             />
 
             <div className="field-block">
-              <label className="checkbox-line">
-                <input
-                  checked={settings.randomizeOrder}
-                  onChange={(event) => {
-                    onSettingsChange({ ...settings, randomizeOrder: event.target.checked, itemSource: "manual" });
-                    setQueue([]);
-                  }}
-                  type="checkbox"
-                />
-                <span>{uiText.randomOrder}</span>
-              </label>
               <div className="button-row">
                 <button
                   className="ghost-btn"
