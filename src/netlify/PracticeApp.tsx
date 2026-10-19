@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import ReactMarkdown from "react-markdown";
+import { NumberInput } from "../components/NumberInput";
 import { CatalanPresentations } from "./presentations/CatalanPresentations";
 import { StorageBackupSettingsPanel } from "./BrowserStorageBackup";
 
@@ -260,14 +261,13 @@ function SessionControls({
       </label>
       <label className="field">
         <span>{uiText.questions}</span>
-        <input
+        <NumberInput
           aria-label={uiText.exactBatchSize}
           max={MAX_PRACTICE_BATCH_SIZE}
           min={MIN_PRACTICE_BATCH_SIZE}
           step={1}
-          type="number"
           value={coercePracticeBatchSize(batchSize)}
-          onChange={(event) => onBatchSizeChange(coercePracticeBatchSize(event.target.value))}
+          onValueChange={onBatchSizeChange}
         />
       </label>
     </div>
@@ -298,24 +298,22 @@ function PracticeMixControl({
       <div className="field-grid">
         <label className="field">
           <span>{uiText.weaknessWeight}</span>
-          <input
+          <NumberInput
             max={100}
             min={0}
             step={5}
-            type="number"
             value={targetWeight}
-            onChange={(event) => onTargetWeightChange(Math.min(100, Math.max(0, Number(event.target.value) || 0)))}
+            onValueChange={onTargetWeightChange}
           />
         </label>
         <label className="field">
           <span>{uiText.normalWeight}</span>
-          <input
+          <NumberInput
             max={100}
             min={0}
             step={5}
-            type="number"
             value={normalWeight}
-            onChange={(event) => onNormalWeightChange(Math.min(100, Math.max(0, Number(event.target.value) || 0)))}
+            onValueChange={onNormalWeightChange}
           />
         </label>
       </div>
