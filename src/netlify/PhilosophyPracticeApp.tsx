@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
+import { NumberInput } from "../components/NumberInput";
 
 import { PHILOSOPHY_CARDS, PHILOSOPHY_CHAPTERS, type PhilosophyCard } from "./philosophyData";
 import { useUiText } from "./uiLanguage";
@@ -280,18 +281,17 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
                         }))
                       }
                     />
-                    <input
+                    <NumberInput
                       aria-label={uiText.exactBatchSize}
                       className="philosophy-batch-number"
                       disabled={!selectedCards.length}
                       max={Math.max(1, selectedCards.length)}
                       min={1}
-                      type="number"
                       value={effectiveBatchSize}
-                      onChange={(event) =>
+                      onValueChange={(batchSize) =>
                         setSettings((current) => ({
                           ...current,
-                          batchSize: clampBatchSize(event.target.value, selectedCards.length),
+                          batchSize: clampBatchSize(batchSize, selectedCards.length),
                         }))
                       }
                     />

@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
+import { NumberInput } from "../components/NumberInput";
 
 type CatalanView = "study" | "library" | "import" | "prompt";
 type StudyMode = "Random" | "Weak" | "Fresh" | "Mistakes";
@@ -901,8 +902,10 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
   ]);
 
   useEffect(() => {
+    // Rebuilding a session must not interrupt edits to its settings.
+    if (document.activeElement?.closest(".catalan-controls")) return;
     if (active && view === "study" && !feedback) {
-      answerInputRef.current?.focus();
+      answerInputRef.current?.focus({ preventScroll: true });
     }
   }, [active, view, currentCard?.termId, feedback]);
 
@@ -948,9 +951,15 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      if (event.defaultPrevented || event.repeat) {
+      const target = event.target;
+      if (
+        event.defaultPrevented || event.repeat ||
+        (target instanceof Element && target.closest(".catalan-controls, button, select, textarea, [contenteditable]")) ||
+        (target instanceof HTMLInputElement && target !== answerInputRef.current)
+      ) {
         return;
       }
+      if (target === answerInputRef.current && (event.key === "ArrowLeft" || event.key === "ArrowRight")) return;
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         previousCard();
@@ -1155,11 +1164,10 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
               <div>
                 <label className="field">
                   <span>Cards</span>
-                  <input
+                  <NumberInput
                     min={1}
-                    type="number"
                     value={cardCount}
-                    onChange={(event) => setCardCount(Math.max(1, Number(event.target.value) || 1))}
+                    onValueChange={setCardCount}
                   />
                 </label>
               </div>
