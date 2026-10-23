@@ -1,4 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
+import { PracticeControls } from "../components/PracticeControls";
+import { PracticeActions } from "../components/PracticeActions";
+import { usePracticePosition } from "../components/usePracticePosition";
 import katex from "katex";
 import "katex/dist/katex.min.css";
 import ReactMarkdown from "react-markdown";
@@ -1653,6 +1656,7 @@ function DailyCatalanQuestion({
   }, [item.termId]);
 
   const checkAnswer = () => {
+    if (feedback) return;
     const selectedIndices = [...accentSelection].sort((left, right) => left - right);
     const expected = item.missing || item.answer;
     const correct = isCatalanAccentCard(item)
@@ -1715,11 +1719,13 @@ function DailyCatalanQuestion({
       >
         <input
           aria-label={uiText.yourAnswer}
+          autoCapitalize="none"
           autoComplete="off"
-          disabled={Boolean(feedback)}
+          autoCorrect="off"
+          enterKeyHint="go"
           spellCheck={false}
           value={answerDraft}
-          onChange={(event) => setAnswerDraft(event.target.value)}
+          onChange={(event) => { if (!feedback) setAnswerDraft(event.target.value); }}
         />
         <button className="primary-btn catalan-check-btn" disabled={Boolean(feedback)} type="submit">
           {uiText.checkResponse}
@@ -2688,6 +2694,12 @@ export function NetlifyPracticeApp() {
   }, [storageState.uiLanguage]);
 
   useEffect(() => {
+    if (window.matchMedia("(max-width: 1012px)").matches) {
+      window.scrollTo({ top: 0, behavior: "instant" });
+    }
+  }, [activeSection, globalPage]);
+
+  useEffect(() => {
     let cancelled = false;
     void loadBuiltInCatalanDecks()
       .then((decks) => {
@@ -3015,10 +3027,10 @@ export function NetlifyPracticeApp() {
                 onSintaxisSettingsChange={updateSintaxisSettings}
                 onUiLanguageChange={updateUiLanguage}
               />
-            ) : (
-              <>
+            ) : null}
+              <div className={globalPage ? "hidden-workspace" : undefined}>
                 <SeWorkspace
-                  active={activeSection === "se"}
+                  active={!globalPage && activeSection === "se"}
                   page={sePage}
                   settings={storageState.seSettings}
                   attempts={storageState.seAttempts}
@@ -3029,7 +3041,7 @@ export function NetlifyPracticeApp() {
                   onAttemptsChange={updateSeAttempts}
                 />
                 <PeriphrasisWorkspace
-                  active={activeSection === "perifrasis"}
+                  active={!globalPage && activeSection === "perifrasis"}
                   page={periphrasisPage}
                   settings={storageState.periphrasisSettings}
                   attempts={storageState.periphrasisAttempts}
@@ -3040,7 +3052,7 @@ export function NetlifyPracticeApp() {
                   onAttemptsChange={updatePeriphrasisAttempts}
                 />
                 <MorfoWorkspace
-                  active={activeSection === "morfologia"}
+                  active={!globalPage && activeSection === "morfologia"}
                   page={morfoPage}
                   settings={storageState.morfoSettings}
                   attempts={storageState.morfoAttempts}
@@ -3051,7 +3063,7 @@ export function NetlifyPracticeApp() {
                   onAttemptsChange={updateMorfoAttempts}
                 />
                 <SintaxisWorkspace
-                  active={activeSection === "sintaxis"}
+                  active={!globalPage && activeSection === "sintaxis"}
                   page={sintaxisPage}
                   settings={storageState.sintaxisSettings}
                   attempts={storageState.sintaxisAttempts}
@@ -3060,7 +3072,7 @@ export function NetlifyPracticeApp() {
                   onAttemptsChange={updateSintaxisAttempts}
                 />
                 <DerivativeWorkspace
-                  active={activeSection === "derivative"}
+                  active={!globalPage && activeSection === "derivative"}
                   page={derivativePage}
                   settings={storageState.derivativeSettings}
                   attempts={storageState.derivativeAttempts}
@@ -3068,10 +3080,9 @@ export function NetlifyPracticeApp() {
                   onSettingsChange={updateDerivativeSettings}
                   onAttemptsChange={updateDerivativeAttempts}
                 />
-                <CatalanPracticeApp active={activeSection === "catalan"} />
-                <PhilosophyPracticeApp active={activeSection === "philosophy"} />
-              </>
-            )}
+                <CatalanPracticeApp active={!globalPage && activeSection === "catalan"} />
+                <PhilosophyPracticeApp active={!globalPage && activeSection === "philosophy"} />
+              </div>
             <CatalanPresentations active={!globalPage && activeSection === "presentations"} />
             <PhysicsRevisionApp active={!globalPage && activeSection === "physics"} />
           </main>
@@ -3111,6 +3122,7 @@ function SeWorkspace({
   );
   const availableSeValues = useMemo(() => mergeLabelGroups(SE_VALUES, settings.customValues), [settings.customValues]);
   const [currentItem, setCurrentItem] = useState<SeItem | null>(null);
+  const practiceRef = usePracticePosition(currentItem?.id, active);
   const [queue, setQueue] = useState<SeItem[]>([]);
   const [checkedItemId, setCheckedItemId] = useState<string | null>(null);
   const [evaluations, setEvaluations] = useState<Record<string, SeEvaluation>>({});
@@ -3394,7 +3406,11 @@ function SeWorkspace({
     <section className={cx("workspace", !active && "hidden-workspace")}>
       {page === "practice" ? (
         <div className="page-grid">
-          <div className="panel control-panel exercise-sidebar">
+          <PracticeControls action={
+            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
+              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextPhrase : uiText.generateBatch}
+            </button>
+          } notice={statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}>
             <SessionControls
               batchSize={settings.batchSize}
               mode={settings.personalized ? "personalized" : "random"}
@@ -3450,14 +3466,10 @@ function SeWorkspace({
               onNormalWeightChange={(normalWeight) => onSettingsChange({ ...settings, normalWeight })}
             />
 
-            {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
-            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
-              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextPhrase : uiText.generateBatch}
-            </button>
-          </div>
+          </PracticeControls>
 
-          <div className="panel practice-panel">
+          <div ref={practiceRef} className="panel practice-panel">
             {!currentItem ? (
               <div className="empty-state">
                 <h3>{uiText.generatePhraseStart}</h3>
@@ -3488,9 +3500,11 @@ function SeWorkspace({
                   </div>
                 </div>
 
-                <button className="primary-btn" type="button" onClick={handleCheck}>
-                  {uiText.checkResponse}
-                </button>
+                <PracticeActions disabled={isGenerating} onNext={handleGenerate} nextLabel={uiText.next}>
+                  <button className="primary-btn" type="button" onClick={handleCheck}>
+                    {uiText.checkResponse}
+                  </button>
+                </PracticeActions>
 
                 {evaluation ? (
                   <>
@@ -3781,6 +3795,7 @@ function PeriphrasisWorkspace({
   );
 
   const [currentItem, setCurrentItem] = useState<PeriphrasisItem | null>(null);
+  const practiceRef = usePracticePosition(currentItem?.id, active);
   const [queue, setQueue] = useState<PeriphrasisItem[]>([]);
   const [checkedItemId, setCheckedItemId] = useState<string | null>(null);
   const [evaluations, setEvaluations] = useState<Record<string, PeriphrasisEvaluation>>({});
@@ -3941,7 +3956,11 @@ function PeriphrasisWorkspace({
     <section className={cx("workspace", !active && "hidden-workspace")}>
       {page === "practice" ? (
         <div className="page-grid">
-          <div className="panel control-panel exercise-sidebar">
+          <PracticeControls action={
+            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
+              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextPhrase : uiText.generateBatch}
+            </button>
+          } notice={statusNote ? <div className="inline-banner">{statusNote}</div> : null}>
             <SessionControls
               batchSize={settings.batchSize}
               mode={settings.personalized ? "personalized" : "random"}
@@ -3986,11 +4005,7 @@ function PeriphrasisWorkspace({
               onNormalWeightChange={(normalWeight) => onSettingsChange({ ...settings, normalWeight })}
             />
 
-            {statusNote ? <div className="inline-banner">{statusNote}</div> : null}
 
-            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
-              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextPhrase : uiText.generateBatch}
-            </button>
 
             {settings.personalized && (weakStructureLabels.length > 0 || weakPeriphrasisTypeLabels.length > 0) ? (
               <div className="info-block">
@@ -4001,9 +4016,9 @@ function PeriphrasisWorkspace({
                 </p>
               </div>
             ) : null}
-          </div>
+          </PracticeControls>
 
-          <div className="panel practice-panel">
+          <div ref={practiceRef} className="panel practice-panel">
             {!currentItem ? (
               <div className="empty-state">
                 <h3>{uiText.generatePhraseStart}</h3>
@@ -4047,9 +4062,11 @@ function PeriphrasisWorkspace({
                   </div>
                 </div>
 
-                <button className="primary-btn" type="button" onClick={handleCheck}>
-                  {uiText.checkResponse}
-                </button>
+                <PracticeActions disabled={isGenerating} onNext={handleGenerate} nextLabel={uiText.next}>
+                  <button className="primary-btn" type="button" onClick={handleCheck}>
+                    {uiText.checkResponse}
+                  </button>
+                </PracticeActions>
 
                 {evaluation ? (
                   <>
@@ -4300,6 +4317,9 @@ function MorfoWorkspace({
     [attempts, settings.profileId],
   );
   const [currentItem, setCurrentItem] = useState<MorfoItem | null>(null);
+  const practiceRef = usePracticePosition(currentItem?.id, active);
+  const morphemesInputRef = useRef<HTMLInputElement>(null);
+  const lexemeInputRef = useRef<HTMLInputElement>(null);
   const [queue, setQueue] = useState<MorfoItem[]>([]);
   const [checkedItemId, setCheckedItemId] = useState<string | null>(null);
   const [evaluations, setEvaluations] = useState<Record<string, MorfoEvaluation>>({});
@@ -4366,6 +4386,9 @@ function MorfoWorkspace({
   };
 
   const handleGenerate = async () => {
+    if (document.activeElement === morphemesInputRef.current) {
+      lexemeInputRef.current?.focus({ preventScroll: true });
+    }
     setIsGenerating(true);
     try {
       let nextQueue = [...queue];
@@ -4544,7 +4567,11 @@ function MorfoWorkspace({
     <section className={cx("workspace", !active && "hidden-workspace")}>
       {page === "practice" ? (
         <div className="page-grid">
-          <div className="panel control-panel exercise-sidebar">
+          <PracticeControls action={
+            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
+              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextWord : uiText.generateBatch}
+            </button>
+          } notice={statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}>
             <SessionControls
               batchSize={settings.batchSize}
               mode={settings.personalized ? "personalized" : "random"}
@@ -4568,11 +4595,7 @@ function MorfoWorkspace({
               onNormalWeightChange={(normalWeight) => onSettingsChange({ ...settings, normalWeight })}
             />
 
-            {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
-            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
-              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextWord : uiText.generateBatch}
-            </button>
 
             {settings.personalized && (weakWordTypeLabels.length > 0 || weakMorphemeTypeLabels.length > 0) ? (
               <div className="info-block">
@@ -4583,9 +4606,14 @@ function MorfoWorkspace({
                 </p>
               </div>
             ) : null}
-          </div>
+          </PracticeControls>
 
-          <div className="panel practice-panel">
+          <div ref={practiceRef} className="panel practice-panel" onKeyDown={(event) => {
+            if (!event.defaultPrevented && event.key === "Enter" && !event.nativeEvent.isComposing && !event.repeat && event.target instanceof HTMLInputElement) {
+              event.preventDefault();
+              if (evaluation) { void handleGenerate(); } else { handleCheck(); }
+            }
+          }}>
             {!currentItem ? (
               <div className="empty-state">
                 <h3>{uiText.generateWordStart}</h3>
@@ -4606,7 +4634,24 @@ function MorfoWorkspace({
                   </div>
                   <div>
                     <FieldLabel label="Lexema" />
-                    <input placeholder="Ej. cant / cas / just" value={guessLexeme} onChange={(event) => setGuessLexeme(event.target.value)} />
+                    <input
+                      ref={lexemeInputRef}
+                      aria-label="Lexema"
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      autoCorrect="off"
+                      spellCheck={false}
+                      enterKeyHint="next"
+                      placeholder="Ej. cant / cas / just"
+                      value={guessLexeme}
+                      onChange={(event) => setGuessLexeme(event.target.value)}
+                      onKeyDown={(event) => {
+                        if (event.key === "Enter" && !event.nativeEvent.isComposing && !evaluation) {
+                          event.preventDefault();
+                          morphemesInputRef.current?.focus({ preventScroll: true });
+                        }
+                      }}
+                    />
                   </div>
                 </div>
 
@@ -4614,6 +4659,13 @@ function MorfoWorkspace({
                   <div>
                     <FieldLabel label="Morfemas" hint="Sin contar el lexema; separados por coma." />
                     <input
+                      ref={morphemesInputRef}
+                      aria-label="Morfemas"
+                      autoCorrect="off"
+                      autoCapitalize="none"
+                      autoComplete="off"
+                      spellCheck={false}
+                      enterKeyHint="go"
                       placeholder="Ej. des, ad, o, s"
                       value={guessMorphemesText}
                       onChange={(event) => setGuessMorphemesText(event.target.value)}
@@ -4633,9 +4685,11 @@ function MorfoWorkspace({
                   </div>
                 </div>
 
-                <button className="primary-btn" type="button" onClick={handleCheck}>
-                  {uiText.checkResponse}
-                </button>
+                <PracticeActions disabled={isGenerating} onNext={handleGenerate} nextLabel={uiText.next}>
+                  <button className="primary-btn" type="button" onClick={handleCheck}>
+                    {uiText.checkResponse}
+                  </button>
+                </PracticeActions>
 
                 {evaluation ? (
                   <>
@@ -4930,6 +4984,7 @@ function SintaxisWorkspace({
     [attempts, settings.profileId],
   );
   const [currentItem, setCurrentItem] = useState<SintaxisItem | null>(null);
+  const practiceRef = usePracticePosition(currentItem?.id, active);
   const [queue, setQueue] = useState<SintaxisItem[]>([]);
   const [checkedItemId, setCheckedItemId] = useState<string | null>(null);
   const [correctionVisible, setCorrectionVisible] = useState(false);
@@ -5009,7 +5064,11 @@ function SintaxisWorkspace({
     <section className={cx("workspace", !active && "hidden-workspace")}>
       {page === "practice" ? (
         <div className="page-grid">
-          <div className="panel control-panel exercise-sidebar">
+          <PracticeControls action={
+            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
+              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextPhrase : uiText.generateBatch}
+            </button>
+          } notice={statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}>
             <SessionControls
               batchSize={settings.batchSize}
               mode={settings.randomizeOrder ? "random" : "ordered"}
@@ -5036,14 +5095,10 @@ function SintaxisWorkspace({
               </div>
             </div>
 
-            {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
-            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
-              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextPhrase : uiText.generateBatch}
-            </button>
-          </div>
+          </PracticeControls>
 
-          <div className="panel practice-panel">
+          <div ref={practiceRef} className="panel practice-panel">
             {!currentItem ? (
               <div className="empty-state">
                 <h3>{uiText.generatePhraseStart}</h3>
@@ -5052,9 +5107,11 @@ function SintaxisWorkspace({
               <div className="sintaxis-practice-column">
                 <h3 className="prompt-text sintaxis-prompt-text">{currentItem.phrase}</h3>
 
-                <button className="primary-btn sintaxis-correction-btn" type="button" onClick={handleRevealCorrection}>
+                <PracticeActions disabled={isGenerating} onNext={handleGenerate} nextLabel={uiText.next}>
+                  <button className="primary-btn sintaxis-correction-btn" type="button" onClick={handleRevealCorrection}>
                   {uiText.showCorrection}
                 </button>
+                </PracticeActions>
 
                 {correctionVisible ? (
                   <div className="info-block markdown-correction sintaxis-correction-box">
@@ -5174,6 +5231,7 @@ function DerivativeWorkspace({
     [attempts, settings.profileId],
   );
   const [currentItem, setCurrentItem] = useState<DerivativeItem | null>(null);
+  const practiceRef = usePracticePosition(currentItem?.id, active);
   const [queue, setQueue] = useState<DerivativeItem[]>([]);
   const [checkedItemId, setCheckedItemId] = useState<string | null>(null);
   const [answerVisible, setAnswerVisible] = useState(false);
@@ -5253,7 +5311,11 @@ function DerivativeWorkspace({
     <section className={cx("workspace", !active && "hidden-workspace")}>
       {page === "practice" ? (
         <div className="page-grid">
-          <div className="panel control-panel exercise-sidebar">
+          <PracticeControls action={
+            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
+              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextFunction : uiText.generateBatch}
+            </button>
+          } notice={statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}>
             <SessionControls
               batchSize={settings.batchSize}
               mode={settings.randomizeOrder ? "random" : "ordered"}
@@ -5280,14 +5342,10 @@ function DerivativeWorkspace({
               </div>
             </div>
 
-            {statusNote ? <div className={cx("inline-banner", statusTone === "warn" && "warn")}>{statusNote}</div> : null}
 
-            <button className="primary-btn" disabled={isGenerating} type="button" onClick={handleGenerate}>
-              {isGenerating ? uiText.preparingBatch : queue.length > 0 ? uiText.nextFunction : uiText.generateBatch}
-            </button>
-          </div>
+          </PracticeControls>
 
-          <div className="panel practice-panel">
+          <div ref={practiceRef} className="panel practice-panel">
             {!currentItem ? (
               <div className="empty-state">
                 <h3>{uiText.generateFunctionStart}</h3>
@@ -5296,9 +5354,11 @@ function DerivativeWorkspace({
               <div className="derivative-practice-column">
                 <MathDisplay value={currentItem.functionText} className="derivative-function-display" />
 
-                <button className="primary-btn derivative-answer-btn" type="button" onClick={handleRevealAnswer}>
+                <PracticeActions disabled={isGenerating} onNext={handleGenerate} nextLabel={uiText.next}>
+                  <button className="primary-btn derivative-answer-btn" type="button" onClick={handleRevealAnswer}>
                   {uiText.showAnswer}
                 </button>
+                </PracticeActions>
 
                 {answerVisible ? (
                   <div className="info-block derivative-answer-box">

@@ -1,6 +1,8 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import type { ChangeEvent, FormEvent } from "react";
 import { NumberInput } from "../components/NumberInput";
+import { PracticeControls } from "../components/PracticeControls";
+import { preserveAnswerFocus } from "../components/PracticeActions";
 
 type CatalanView = "study" | "library" | "import" | "prompt";
 type StudyMode = "Random" | "Weak" | "Fresh" | "Mistakes";
@@ -904,12 +906,22 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
   useEffect(() => {
     // Rebuilding a session must not interrupt edits to its settings.
     if (document.activeElement?.closest(".catalan-controls")) return;
-    if (active && view === "study" && !feedback) {
+    // Mobile browsers only open the keyboard following a deliberate tap. Keep
+    // that same input mounted and focused throughout check/next transitions.
+    if (active && view === "study" && !window.matchMedia("(pointer: coarse)").matches) {
       answerInputRef.current?.focus({ preventScroll: true });
     }
-  }, [active, view, currentCard?.termId, feedback]);
+  }, [active, view]);
+
+  const retainAnswerFocus = () => {
+    const input = answerInputRef.current;
+    if (document.activeElement === input || !window.matchMedia("(pointer: coarse)").matches) {
+      input?.focus({ preventScroll: true });
+    }
+  };
 
   const nextCard = () => {
+    retainAnswerFocus();
     setQueueIndex((current) => Math.min(current + 1, queue.length));
     setFeedback(null);
     setAnswerDraft("");
@@ -917,6 +929,7 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
   };
 
   const previousCard = () => {
+    retainAnswerFocus();
     setQueueIndex((current) => Math.max(current - 1, 0));
     setFeedback(null);
     setAnswerDraft("");
@@ -929,6 +942,9 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
     }
     if (feedback) {
       nextCard();
+      return;
+    }
+    if (!isCatalanAccentCard(currentCard) && !answerDraft.trim()) {
       return;
     }
 
@@ -951,15 +967,13 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
     }
 
     const handleKeyDown = (event: KeyboardEvent) => {
-      const target = event.target;
-      if (
-        event.defaultPrevented || event.repeat ||
-        (target instanceof Element && target.closest(".catalan-controls, button, select, textarea, [contenteditable]")) ||
-        (target instanceof HTMLInputElement && target !== answerInputRef.current)
-      ) {
+      if (event.defaultPrevented || event.repeat || event.isComposing || event.altKey || event.ctrlKey || event.metaKey) {
         return;
       }
-      if (target === answerInputRef.current && (event.key === "ArrowLeft" || event.key === "ArrowRight")) return;
+      const target = event.target;
+      if (target instanceof HTMLElement && target.closest(".catalan-controls, input, textarea, select, button, [contenteditable]")) {
+        return;
+      }
       if (event.key === "ArrowLeft") {
         event.preventDefault();
         previousCard();
@@ -1031,6 +1045,7 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
 
   const handleAnswerSubmit = (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
+    retainAnswerFocus();
     submitAnswer();
   };
 
@@ -1129,7 +1144,7 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
 
       {view === "study" ? (
         <div className="catalan-study">
-          <div className="panel control-panel exercise-sidebar catalan-controls">
+          <PracticeControls className="panel control-panel exercise-sidebar catalan-controls" label="Decks & study options">
             <div className="field-block">
               <div className="sidebar-section-heading">
                 <h3 className="section-heading">Decks</h3>
@@ -1203,7 +1218,7 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
             <button className="primary-btn" type="button" onClick={() => setReshuffleToken((current) => current + 1)}>
               Reshuffle
             </button>
-          </div>
+          </PracticeControls>
 
           <div className="panel practice-panel catalan-practice-panel">
             <section className="catalan-metrics" aria-label="Catalan study metrics">
@@ -1244,10 +1259,10 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
             ) : (
               <>
                 <section className="catalan-question-card">
-                  <div className="question-section">{currentCard.section}</div>
+                  {displayCatalanPrompt(currentCard) !== currentCard.section ? <div className="question-section">{currentCard.section}</div> : null}
                   <div className="question-prompt">{displayCatalanPrompt(currentCard)}</div>
                   {isCatalanAccentCard(currentCard) ? (
-                    <div className="catalan-accent-word">
+                    <div className="catalan-accent-word" onMouseDown={preserveAnswerFocus}>
                       {chars(catalanAccentBaseWord(currentCard)).map((letter, index) => {
                         const selected = accentSelection.includes(index);
                         return (
@@ -1263,7 +1278,6 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
                                   ? current.filter((item) => item !== index)
                                   : [...current, index].sort((a, b) => a - b),
                               );
-                              answerInputRef.current?.focus();
                             }}
                           >
                             {letter}
@@ -1280,31 +1294,45 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
                   <input
                     ref={answerInputRef}
                     aria-label="Answer"
+                    aria-describedby="catalan-answer-hint"
+                    autoCapitalize="none"
                     autoComplete="off"
-                    disabled={Boolean(feedback)}
+                    autoCorrect="off"
+                    enterKeyHint="go"
                     spellCheck={false}
-                    value={answerDraft}
-                    onChange={(event) => setAnswerDraft(event.target.value)}
+                    placeholder={feedback ? "Enter → next word" : "Your answer"}
+                    value={feedback ? "" : answerDraft}
+                    onKeyDown={(event) => {
+                      if (event.key === "Enter" && (event.nativeEvent.isComposing || event.repeat)) {
+                        event.preventDefault();
+                      }
+                    }}
+                    onChange={(event) => {
+                      // A new keystroke can start the next answer without a tap.
+                      if (feedback) nextCard();
+                      setAnswerDraft(event.target.value);
+                    }}
                   />
-                  <div className="actions">
+                  <div className="actions" onMouseDown={preserveAnswerFocus}>
+                    <button className="primary-btn catalan-check-btn" type="submit">
+                      {feedback ? queueIndex + 1 === queue.length ? "Finish" : "Next" : "Check"}
+                    </button>
                     <button className="ghost-btn" disabled={queueIndex <= 0} type="button" onClick={previousCard}>
                       Previous
                     </button>
-                    <button className="primary-btn catalan-check-btn" type="submit">
-                      {feedback ? "Next" : "Check"}
-                    </button>
-                    <button className="ghost-btn" type="button" onClick={nextCard}>
-                      {feedback ? "Next" : "Skip"}
-                    </button>
+                    {!feedback ? <button className="ghost-btn" type="button" onClick={nextCard}>Skip</button> : null}
                   </div>
                 </form>
 
+                <p className="catalan-answer-hint" id="catalan-answer-hint">Enter to check · Enter again for next</p>
+                <div className="catalan-feedback-slot" role="status" aria-live="polite" aria-atomic="true">
                 {feedback ? (
                   <section className={cx("catalan-feedback", feedback.correct ? "success" : "danger")}>
-                    <strong>{feedback.correct ? "Correct" : "Incorrect"}</strong>
-                    <div>{currentCard.answer}</div>
-                    {isCatalanAccentCard(currentCard) ? null : <div>Gap: {currentCard.missing || "-"}</div>}
-                    <div>
+                    <div className="catalan-feedback__summary">
+                      <strong>{feedback.correct ? "Correct" : "Incorrect"}</strong>
+                      <span>{currentCard.answer}</span>
+                    </div>
+                    <div className="catalan-feedback__expected">
                       Expected:{" "}
                       {isCatalanAccentCard(currentCard)
                         ? expectedCatalanAccentInput(currentCard) || "no accent"
@@ -1312,6 +1340,8 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
                           ? currentCard.missing
                           : currentCard.answer}
                     </div>
+                    <details>
+                    <summary>Answer details</summary>
                     {isCatalanAccentCard(currentCard) ? (
                       <div>
                         Clicked:{" "}
@@ -1321,8 +1351,10 @@ export function CatalanPracticeApp({ active }: { active: boolean }) {
                       </div>
                     ) : null}
                     <div>You typed: {feedback.userText || "-"}</div>
+                    </details>
                   </section>
                 ) : null}
+                </div>
               </>
             )}
           </div>

@@ -1,3 +1,5 @@
+import { PracticeControls } from "../components/PracticeControls";
+import { usePracticePosition } from "../components/usePracticePosition";
 import { useEffect, useMemo, useState } from "react";
 import ReactMarkdown from "react-markdown";
 import { NumberInput } from "../components/NumberInput";
@@ -89,6 +91,7 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
   const effectiveBatchSize = clampBatchSize(settings.batchSize, selectedCards.length);
   const displayedBatchSize = selectedCards.length ? effectiveBatchSize : 0;
   const currentCard = session && !session.finished ? session.cards[session.currentIndex] : null;
+  const sessionRef = usePracticePosition(currentCard?.id, active);
   const cardsByChapter = useMemo(() => {
     const counts = new Map<string, number>();
     for (const card of PHILOSOPHY_CARDS) {
@@ -108,7 +111,8 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
 
     const handleKeyDown = (event: KeyboardEvent) => {
       const target = event.target;
-      if (target instanceof HTMLInputElement || target instanceof HTMLTextAreaElement || target instanceof HTMLSelectElement) {
+      if (event.defaultPrevented || event.repeat || event.isComposing ||
+        (target instanceof HTMLElement && target.closest("input, textarea, select, button, [contenteditable='true']"))) {
         return;
       }
 
@@ -201,7 +205,7 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
   return (
     <section className={`workspace philosophy-workspace${active ? "" : " hidden-workspace"}`} aria-hidden={!active}>
       <div className="philosophy-layout">
-        <aside className="exercise-sidebar philosophy-sidebar" aria-label={uiText.philosophyChaptersAria}>
+        <PracticeControls className="exercise-sidebar philosophy-sidebar" label={`${uiText.chapters} · ${settings.selectedChapterIds.length}/6`}>
           <div className="philosophy-sidebar__heading">
             <div>
               <span className="eyebrow">{uiText.syllabus}</span>
@@ -254,7 +258,7 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
           {session && !session.finished ? (
             <p className="philosophy-sidebar__note">{uiText.selectionLocked}</p>
           ) : null}
-        </aside>
+        </PracticeControls>
 
         <div className="philosophy-main">
           {!session ? (
@@ -340,7 +344,7 @@ export function PhilosophyPracticeApp({ active }: { active: boolean }) {
               </div>
             </section>
           ) : currentCard ? (
-            <section className="philosophy-session">
+            <section className="philosophy-session" ref={sessionRef}>
               <div className="philosophy-session__topbar">
                 <div>
                   <span className="eyebrow">{uiText.cardProgress(session.currentIndex + 1, session.cards.length)}</span>
