@@ -35,3 +35,7 @@ streamlit run streamlit_app.py
 ```
 
 If no API key is configured, local examples and manually imported decks can still be used where supported.
+
+---
+
+Built by [Marton Vegh](https://marton.top/). Read the [project case study](https://marton.top/projects/habitro/).
